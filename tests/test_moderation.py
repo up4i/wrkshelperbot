@@ -57,3 +57,44 @@ async def test_mute_requires_reply():
 
     msg.reply_text.assert_called_once()
     assert "reply" in msg.reply_text.call_args[0][0].lower()
+
+@pytest.mark.asyncio
+async def test_ban_requires_reply():
+    from handlers.moderation import cmd_ban
+    msg = make_message("/ban")
+    msg.reply_to_message = None
+    update = make_update(msg)
+    ctx = make_context()
+
+    admin_member = MagicMock()
+    admin_member.status = "administrator"
+    ctx.bot.get_chat_member.return_value = admin_member
+    ctx.bot.ban_chat_member = AsyncMock()
+
+    with patch("handlers.moderation.config.DB_PATH", ":memory:"), \
+         patch("handlers.moderation.db.upsert_group", AsyncMock()), \
+         patch("handlers.moderation.db.get_group", AsyncMock(return_value={"log_channel_id": None})):
+        await cmd_ban(update, ctx)
+
+    msg.reply_text.assert_called_once()
+    assert "reply" in msg.reply_text.call_args[0][0].lower()
+
+@pytest.mark.asyncio
+async def test_kick_requires_reply():
+    from handlers.moderation import cmd_kick
+    msg = make_message("/kick")
+    msg.reply_to_message = None
+    update = make_update(msg)
+    ctx = make_context()
+
+    admin_member = MagicMock()
+    admin_member.status = "administrator"
+    ctx.bot.get_chat_member.return_value = admin_member
+
+    with patch("handlers.moderation.config.DB_PATH", ":memory:"), \
+         patch("handlers.moderation.db.upsert_group", AsyncMock()), \
+         patch("handlers.moderation.db.get_group", AsyncMock(return_value={"log_channel_id": None})):
+        await cmd_kick(update, ctx)
+
+    msg.reply_text.assert_called_once()
+    assert "reply" in msg.reply_text.call_args[0][0].lower()
