@@ -98,3 +98,65 @@ async def test_kick_requires_reply():
 
     msg.reply_text.assert_called_once()
     assert "reply" in msg.reply_text.call_args[0][0].lower()
+
+@pytest.mark.asyncio
+async def test_warn_increments_and_replies():
+    from handlers.moderation import cmd_warn
+    target = make_user(uid=555, username="badguy")
+    reply_msg = MagicMock(spec=Message)
+    reply_msg.from_user = target
+    reply_msg.delete = AsyncMock()
+
+    msg = make_message("/warn rulebreak", reply_to=reply_msg)
+    update = make_update(msg)
+    ctx = make_context(args=["rulebreak"])
+
+    admin_member = MagicMock(); admin_member.status = "administrator"
+    target_member = MagicMock(); target_member.status = "member"
+    ctx.bot.get_chat_member.side_effect = [admin_member, target_member]
+
+    with patch("handlers.moderation.config.DB_PATH", ":memory:"), \
+         patch("handlers.moderation.db.upsert_group", AsyncMock()), \
+         patch("handlers.moderation.db.get_group", AsyncMock(return_value={
+             "log_channel_id": None, "warn_limit": 3, "warn_action": "mute",
+             "warn_mute_duration": 3600, "default_mute_duration": None,
+         })), \
+         patch("handlers.moderation.db.add_warning", AsyncMock(return_value=1)), \
+         patch("handlers.moderation.db.add_punishment", AsyncMock()), \
+         patch("handlers.moderation.db.reset_warnings", AsyncMock()), \
+         patch("handlers.moderation.log_action", AsyncMock()):
+        await cmd_warn(update, ctx)
+
+    msg.reply_text.assert_called_once()
+    assert "⚠️" in msg.reply_text.call_args[0][0]
+
+@pytest.mark.asyncio
+async def test_warn_escalates_at_limit():
+    from handlers.moderation import cmd_warn
+    target = make_user(uid=555, username="badguy")
+    reply_msg = MagicMock(spec=Message)
+    reply_msg.from_user = target
+    reply_msg.delete = AsyncMock()
+
+    msg = make_message("/warn", reply_to=reply_msg)
+    update = make_update(msg)
+    ctx = make_context(args=[])
+    ctx.bot.restrict_chat_member = AsyncMock()
+
+    admin_member = MagicMock(); admin_member.status = "administrator"
+    target_member = MagicMock(); target_member.status = "member"
+    ctx.bot.get_chat_member.side_effect = [admin_member, target_member, target_member]
+
+    with patch("handlers.moderation.config.DB_PATH", ":memory:"), \
+         patch("handlers.moderation.db.upsert_group", AsyncMock()), \
+         patch("handlers.moderation.db.get_group", AsyncMock(return_value={
+             "log_channel_id": None, "warn_limit": 3, "warn_action": "mute",
+             "warn_mute_duration": 3600, "default_mute_duration": None,
+         })), \
+         patch("handlers.moderation.db.add_warning", AsyncMock(return_value=3)), \
+         patch("handlers.moderation.db.add_punishment", AsyncMock()), \
+         patch("handlers.moderation.db.reset_warnings", AsyncMock()), \
+         patch("handlers.moderation.log_action", AsyncMock()):
+        await cmd_warn(update, ctx)
+
+    ctx.bot.restrict_chat_member.assert_called_once()

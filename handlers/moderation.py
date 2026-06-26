@@ -295,8 +295,131 @@ async def cmd_dkick(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await _do_kick(update, ctx, delete_trigger=True)
 
 
-# Warn stubs — filled in Task 8
-async def cmd_warn(update, ctx): pass
-async def cmd_dwarn(update, ctx): pass
-async def cmd_warns(update, ctx): pass
-async def cmd_resetwarns(update, ctx): pass
+async def _do_warn(update: Update, ctx: ContextTypes.DEFAULT_TYPE, delete_trigger: bool):
+    msg = update.effective_message
+    chat_id = msg.chat.id
+
+    if not await is_admin(ctx.bot, chat_id, update.effective_user.id):
+        return
+
+    await db.upsert_group(config.DB_PATH, chat_id)
+    group = await db.get_group(config.DB_PATH, chat_id)
+
+    target_id, target_name, remaining = await _resolve_target(update, ctx)
+    if not target_id:
+        await msg.reply_text("Reply to a message to warn that user.")
+        return
+
+    if await is_admin(ctx.bot, chat_id, target_id):
+        await msg.reply_text("Can't warn an admin.")
+        return
+
+    reason = " ".join(remaining) or None
+    warn_limit = group.get("warn_limit", 3)
+    warn_action = group.get("warn_action", "mute")
+
+    count = await db.add_warning(config.DB_PATH, chat_id, target_id, reason or "")
+    await msg.reply_text(f"⚠️ {target_name} warned. ({count}/{warn_limit})" +
+                         (f"\nReason: {reason}" if reason else ""))
+
+    await log_action(
+        ctx.bot, group.get("log_channel_id"),
+        action="warn", target_id=target_id, target_name=target_name,
+        admin_name=display_name(update.effective_user),
+        group_id=chat_id, group_name=msg.chat.title or str(chat_id),
+        reason=reason, warn_count=count, warn_limit=warn_limit,
+    )
+
+    if count >= warn_limit:
+        await db.reset_warnings(config.DB_PATH, chat_id, target_id)
+        if warn_action == "ban":
+            try:
+                await ctx.bot.ban_chat_member(chat_id, target_id)
+            except TelegramError:
+                pass
+            await log_action(
+                ctx.bot, group.get("log_channel_id"),
+                action="ban", target_id=target_id, target_name=target_name,
+                admin_name="Auto (warn limit)",
+                group_id=chat_id, group_name=msg.chat.title or str(chat_id),
+                reason=f"Reached warn limit ({warn_limit})",
+            )
+        else:
+            dur = group.get("warn_mute_duration", 3600)
+            until = datetime.fromtimestamp(time.time() + dur, tz=timezone.utc)
+            try:
+                await ctx.bot.restrict_chat_member(chat_id, target_id, _MUTED_PERMS, until_date=until)
+                await db.add_punishment(config.DB_PATH, chat_id, target_id, "mute", int(time.time()) + dur)
+            except TelegramError:
+                pass
+            await log_action(
+                ctx.bot, group.get("log_channel_id"),
+                action="mute", target_id=target_id, target_name=target_name,
+                admin_name="Auto (warn limit)",
+                group_id=chat_id, group_name=msg.chat.title or str(chat_id),
+                reason=f"Reached warn limit ({warn_limit})", duration_secs=dur,
+            )
+
+    if delete_trigger and msg.reply_to_message:
+        try:
+            await msg.reply_to_message.delete()
+        except TelegramError:
+            pass
+
+
+async def cmd_warn(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    await _do_warn(update, ctx, delete_trigger=False)
+
+async def cmd_dwarn(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    await _do_warn(update, ctx, delete_trigger=True)
+
+
+async def cmd_warns(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    chat_id = msg.chat.id
+
+    if not await is_admin(ctx.bot, chat_id, update.effective_user.id):
+        return
+
+    target_id, target_name, _ = await _resolve_target(update, ctx)
+    if not target_id:
+        await msg.reply_text("Reply to a message to check that user's warns.")
+        return
+
+    row = await db.get_warnings(config.DB_PATH, chat_id, target_id)
+    group = await db.get_group(config.DB_PATH, chat_id)
+    limit = group.get("warn_limit", 3) if group else 3
+
+    if not row or row["count"] == 0:
+        await msg.reply_text(f"{target_name} has no warnings.")
+    else:
+        await msg.reply_text(
+            f"⚠️ {target_name}: {row['count']}/{limit} warns\n"
+            f"Last reason: {row['last_reason'] or 'none'}"
+        )
+
+
+async def cmd_resetwarns(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    chat_id = msg.chat.id
+
+    if not await is_admin(ctx.bot, chat_id, update.effective_user.id):
+        return
+
+    await db.upsert_group(config.DB_PATH, chat_id)
+    group = await db.get_group(config.DB_PATH, chat_id)
+
+    target_id, target_name, _ = await _resolve_target(update, ctx)
+    if not target_id:
+        await msg.reply_text("Reply to a message to reset that user's warns.")
+        return
+
+    await db.reset_warnings(config.DB_PATH, chat_id, target_id)
+    await msg.reply_text(f"🔄 {target_name}'s warnings have been reset.")
+
+    await log_action(
+        ctx.bot, group.get("log_channel_id"),
+        action="resetwarns", target_id=target_id, target_name=target_name,
+        admin_name=display_name(update.effective_user),
+        group_id=chat_id, group_name=msg.chat.title or str(chat_id),
+    )
