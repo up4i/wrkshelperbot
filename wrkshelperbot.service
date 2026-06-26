@@ -1,0 +1,15 @@
+[Unit]
+Description=wrkshelperbot Telegram Group Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ogkush/Projects/wrkshelperbot
+ExecStart=/usr/bin/python3 /home/ogkush/Projects/wrkshelperbot/bot.py
+Restart=on-failure
+RestartSec=10
+Environment=HOME=/home/ogkush
+
+[Install]
+WantedBy=default.target
