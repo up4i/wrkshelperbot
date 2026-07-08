@@ -423,3 +423,175 @@ async def cmd_resetwarns(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         admin_name=display_name(update.effective_user),
         group_id=chat_id, group_name=msg.chat.title or str(chat_id),
     )
+
+
+async def cmd_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    chat_id = msg.chat.id
+
+    if not msg.reply_to_message:
+        await msg.reply_text("Reply to a message to report it.")
+        return
+
+    reporter = update.effective_user
+    target = msg.reply_to_message
+    reason = " ".join(ctx.args) if ctx.args else None
+
+    group = await db.get_group(config.DB_PATH, chat_id)
+    log_channel_id = group.get("log_channel_id") if group else None
+
+    target_user = target.from_user
+    target_name = display_name(target_user) if target_user else "Unknown"
+    target_id_str = str(target_user.id) if target_user else "?"
+
+    header = (
+        f"📢 *User Report*\n"
+        f"Reporter: {display_name(reporter)} (`{reporter.id}`)\n"
+        f"Reported: {target_name} (`{target_id_str}`)\n"
+        f"Group: {msg.chat.title or str(chat_id)}"
+        + (f"\nReason: {reason}" if reason else "")
+    )
+
+    admins = await ctx.bot.get_chat_administrators(chat_id)
+
+    if log_channel_id:
+        try:
+            await ctx.bot.send_message(log_channel_id, header, parse_mode="Markdown")
+            await ctx.bot.copy_message(log_channel_id, chat_id, target.message_id)
+        except TelegramError:
+            pass
+    else:
+        for m in admins:
+            if m.user.is_bot:
+                continue
+            try:
+                await ctx.bot.send_message(m.user.id, header, parse_mode="Markdown")
+                await ctx.bot.copy_message(m.user.id, chat_id, target.message_id)
+            except TelegramError:
+                pass
+
+    tags = [f"@{m.user.username}" for m in admins if m.user.username and not m.user.is_bot]
+    ack = "✅ Report sent to admins." + ("\n" + " ".join(tags) if tags else "")
+    await msg.reply_text(ack)
+
+
+async def _delete_msg_job(ctx: ContextTypes.DEFAULT_TYPE):
+    chat_id, msg_id = ctx.job.data
+    try:
+        await ctx.bot.delete_message(chat_id, msg_id)
+    except TelegramError:
+        pass
+
+
+async def cmd_purge(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    chat_id = msg.chat.id
+
+    if not await is_admin(ctx.bot, chat_id, update.effective_user.id):
+        return
+
+    if msg.reply_to_message:
+        start_id = msg.reply_to_message.message_id
+        end_id = msg.message_id
+        ids = list(range(start_id, end_id + 1))
+    elif ctx.args:
+        try:
+            n = max(1, min(int(ctx.args[0]), 200))
+        except ValueError:
+            await msg.reply_text(
+                "Usage: `/purge [N]` or reply to a message.", parse_mode="Markdown"
+            )
+            return
+        ids = list(range(msg.message_id - n, msg.message_id + 1))
+    else:
+        await msg.reply_text(
+            "Reply to a message to purge from there, or use `/purge N`.", parse_mode="Markdown"
+        )
+        return
+
+    for i in range(0, len(ids), 100):
+        try:
+            await ctx.bot.delete_messages(chat_id, ids[i:i + 100])
+        except TelegramError:
+            pass
+
+    notice = await ctx.bot.send_message(chat_id, f"🗑 Purged {len(ids)} message(s).")
+    ctx.job_queue.run_once(_delete_msg_job, 5, data=(chat_id, notice.message_id))
+
+
+async def cmd_promote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    chat_id = msg.chat.id
+
+    if not await is_admin(ctx.bot, chat_id, update.effective_user.id):
+        return
+
+    target_id, target_name, _ = await _resolve_target(update, ctx)
+    if not target_id:
+        await msg.reply_text("Reply to a user to promote them.")
+        return
+
+    try:
+        await ctx.bot.promote_chat_member(
+            chat_id, target_id,
+            can_manage_chat=True,
+            can_delete_messages=True,
+            can_manage_video_chats=True,
+            can_restrict_members=True,
+            can_pin_messages=True,
+            can_change_info=True,
+            can_invite_users=True,
+            can_promote_members=False,
+            is_anonymous=False,
+        )
+    except TelegramError as e:
+        await msg.reply_text(f"Failed to promote: {e}")
+        return
+
+    await msg.reply_text(f"⬆️ {target_name} promoted to admin.")
+    group = await db.get_group(config.DB_PATH, chat_id)
+    await log_action(
+        ctx.bot, group.get("log_channel_id") if group else None,
+        action="promote", target_id=target_id, target_name=target_name,
+        admin_name=display_name(update.effective_user),
+        group_id=chat_id, group_name=msg.chat.title or str(chat_id),
+    )
+
+
+async def cmd_demote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    chat_id = msg.chat.id
+
+    if not await is_admin(ctx.bot, chat_id, update.effective_user.id):
+        return
+
+    target_id, target_name, _ = await _resolve_target(update, ctx)
+    if not target_id:
+        await msg.reply_text("Reply to a user to demote them.")
+        return
+
+    try:
+        await ctx.bot.promote_chat_member(
+            chat_id, target_id,
+            can_manage_chat=False,
+            can_delete_messages=False,
+            can_manage_video_chats=False,
+            can_restrict_members=False,
+            can_pin_messages=False,
+            can_change_info=False,
+            can_invite_users=False,
+            can_promote_members=False,
+            is_anonymous=False,
+        )
+    except TelegramError as e:
+        await msg.reply_text(f"Failed to demote: {e}")
+        return
+
+    await msg.reply_text(f"⬇️ {target_name} demoted.")
+    group = await db.get_group(config.DB_PATH, chat_id)
+    await log_action(
+        ctx.bot, group.get("log_channel_id") if group else None,
+        action="demote", target_id=target_id, target_name=target_name,
+        admin_name=display_name(update.effective_user),
+        group_id=chat_id, group_name=msg.chat.title or str(chat_id),
+    )

@@ -1,5 +1,6 @@
 import logging
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 import config
@@ -9,10 +10,159 @@ from utils import is_admin
 log = logging.getLogger(__name__)
 
 
+# ── Help pages ──────────────────────────────────────────────────────────────────
+
+_PAGES = {
+    "mod": (
+        "🚨 *Moderation*\n\n"
+        "`/warn [reason]` — warn replied user; auto-punishes at limit\n"
+        "`/dwarn` — warn + delete the message\n"
+        "`/warns` — check warns (reply)\n"
+        "`/resetwarns` — clear warns (reply)\n"
+        "`/mute [dur] [reason]` — mute (reply)\n"
+        "`/dmute` — mute + delete the message\n"
+        "`/unmute` — remove mute (reply)\n"
+        "`/ban [dur] [reason]` — ban; no duration = permanent\n"
+        "`/dban` — ban + delete the message\n"
+        "`/unban` — unban (reply)\n"
+        "`/kick` — kick (reply)\n"
+        "`/dkick` — kick + delete the message\n"
+        "`/promote` — make replied user an admin\n"
+        "`/demote` — remove replied user's admin rights\n"
+        "`/purge [N]` — delete from replied message, or last N messages\n"
+        "`/report [reason]` — report a message to admins _(any user)_\n"
+        "`/dlog` — delete replied message and forward to log channel\n\n"
+        "⏱ _Duration format:_ `30s` · `5m` · `2h` · `1d` · `1w`"
+    ),
+    "protection": (
+        "🛡️ *Protection*\n\n"
+        "⚡ *Antiflood*\n"
+        "`/setflood <N> [secs]` — trigger after N msgs in window (0 = off)\n"
+        "`/setfloodaction <mute|kick|ban> [mute\\_secs]`\n"
+        "`/antiflood` — show current settings\n\n"
+        "🚫 *Blocklist*\n"
+        "`/addblocked <word or phrase>`\n"
+        "`/removeblocked <word or phrase>`\n"
+        "`/blocklist` — list all blocked patterns\n"
+        "`/setblocklistaction <delete|warn|mute|ban>`\n\n"
+        "🔒 *Locks*\n"
+        "`/lock <type>` · `/unlock <type>` · `/locks`\n"
+        "_Types:_ `links` `forwards` `stickers` `photos`\n"
+        "`videos` `audios` `documents` `gifs` `polls` `all`\n\n"
+        "🚨 *Antiraid*\n"
+        "`/antiraid on|off`\n"
+        "`/setantiraid <joins> <secs> [mute\\_secs]`\n\n"
+        "😇 *Halo* — exempt a user from all protection\n"
+        "`/givehalo` · `/removehalo` — reply to a user"
+    ),
+    "group": (
+        "👥 *Group*\n\n"
+        "`/admins` — list admins with custom titles\n"
+        "`/rules` — show rules; reply to a user to DM them the rules\n"
+        "`/setrules <text>` — set group rules _(reply to message or inline)_\n"
+        "`/me` — your info + warns, sent to your DMs\n"
+        "`/report [reason]` — report a message to admins _(any user)_\n\n"
+        "👋 *Welcome & Goodbye*\n"
+        "`/setwelcome <text|off>` · `/welcome` — view/edit welcome\n"
+        "`/setgoodbye <text|off>` · `/goodbye` — view/edit goodbye\n"
+        "_Variables:_ `{name}` `{id}` `{mention}` `{username}` `{group}`\n\n"
+        "📊 *Activity*\n"
+        "`/inactives [days] [kick|ban]` — users silent for N days\n\n"
+        "📦 *Settings*\n"
+        "`/exportsettings` — download config as JSON\n"
+        "`/importsettings` — restore config from JSON file"
+    ),
+    "autoreply": (
+        "🤖 *Autoreplies*\n\n"
+        "`/addautoreply trigger | text response`\n"
+        "└ Text supports Markdown and `[Button](url)` for inline buttons\n\n"
+        "`/addautoreply trigger` _(reply to a photo/gif/sticker/video)_\n"
+        "└ Saves that media as the response\n\n"
+        "`/removeautoreply <trigger>` — remove a trigger\n"
+        "`/autoreplies` — list all triggers for this group\n\n"
+        "_Matching is case-insensitive, word-boundary. First match wins._"
+    ),
+    "setup": (
+        "⚙️ *Setup & Info*\n\n"
+        "`/setup` — open per-group config panel\n"
+        "`/connect` — configure this group in your DMs\n"
+        "`/setlog @channel` — set audit log channel\n"
+        "`/cleanservice on|off` — auto-delete join/leave/pin service messages\n\n"
+        "ℹ️ *Info*\n"
+        "`/id` — show your ID and chat ID\n"
+        "`/info` — detailed user info (reply)\n"
+        "`/help` — this menu"
+    ),
+}
+
+_PAGE_BACK = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="help:main")]])
+
+_MAIN_TEXT = "🤖 *wrkshelperbot* — pick a section:"
+
+def _main_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🚨 Moderation",  callback_data="help:mod"),
+            InlineKeyboardButton("🛡️ Protection",   callback_data="help:protection"),
+        ],
+        [
+            InlineKeyboardButton("👥 Group",        callback_data="help:group"),
+            InlineKeyboardButton("🤖 Autoreplies",  callback_data="help:autoreply"),
+        ],
+        [
+            InlineKeyboardButton("⚙️ Setup & Info", callback_data="help:setup"),
+            InlineKeyboardButton("❌ Close",         callback_data="help:close"),
+        ],
+    ])
+
+
+async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    await update.effective_message.reply_text(
+        _MAIN_TEXT, parse_mode="Markdown", reply_markup=_main_kb()
+    )
+
+
+async def help_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    page = query.data.split(":", 1)[1]
+
+    if page == "close":
+        try:
+            await query.message.delete()
+        except TelegramError:
+            pass
+        return
+
+    if page == "main":
+        await query.edit_message_text(_MAIN_TEXT, parse_mode="Markdown", reply_markup=_main_kb())
+        return
+
+    content = _PAGES.get(page)
+    if content:
+        await query.edit_message_text(content, parse_mode="Markdown", reply_markup=_PAGE_BACK)
+
+
 async def on_any_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Auto-register new groups with default settings on first message."""
+    """Auto-register new groups and track user activity."""
     chat_id = update.effective_chat.id
     await db.upsert_group(config.DB_PATH, chat_id)
+    user = update.effective_user
+    if user and not user.is_bot:
+        await db.update_activity(config.DB_PATH, chat_id, user.id, user.username, user.full_name)
+
+
+async def on_service_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Delete join/leave/pin service messages if clean_service_msgs is enabled."""
+    msg = update.effective_message
+    if not msg:
+        return
+    group = await db.get_group(config.DB_PATH, msg.chat.id)
+    if group and group.get("clean_service_msgs"):
+        try:
+            await msg.delete()
+        except TelegramError:
+            pass
 
 
 async def cmd_id(update: Update, ctx: ContextTypes.DEFAULT_TYPE):

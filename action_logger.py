@@ -7,6 +7,7 @@ from utils import format_duration
 _EMOJI = {
     "ban": "🔨", "mute": "🔇", "kick": "👢", "warn": "⚠️",
     "unban": "✅", "unmute": "🔊", "resetwarns": "🔄",
+    "promote": "⬆️", "demote": "⬇️",
 }
 
 def build_log_message(

@@ -25,12 +25,66 @@ CREATE TABLE IF NOT EXISTS punishments (
     action TEXT,
     expires_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS halo_users (
+    chat_id INTEGER,
+    user_id INTEGER,
+    PRIMARY KEY (chat_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS user_activity (
+    chat_id INTEGER,
+    user_id INTEGER,
+    username TEXT,
+    full_name TEXT,
+    last_seen INTEGER,
+    PRIMARY KEY (chat_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS autoreplies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id INTEGER,
+    trigger TEXT COLLATE NOCASE,
+    response_type TEXT,
+    response_content TEXT,
+    response_caption TEXT,
+    UNIQUE(chat_id, trigger)
+);
+CREATE TABLE IF NOT EXISTS blocklist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id INTEGER,
+    pattern TEXT COLLATE NOCASE,
+    UNIQUE(chat_id, pattern)
+);
 """
+
+async def _migrate(db) -> None:
+    async with db.execute("PRAGMA table_info(groups)") as cur:
+        cols = {row[1] async for row in cur}
+    new_cols = {
+        "rules": "TEXT",
+        "clean_service_msgs": "INTEGER DEFAULT 0",
+        "welcome_text": "TEXT",
+        "welcome_enabled": "INTEGER DEFAULT 1",
+        "goodbye_text": "TEXT",
+        "goodbye_enabled": "INTEGER DEFAULT 1",
+        "flood_limit": "INTEGER DEFAULT 0",
+        "flood_window": "INTEGER DEFAULT 30",
+        "flood_action": "TEXT DEFAULT 'mute'",
+        "flood_mute_duration": "INTEGER DEFAULT 600",
+        "blocklist_action": "TEXT DEFAULT 'delete'",
+        "locks": "TEXT",
+        "antiraid_enabled": "INTEGER DEFAULT 0",
+        "antiraid_limit": "INTEGER DEFAULT 5",
+        "antiraid_window": "INTEGER DEFAULT 30",
+        "antiraid_mute_duration": "INTEGER DEFAULT 600",
+    }
+    for col, typedef in new_cols.items():
+        if col not in cols:
+            await db.execute(f"ALTER TABLE groups ADD COLUMN {col} {typedef}")
+            await db.commit()
 
 async def init_db(db_path: str) -> None:
     async with aiosqlite.connect(db_path) as db:
         await db.executescript(_SCHEMA)
-        await db.commit()
+        await _migrate(db)
 
 async def upsert_group(db_path: str, chat_id: int) -> None:
     async with aiosqlite.connect(db_path) as db:
@@ -117,3 +171,120 @@ async def delete_punishment_by_id(db_path: str, punishment_id: int) -> None:
     async with aiosqlite.connect(db_path) as db:
         await db.execute("DELETE FROM punishments WHERE id = ?", (punishment_id,))
         await db.commit()
+
+# --- halo ---
+
+async def give_halo(db_path: str, chat_id: int, user_id: int) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO halo_users (chat_id, user_id) VALUES (?, ?)",
+            (chat_id, user_id),
+        )
+        await db.commit()
+
+async def remove_halo(db_path: str, chat_id: int, user_id: int) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "DELETE FROM halo_users WHERE chat_id = ? AND user_id = ?",
+            (chat_id, user_id),
+        )
+        await db.commit()
+
+async def has_halo(db_path: str, chat_id: int, user_id: int) -> bool:
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "SELECT 1 FROM halo_users WHERE chat_id = ? AND user_id = ?",
+            (chat_id, user_id),
+        ) as cur:
+            return await cur.fetchone() is not None
+
+# --- user activity ---
+
+async def update_activity(
+    db_path: str, chat_id: int, user_id: int, username: str | None, full_name: str
+) -> None:
+    now = int(time.time())
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            """INSERT INTO user_activity (chat_id, user_id, username, full_name, last_seen)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(chat_id, user_id) DO UPDATE SET
+                   username = excluded.username,
+                   full_name = excluded.full_name,
+                   last_seen = excluded.last_seen""",
+            (chat_id, user_id, username, full_name, now),
+        )
+        await db.commit()
+
+# --- blocklist ---
+
+async def add_blocked_pattern(db_path: str, chat_id: int, pattern: str) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO blocklist (chat_id, pattern) VALUES (?, ?)",
+            (chat_id, pattern),
+        )
+        await db.commit()
+
+async def remove_blocked_pattern(db_path: str, chat_id: int, pattern: str) -> bool:
+    async with aiosqlite.connect(db_path) as db:
+        cur = await db.execute(
+            "DELETE FROM blocklist WHERE chat_id = ? AND pattern = ?",
+            (chat_id, pattern),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+async def get_blocklist(db_path: str, chat_id: int) -> list[str]:
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "SELECT pattern FROM blocklist WHERE chat_id = ? ORDER BY pattern", (chat_id,)
+        ) as cur:
+            return [row[0] async for row in cur]
+
+# --- autoreplies ---
+
+async def add_autoreply(
+    db_path: str, chat_id: int, trigger: str, response_type: str,
+    response_content: str, response_caption: str | None = None,
+) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            """INSERT INTO autoreplies (chat_id, trigger, response_type, response_content, response_caption)
+               VALUES (?, ?, ?, ?, ?)
+               ON CONFLICT(chat_id, trigger) DO UPDATE SET
+                   response_type = excluded.response_type,
+                   response_content = excluded.response_content,
+                   response_caption = excluded.response_caption""",
+            (chat_id, trigger, response_type, response_content, response_caption),
+        )
+        await db.commit()
+
+async def remove_autoreply(db_path: str, chat_id: int, trigger: str) -> bool:
+    async with aiosqlite.connect(db_path) as db:
+        cur = await db.execute(
+            "DELETE FROM autoreplies WHERE chat_id = ? AND trigger = ?",
+            (chat_id, trigger),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+async def get_autoreplies(db_path: str, chat_id: int) -> list[dict]:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM autoreplies WHERE chat_id = ? ORDER BY trigger", (chat_id,)
+        ) as cur:
+            return [dict(r) async for r in cur]
+
+async def get_inactives(db_path: str, chat_id: int, since_ts: int) -> list[dict]:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT user_id, username, full_name, last_seen
+               FROM user_activity
+               WHERE chat_id = ? AND last_seen < ?
+               ORDER BY last_seen ASC""",
+            (chat_id, since_ts),
+        ) as cur:
+            return [dict(r) async for r in cur]

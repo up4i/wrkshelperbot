@@ -12,9 +12,28 @@ from handlers.moderation import (
     cmd_ban, cmd_dban, cmd_unban,
     cmd_kick, cmd_dkick,
     cmd_warn, cmd_dwarn, cmd_warns, cmd_resetwarns,
+    cmd_report, cmd_purge, cmd_promote, cmd_demote,
 )
-from handlers.setup import cmd_setup, setup_callback
-from handlers.admin import cmd_id, cmd_info, cmd_setlog, on_any_message
+from handlers.setup import cmd_setup, setup_callback, cmd_connect, cmd_start, dsetup_callback
+from handlers.autoreply import cmd_addautoreply, cmd_removeautoreply, cmd_autoreplies, on_message_autoreply
+from handlers.protection import (
+    cmd_setflood, cmd_setfloodaction, cmd_antiflood,
+    cmd_addblocked, cmd_removeblocked, cmd_blocklist, cmd_setblocklistaction,
+    cmd_lock, cmd_unlock, cmd_locks,
+    cmd_antiraid, cmd_setantiraid,
+    on_protection_check, on_antiraid_check,
+)
+from handlers.admin import cmd_id, cmd_info, cmd_setlog, cmd_help, help_callback, on_any_message, on_service_message
+from handlers.utility import (
+    cmd_admins, cmd_rules, cmd_setrules, cmd_me, cmd_dlog, cmd_cleanservice,
+    cmd_givehalo, cmd_removehalo,
+    cmd_exportsettings, cmd_importsettings,
+    cmd_inactives,
+)
+from handlers.welcome import (
+    cmd_setwelcome, cmd_setgoodbye, cmd_welcome, cmd_goodbye,
+    on_new_member, on_member_left,
+)
 
 os.makedirs(os.path.dirname(config.LOG_FILE), exist_ok=True)
 os.makedirs(os.path.dirname(config.DB_PATH), exist_ok=True)
@@ -45,12 +64,75 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("dwarn",      cmd_dwarn))
     app.add_handler(CommandHandler("warns",      cmd_warns))
     app.add_handler(CommandHandler("resetwarns", cmd_resetwarns))
-    app.add_handler(CommandHandler("setup",      cmd_setup))
-    app.add_handler(CommandHandler("id",         cmd_id))
-    app.add_handler(CommandHandler("info",       cmd_info))
-    app.add_handler(CommandHandler("setlog",     cmd_setlog))
-    app.add_handler(CallbackQueryHandler(setup_callback, pattern=r"^setup:"))
+    app.add_handler(CommandHandler("report",     cmd_report))
+    app.add_handler(CommandHandler("purge",      cmd_purge))
+    app.add_handler(CommandHandler("promote",    cmd_promote))
+    app.add_handler(CommandHandler("demote",     cmd_demote))
+    app.add_handler(CommandHandler("setup",        cmd_setup))
+    app.add_handler(CommandHandler("help",         cmd_help))
+    app.add_handler(CommandHandler("id",           cmd_id))
+    app.add_handler(CommandHandler("info",         cmd_info))
+    app.add_handler(CommandHandler("setlog",       cmd_setlog))
+    app.add_handler(CommandHandler("admins",       cmd_admins))
+    app.add_handler(CommandHandler("rules",        cmd_rules))
+    app.add_handler(CommandHandler("setrules",     cmd_setrules))
+    app.add_handler(CommandHandler("me",           cmd_me))
+    app.add_handler(CommandHandler("dlog",           cmd_dlog))
+    app.add_handler(CommandHandler("cleanservice",   cmd_cleanservice))
+    app.add_handler(CommandHandler("setwelcome",     cmd_setwelcome))
+    app.add_handler(CommandHandler("setgoodbye",     cmd_setgoodbye))
+    app.add_handler(CommandHandler("welcome",        cmd_welcome))
+    app.add_handler(CommandHandler("goodbye",        cmd_goodbye))
+    app.add_handler(CommandHandler("givehalo",       cmd_givehalo))
+    app.add_handler(CommandHandler("removehalo",     cmd_removehalo))
+    app.add_handler(CommandHandler("exportsettings", cmd_exportsettings))
+    app.add_handler(CommandHandler("importsettings", cmd_importsettings))
+    app.add_handler(CommandHandler("inactives",        cmd_inactives))
+    app.add_handler(CommandHandler("connect",          cmd_connect))
+    app.add_handler(CommandHandler("start",            cmd_start, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("addautoreply",       cmd_addautoreply))
+    app.add_handler(CommandHandler("removeautoreply",    cmd_removeautoreply))
+    app.add_handler(CommandHandler("autoreplies",        cmd_autoreplies))
+    app.add_handler(CommandHandler("setflood",           cmd_setflood))
+    app.add_handler(CommandHandler("setfloodaction",     cmd_setfloodaction))
+    app.add_handler(CommandHandler("antiflood",          cmd_antiflood))
+    app.add_handler(CommandHandler("addblocked",         cmd_addblocked))
+    app.add_handler(CommandHandler("removeblocked",      cmd_removeblocked))
+    app.add_handler(CommandHandler("blocklist",          cmd_blocklist))
+    app.add_handler(CommandHandler("setblocklistaction", cmd_setblocklistaction))
+    app.add_handler(CommandHandler("lock",               cmd_lock))
+    app.add_handler(CommandHandler("unlock",             cmd_unlock))
+    app.add_handler(CommandHandler("locks",              cmd_locks))
+    app.add_handler(CommandHandler("antiraid",           cmd_antiraid))
+    app.add_handler(CommandHandler("setantiraid",        cmd_setantiraid))
+    app.add_handler(CallbackQueryHandler(setup_callback,  pattern=r"^setup:"))
+    app.add_handler(CallbackQueryHandler(dsetup_callback, pattern=r"^dsetup:"))
+    app.add_handler(CallbackQueryHandler(help_callback,   pattern=r"^help:"))
     app.add_handler(MessageHandler(filters.ChatType.GROUPS & filters.ALL, on_any_message))
+    app.add_handler(
+        MessageHandler(filters.ChatType.GROUPS & filters.StatusUpdate.ALL, on_service_message),
+        group=1,
+    )
+    app.add_handler(
+        MessageHandler(filters.ChatType.GROUPS & filters.StatusUpdate.NEW_CHAT_MEMBERS, on_new_member),
+        group=2,
+    )
+    app.add_handler(
+        MessageHandler(filters.ChatType.GROUPS & filters.StatusUpdate.LEFT_CHAT_MEMBER, on_member_left),
+        group=2,
+    )
+    app.add_handler(
+        MessageHandler(filters.ChatType.GROUPS & filters.TEXT & ~filters.COMMAND, on_message_autoreply),
+        group=3,
+    )
+    app.add_handler(
+        MessageHandler(filters.ChatType.GROUPS & ~filters.COMMAND & ~filters.StatusUpdate.ALL, on_protection_check),
+        group=4,
+    )
+    app.add_handler(
+        MessageHandler(filters.ChatType.GROUPS & filters.StatusUpdate.NEW_CHAT_MEMBERS, on_antiraid_check),
+        group=5,
+    )
 
     app.job_queue.run_repeating(sweep_punishments, interval=60, first=10)
 
