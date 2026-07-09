@@ -462,8 +462,8 @@ async def gift_offer_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await query.answer("You no longer own that gift.", show_alert=True)
         return
 
-    seller_wallet = await db.get_wallet(config.DB_PATH, from_user_id)
-    if not seller_wallet or seller_wallet["balance"] < offer["wrk_offered"]:
+    buyer_wallet = await db.get_wallet(config.DB_PATH, from_user_id)
+    if not buyer_wallet or buyer_wallet["balance"] < offer["wrk_offered"]:
         await db.update_offer_status(config.DB_PATH, offer_id, "declined")
         await query.answer("The buyer no longer has enough WRK$.", show_alert=True)
         return
