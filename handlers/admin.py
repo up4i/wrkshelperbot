@@ -95,6 +95,31 @@ _PAGES = {
         "`/help` — this menu\n"
         "`/econhelp` — economy command reference"
     ),
+    "gifts": (
+        "🎁 *Gifts*\n\n"
+        "Collect, trade, and flex unique animated gift models.\n"
+        "Each gift has a *model* (the art style) and a *background* (color rarity).\n\n"
+        "🏪 *Shop*\n"
+        "`/shop` — browse all collections with inline pages\n"
+        "`/shop <collection>` — see models & prices for one collection\n"
+        "└ e.g. `/shop scared cat` or `/shop scared_cat`\n\n"
+        "🛒 *Buying & Selling*\n"
+        "`/buy <collection> <#> <bg>` — buy from bank\n"
+        "└ e.g. `/buy scared cat 12 black`\n"
+        "`/sell <collection> <#> <bg>` — sell back (80% of market price)\n\n"
+        "🎒 *Inventory*\n"
+        "`/inv` — browse your gifts with inline pages\n"
+        "`/gift <collection> <#> [bg]` — flex a gift in chat\n\n"
+        "🤝 *Trading*\n"
+        "`/offer @user <amount> for <collection> <#> <bg>`\n"
+        "└ Send a WRK$ offer to buy someone's gift\n"
+        "`/offers` — view your pending offers\n\n"
+        "🎨 *Backgrounds* (rarity multiplier)\n"
+        "⬛ Black 3x · 🖤 Onyx 2.5x · 🟣 Grape 2x\n"
+        "🟢 Emerald 1.5x · 🔵 Midnight 1.2x · 🟠 Orange 1x\n\n"
+        "💰 *Tiers*\n"
+        "🟡 High — 1.5M–8M+ WRK$ · 🔵 Mid — 70k–900k · ⚪ Low — 7k–100k"
+    ),
     "economy": (
         "💰 *Economy — WRK$*\n\n"
         "💼 *Wallet*\n"
@@ -139,9 +164,10 @@ def _main_kb() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("💰 Economy",      callback_data="help:economy"),
-            InlineKeyboardButton("⚙️ Setup & Info", callback_data="help:setup"),
+            InlineKeyboardButton("🎁 Gifts",        callback_data="help:gifts"),
         ],
         [
+            InlineKeyboardButton("⚙️ Setup & Info", callback_data="help:setup"),
             InlineKeyboardButton("❌ Close",         callback_data="help:close"),
         ],
     ])
