@@ -228,35 +228,29 @@ async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 # ── /work + /jobs ─────────────────────────────────────────────────────────────
+# Each job tier has its own mini-game. Players answer a quick question (3 options)
+# and always earn something — correct earns full reward, wrong earns 30% consolation.
+# Cooldown: 2 minutes between plays, so it's quickly repeatable for small checks.
 
+# (min_shifts, title, win_low, win_high)
 _JOBS = [
-    (0,   "🧑‍🎓 Crypto Intern",      100,  400),
-    (10,  "📈 Degen Trader",         250,  700),
-    (25,  "🌾 Yield Farmer",         400, 1000),
-    (50,  "🔍 On-Chain Analyst",     600, 1400),
-    (100, "⚙️ Protocol Dev",         900, 2000),
-    (200, "🦈 Blockchain Shark",    1300, 2800),
-    (500, "👑 Blockchain Baron",    2000, 4000),
+    (0,   "🧑‍🎓 Crypto Intern",    50,   200),
+    (10,  "📈 Degen Trader",       100,  400),
+    (25,  "🌾 Yield Farmer",       200,  700),
+    (50,  "🔍 On-Chain Analyst",   350, 1000),
+    (100, "⚙️ Protocol Dev",       500, 1500),
+    (200, "🦈 Blockchain Shark",   800, 2200),
+    (500, "👑 Blockchain Baron",  1200, 3000),
 ]
 
-_WORK_LINES = [
-    "you audited a smart contract and caught a reentrancy bug",
-    "you wrote a thread about {token} and it got 200 likes",
-    "you ran a node for 4 hours and collected validator rewards",
-    "you reviewed a whitepaper and submitted a report",
-    "you deployed a test contract on the testnet",
-    "you spotted a MEV opportunity in the mempool",
-    "you yield-farmed on a DEX for a shift",
-    "you answered support tickets in a crypto Discord",
-    "you backtested a trading strategy and it printed",
-    "you traced a suspicious wallet for a security firm",
-    "you minted a batch of NFTs and listed them above floor",
-    "you ran arbitrage between two DEX pools",
-]
+_WORK_COOLDOWN = 120   # 2 minutes
+_WORK_CONSOLATION = 0.3  # 30% of win reward on wrong answer
+_work_games: dict[int, dict] = {}  # user_id -> active game state
+_work_cooldowns: dict[int, float] = {}  # user_id -> last claimed timestamp
 
-_WORK_TOKENS = ["GRAM", "TON", "BTC", "ETH", "SOL"]
-
-_WORK_COOLDOWN = 4 * 3600  # 4 hours
+_TOKENS = ["BTC", "ETH", "SOL", "TON", "GRAM", "MATIC", "AVAX", "ARB"]
+_PROTOCOLS = ["Uniswap", "Curve", "Aave", "Compound", "Lido", "Yearn", "dYdX"]
+_PAIRS = ["ETH/USDC", "BTC/ETH", "SOL/USDC", "TON/USDT", "GRAM/TON", "ARB/ETH"]
 
 
 def _get_job(work_count: int) -> tuple:
@@ -268,10 +262,110 @@ def _get_job(work_count: int) -> tuple:
 
 
 def _next_job(work_count: int) -> tuple | None:
-    for i, tier in enumerate(_JOBS):
+    for tier in _JOBS:
         if work_count < tier[0]:
             return tier
     return None
+
+
+def _gen_game(tier_index: int) -> dict:
+    """Generate a mini-game for the given tier. Returns {prompt, options, correct}."""
+    if tier_index == 0:
+        # Intern: find the cheapest gas fee
+        fees = sorted([random.randint(10, 200) for _ in range(3)])
+        shuffled = fees[:]
+        random.shuffle(shuffled)
+        correct = shuffled.index(min(shuffled))
+        return {
+            "prompt": "⛽ *Mempool is congested.* Which pending TX has the lowest gas fee?\n\n"
+                      + "\n".join(f"TX #{i+1} — {shuffled[i]} gwei" for i in range(3)),
+            "options": [f"TX #{i+1}" for i in range(3)],
+            "correct": correct,
+        }
+
+    if tier_index == 1:
+        # Degen Trader: find the best-performing token
+        tokens = random.sample(_TOKENS, 3)
+        changes = [round(random.uniform(-20, 40), 1) for _ in range(3)]
+        correct = max(range(3), key=lambda i: changes[i])
+        return {
+            "prompt": "📈 *One trade left today.* Which token is pumping the hardest?\n\n"
+                      + "\n".join(f"{tokens[i]}: {changes[i]:+.1f}%" for i in range(3)),
+            "options": tokens,
+            "correct": correct,
+        }
+
+    if tier_index == 2:
+        # Yield Farmer: find the highest APY farm
+        protocols = random.sample(_PROTOCOLS, 3)
+        apys = [round(random.uniform(2, 180), 1) for _ in range(3)]
+        correct = max(range(3), key=lambda i: apys[i])
+        return {
+            "prompt": "🌾 *LP slot open.* Which farm has the best APY right now?\n\n"
+                      + "\n".join(f"{protocols[i]}: {apys[i]}% APY" for i in range(3)),
+            "options": protocols,
+            "correct": correct,
+        }
+
+    if tier_index == 3:
+        # Analyst: spot the whale (largest ETH balance)
+        labels = [f"Wallet {chr(65+i)}" for i in range(3)]
+        balances = [round(random.uniform(0.5, 500), 1) for _ in range(3)]
+        correct = max(range(3), key=lambda i: balances[i])
+        return {
+            "prompt": "🔍 *Suspicious wallets flagged.* Which one is the whale?\n\n"
+                      + "\n".join(f"{labels[i]}: {balances[i]} ETH" for i in range(3)),
+            "options": labels,
+            "correct": correct,
+        }
+
+    if tier_index == 4:
+        # Protocol Dev: most gas-efficient function (lowest gas used)
+        funcs = [f"func_{chr(65+i)}()" for i in range(3)]
+        gas = [random.randint(21_000, 600_000) for _ in range(3)]
+        correct = min(range(3), key=lambda i: gas[i])
+        return {
+            "prompt": "⚙️ *Code review.* Which function is the most gas-efficient?\n\n"
+                      + "\n".join(f"`{funcs[i]}` — {gas[i]:,} gas" for i in range(3)),
+            "options": funcs,
+            "correct": correct,
+        }
+
+    if tier_index == 5:
+        # Blockchain Shark: deepest liquidity pool (highest TVL)
+        pairs = random.sample(_PAIRS, 3)
+        tvls = [round(random.uniform(0.5, 80), 2) for _ in range(3)]
+        correct = max(range(3), key=lambda i: tvls[i])
+        return {
+            "prompt": "🦈 *Big trade incoming.* Which pool has the deepest liquidity?\n\n"
+                      + "\n".join(f"{pairs[i]}: ${tvls[i]}M TVL" for i in range(3)),
+            "options": pairs,
+            "correct": correct,
+        }
+
+    # tier_index == 6: Baron: best risk-adjusted return (highest Sharpe)
+    assets = random.sample(_TOKENS, 3)
+    rets = [round(random.uniform(-5, 45), 1) for _ in range(3)]
+    vols = [round(random.uniform(5, 50), 1) for _ in range(3)]
+    sharpes = [round(rets[i] / vols[i], 2) for i in range(3)]
+    correct = max(range(3), key=lambda i: sharpes[i])
+    return {
+        "prompt": "👑 *Rebalance time.* Which asset has the best risk-adjusted return?\n\n"
+                  + "\n".join(
+                      f"{assets[i]}: return {rets[i]:+.1f}%  vol {vols[i]:.1f}%  → Sharpe {sharpes[i]:.2f}"
+                      for i in range(3)
+                  ),
+        "options": assets,
+        "correct": correct,
+    }
+
+
+def _tier_index(work_count: int) -> int:
+    idx = 0
+    for i, tier in enumerate(_JOBS):
+        if work_count >= tier[0]:
+            idx = i
+    return idx
 
 
 @topic_gated
@@ -281,32 +375,36 @@ async def cmd_work(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     wallet = await _ensure_wallet(user, config.DB_PATH)
 
     now = time.time()
-    last = wallet.get("last_work", 0) or 0
-    remaining = _WORK_COOLDOWN - (now - last)
-
-    work_count = wallet.get("work_count", 0) or 0
-    _, title, low, high = _get_job(work_count)
-    next_tier = _next_job(work_count)
-    next_line = f"\n📊 {next_tier[0] - work_count} shift(s) until promotion to {next_tier[1]}" if next_tier else "\n👑 You've reached the top tier!"
-
+    remaining = _WORK_COOLDOWN - (now - _work_cooldowns.get(user.id, 0))
     if remaining > 0:
         m, s = divmod(int(remaining), 60)
-        h, m = divmod(m, 60)
-        time_str = f"{h}h {m}m" if h else f"{m}m {s}s"
-        await msg.reply_text(
-            f"⏳ You're off the clock for {time_str}.\n\n"
-            f"Current job: {title}\n"
-            f"Next shift pays: {low:,}–{high:,} WRK${next_line}",
-            parse_mode="Markdown"
-        )
+        await msg.reply_text(f"⏳ Next shift available in *{m}m {s}s*.", parse_mode="Markdown")
         return
 
+    work_count = wallet.get("work_count", 0) or 0
+    _, title, win_low, win_high = _get_job(work_count)
+    win_reward = random.randint(win_low, win_high)
+    consolation = max(10, int(win_reward * _WORK_CONSOLATION))
+    tidx = _tier_index(work_count)
+    game = _gen_game(tidx)
+
+    _work_games[user.id] = {
+        "correct": game["correct"],
+        "win_reward": win_reward,
+        "consolation": consolation,
+        "work_count": work_count,
+    }
+
     kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton(f"⚙️ Clock In ({low:,}–{high:,} WRK$)", callback_data=f"work:claim:{user.id}")
+        InlineKeyboardButton(opt, callback_data=f"work:pick:{user.id}:{i}")
+        for i, opt in enumerate(game["options"])
     ]])
+    next_tier = _next_job(work_count)
+    promo = f"\n📊 {next_tier[0] - work_count} shifts to {next_tier[1]}" if next_tier else "\n👑 Max tier"
     await msg.reply_text(
-        f"💼 *{title}*\n\n"
-        f"Shift #{work_count + 1} is ready. Clock in to collect your pay.{next_line}",
+        f"💼 *{title}* — Shift #{work_count + 1}\n"
+        f"✅ Correct: +{win_reward:,} WRK$  ·  ❌ Wrong: +{consolation:,} WRK$\n\n"
+        f"{game['prompt']}{promo}",
         parse_mode="Markdown",
         reply_markup=kb
     )
@@ -314,53 +412,44 @@ async def cmd_work(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def work_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    _, action, uid_str = query.data.split(":")
+    parts = query.data.split(":")
+    # format: work:pick:<user_id>:<choice>
+    _, _, uid_str, choice_str = parts
     user_id = int(uid_str)
 
     if query.from_user.id != user_id:
         await query.answer("Not your shift.", show_alert=True)
         return
 
+    game = _work_games.pop(user_id, None)
+    if not game:
+        await query.answer("This shift already ended.", show_alert=True)
+        return
+
     await query.answer()
 
-    wallet = await db.get_wallet(config.DB_PATH, user_id)
-    if not wallet:
-        await query.edit_message_text("No wallet found.")
-        return
+    choice = int(choice_str)
+    correct = game["correct"]
+    won = choice == correct
+    earned = game["win_reward"] if won else game["consolation"]
 
-    now = time.time()
-    last = wallet.get("last_work", 0) or 0
-    if now - last < _WORK_COOLDOWN:
-        remaining = int(_WORK_COOLDOWN - (now - last))
-        m, s = divmod(remaining, 60)
-        h, m = divmod(m, 60)
-        time_str = f"{h}h {m}m" if h else f"{m}m {s}s"
-        await query.edit_message_text(f"⏳ Already clocked in. Next shift in {time_str}.")
-        return
+    _work_cooldowns[user_id] = time.time()
+    new_bal, new_count = await db.claim_work(config.DB_PATH, user_id, earned, int(time.time()))
 
-    work_count = wallet.get("work_count", 0) or 0
-    _, title, low, high = _get_job(work_count)
-    earned = random.randint(low, high)
+    result_line = f"✅ *Correct!* +{earned:,} WRK$" if won else f"❌ Wrong answer. +{earned:,} WRK$ consolation"
 
-    new_bal, new_count = await db.claim_work(config.DB_PATH, user_id, earned, int(now))
+    old_title = _get_job(game["work_count"])[1]
+    new_title = _get_job(new_count)[1]
+    promo_line = f"\n\n🎉 *Promoted to {new_title}!*" if new_title != old_title else ""
 
-    flavor = random.choice(_WORK_LINES).format(token=random.choice(_WORK_TOKENS))
     next_tier = _next_job(new_count)
-
-    promo_line = ""
-    if next_tier and _get_job(work_count)[1] != _get_job(new_count)[1]:
-        promo_line = f"\n\n🎉 *Promoted to {_get_job(new_count)[1]}!*"
-    elif next_tier:
-        promo_line = f"\n📊 {next_tier[0] - new_count} shift(s) until {next_tier[1]}"
-    else:
-        promo_line = "\n👑 Max rank achieved!"
+    progress = f"\n📊 {next_tier[0] - new_count} shifts to {next_tier[1]}" if next_tier and not promo_line else ("\n👑 Max tier!" if not next_tier else "")
 
     await query.edit_message_text(
-        f"💼 *Shift complete!*\n\n"
-        f"You {flavor}.\n\n"
-        f"💰 +{earned:,} WRK$ earned\n"
+        f"{result_line}\n"
         f"Balance: {new_bal:,} WRK$"
-        f"{promo_line}",
+        f"{promo_line}{progress}\n\n"
+        f"_Correct answer: option #{correct + 1}_",
         parse_mode="Markdown"
     )
 
@@ -373,17 +462,17 @@ async def cmd_jobs(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     work_count = wallet.get("work_count", 0) or 0
 
     lines = ["👔 *Job Board*\n"]
-    for min_shifts, title, low, high in _JOBS:
+    for i, (min_shifts, title, win_low, win_high) in enumerate(_JOBS):
         if work_count >= min_shifts:
-            marker = "▶ " if _get_job(work_count)[1] == title else "✅ "
+            marker = "▶ " if _tier_index(work_count) == i else "✅ "
         else:
             marker = f"🔒 {min_shifts} shifts — "
-        lines.append(f"{marker}{title}  ({low:,}–{high:,} WRK$/shift)")
+        lines.append(f"{marker}{title}  (+{win_low:,}–{win_high:,} WRK$ per game)")
 
-    lines.append(f"\n🔧 Your shifts completed: {work_count}")
+    lines.append(f"\n🔧 Total shifts: {work_count}")
     next_tier = _next_job(work_count)
     if next_tier:
-        lines.append(f"📊 {next_tier[0] - work_count} more shift(s) to unlock {next_tier[1]}")
+        lines.append(f"📊 {next_tier[0] - work_count} more to unlock {next_tier[1]}")
 
     await msg.reply_text("\n".join(lines), parse_mode="Markdown")
 

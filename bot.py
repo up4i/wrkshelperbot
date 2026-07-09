@@ -161,7 +161,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(dsetup_callback, pattern=r"^dsetup:"))
     app.add_handler(CallbackQueryHandler(help_callback,   pattern=r"^help:"))
     app.add_handler(CallbackQueryHandler(blackjack_callback, pattern=r"^bj:"))
-    app.add_handler(CallbackQueryHandler(work_callback,      pattern=r"^work:"))
+    app.add_handler(CallbackQueryHandler(work_callback, pattern=r"^work:pick:"))
     app.add_handler(CallbackQueryHandler(gifts_callback,      pattern=r"^gifts:"))
     app.add_handler(CallbackQueryHandler(gift_offer_callback, pattern=r"^gift_offer:"))
     app.add_handler(CallbackQueryHandler(shop_callback,       pattern=r"^shop:"))
