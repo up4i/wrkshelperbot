@@ -363,7 +363,16 @@ async def get_leaderboard(db_path: str, limit: int = 10) -> list[dict]:
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT user_id, full_name, username, balance FROM economy ORDER BY balance DESC LIMIT ?",
+            """SELECT e.user_id, e.balance,
+                      COALESCE(a.full_name, e.full_name) AS full_name,
+                      COALESCE(a.username, e.username) AS username
+               FROM economy e
+               LEFT JOIN (
+                   SELECT user_id, full_name, username
+                   FROM user_activity
+                   GROUP BY user_id
+               ) a ON a.user_id = e.user_id
+               ORDER BY e.balance DESC LIMIT ?""",
             (limit,),
         ) as cur:
             return [dict(r) async for r in cur]
