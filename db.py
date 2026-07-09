@@ -61,6 +61,43 @@ CREATE TABLE IF NOT EXISTS economy (
     streak      INTEGER NOT NULL DEFAULT 0,
     last_daily  INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS gift_models (
+    id               INTEGER PRIMARY KEY,
+    collection       TEXT NOT NULL,
+    model_number     INTEGER NOT NULL,
+    model_name       TEXT NOT NULL,
+    model_emoji      TEXT NOT NULL,
+    model_rarity_pct REAL NOT NULL,
+    tier             TEXT NOT NULL,
+    custom_emoji_id  TEXT,
+    UNIQUE(collection, model_number)
+);
+CREATE TABLE IF NOT EXISTS gift_instances (
+    id          INTEGER PRIMARY KEY,
+    model_id    INTEGER NOT NULL REFERENCES gift_models(id),
+    background  TEXT NOT NULL,
+    owner_id    INTEGER,
+    acquired_at INTEGER,
+    UNIQUE(model_id, background)
+);
+CREATE TABLE IF NOT EXISTS gift_prices (
+    collection      TEXT NOT NULL,
+    background      TEXT NOT NULL,
+    base_price      INTEGER NOT NULL,
+    current_price   INTEGER NOT NULL,
+    demand_pressure INTEGER NOT NULL DEFAULT 0,
+    last_updated    INTEGER NOT NULL,
+    PRIMARY KEY (collection, background)
+);
+CREATE TABLE IF NOT EXISTS gift_offers (
+    id           INTEGER PRIMARY KEY,
+    from_user_id INTEGER NOT NULL,
+    to_user_id   INTEGER NOT NULL,
+    instance_id  INTEGER NOT NULL REFERENCES gift_instances(id),
+    wrk_offered  INTEGER NOT NULL DEFAULT 0,
+    status       TEXT NOT NULL DEFAULT 'pending',
+    created_at   INTEGER NOT NULL
+);
 """
 
 async def _migrate(db) -> None:
@@ -388,3 +425,259 @@ async def claim_daily(db_path: str, user_id: int, amount: int, streak: int, time
             row = await cur.fetchone()
         await db.commit()
         return row[0] if row else 0
+
+
+# --- gifts ---
+
+_BG_MULTIPLIERS = {
+    "black": 3.0, "onyx": 2.5, "grape": 2.0,
+    "emerald": 1.5, "midnight": 1.2, "orange": 1.0,
+}
+_BACKGROUNDS = ["black", "onyx", "grape", "emerald", "midnight", "orange"]
+
+
+async def seed_gifts(db_path: str, catalog: dict) -> None:
+    now = int(time.time())
+    async with aiosqlite.connect(db_path) as db:
+        for col_key, col in catalog.items():
+            for mdl in col["models"]:
+                await db.execute(
+                    """INSERT OR IGNORE INTO gift_models
+                       (collection, model_number, model_name, model_emoji, model_rarity_pct, tier, custom_emoji_id)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (col_key, mdl["number"], mdl["name"], col["emoji"],
+                     mdl["rarity_pct"], col["tier"], mdl.get("custom_emoji_id")),
+                )
+                await db.commit()
+                async with db.execute(
+                    "SELECT id FROM gift_models WHERE collection=? AND model_number=?",
+                    (col_key, mdl["number"])
+                ) as cur:
+                    row = await cur.fetchone()
+                    model_id = row[0]
+                for bg in _BACKGROUNDS:
+                    await db.execute(
+                        "INSERT OR IGNORE INTO gift_instances (model_id, background) VALUES (?, ?)",
+                        (model_id, bg)
+                    )
+            for bg in _BACKGROUNDS:
+                price = int(col["base_price"] * _BG_MULTIPLIERS[bg])
+                await db.execute(
+                    """INSERT OR IGNORE INTO gift_prices
+                       (collection, background, base_price, current_price, demand_pressure, last_updated)
+                       VALUES (?, ?, ?, ?, 0, ?)""",
+                    (col_key, bg, col["base_price"], price, now)
+                )
+        await db.commit()
+
+
+async def is_gifts_seeded(db_path: str) -> bool:
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute("SELECT COUNT(*) FROM gift_models") as cur:
+            row = await cur.fetchone()
+            return row[0] > 0
+
+
+async def get_user_gifts(db_path: str, user_id: int) -> list[dict]:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT gi.id, gi.background, gi.acquired_at,
+                      gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
+                      gm.model_rarity_pct, gm.tier
+               FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               WHERE gi.owner_id = ?
+               ORDER BY gm.collection, gm.model_number, gi.background""",
+            (user_id,)
+        ) as cur:
+            return [dict(r) async for r in cur]
+
+
+async def get_gift_instance(db_path: str, instance_id: int) -> dict | None:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT gi.id, gi.background, gi.owner_id, gi.acquired_at,
+                      gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
+                      gm.model_rarity_pct, gm.tier
+               FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               WHERE gi.id = ?""",
+            (instance_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def get_gift_instance_by_spec(db_path: str, collection: str, model_number: int, background: str) -> dict | None:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT gi.id, gi.background, gi.owner_id, gi.acquired_at,
+                      gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
+                      gm.model_rarity_pct, gm.tier
+               FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               WHERE gm.collection = ? AND gm.model_number = ? AND gi.background = ?""",
+            (collection, model_number, background)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def transfer_gift(db_path: str, instance_id: int, new_owner_id: int | None) -> None:
+    now = int(time.time()) if new_owner_id else None
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "UPDATE gift_instances SET owner_id = ?, acquired_at = ? WHERE id = ?",
+            (new_owner_id, now, instance_id)
+        )
+        await db.commit()
+
+
+async def get_bank_gifts(db_path: str, collection: str | None = None) -> list[dict]:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        if collection:
+            sql = """SELECT gi.id, gi.background,
+                            gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
+                            gm.model_rarity_pct, gm.tier
+                     FROM gift_instances gi
+                     JOIN gift_models gm ON gm.id = gi.model_id
+                     WHERE gi.owner_id IS NULL AND gm.collection = ?
+                     ORDER BY gm.model_number, gi.background"""
+            params = (collection,)
+        else:
+            sql = """SELECT gi.id, gi.background,
+                            gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
+                            gm.model_rarity_pct, gm.tier
+                     FROM gift_instances gi
+                     JOIN gift_models gm ON gm.id = gi.model_id
+                     WHERE gi.owner_id IS NULL
+                     ORDER BY gm.collection, gm.model_number, gi.background"""
+            params = ()
+        async with db.execute(sql, params) as cur:
+            return [dict(r) async for r in cur]
+
+
+async def get_gift_price(db_path: str, collection: str, background: str) -> dict | None:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM gift_prices WHERE collection=? AND background=?",
+            (collection, background)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def get_all_gift_prices(db_path: str) -> list[dict]:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM gift_prices") as cur:
+            return [dict(r) async for r in cur]
+
+
+async def update_gift_price(db_path: str, collection: str, background: str, new_price: int) -> None:
+    now = int(time.time())
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "UPDATE gift_prices SET current_price=?, last_updated=? WHERE collection=? AND background=?",
+            (new_price, now, collection, background)
+        )
+        await db.commit()
+
+
+async def apply_demand_pressure(db_path: str, collection: str, background: str, delta: int) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "UPDATE gift_prices SET demand_pressure = demand_pressure + ? WHERE collection=? AND background=?",
+            (delta, collection, background)
+        )
+        await db.commit()
+
+
+async def reset_demand_pressure(db_path: str) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute("UPDATE gift_prices SET demand_pressure = 0")
+        await db.commit()
+
+
+async def create_offer(db_path: str, from_user_id: int, to_user_id: int, instance_id: int, wrk_offered: int) -> int:
+    now = int(time.time())
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "INSERT INTO gift_offers (from_user_id, to_user_id, instance_id, wrk_offered, status, created_at) VALUES (?,?,?,?,?,?)",
+            (from_user_id, to_user_id, instance_id, wrk_offered, "pending", now)
+        ) as cur:
+            await db.commit()
+            return cur.lastrowid
+
+
+async def get_offer(db_path: str, offer_id: int) -> dict | None:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM gift_offers WHERE id=?", (offer_id,)) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def get_offers_for_user(db_path: str, user_id: int) -> list[dict]:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT go.*, gi.background,
+                      gm.collection, gm.model_number, gm.model_name, gm.model_emoji
+               FROM gift_offers go
+               JOIN gift_instances gi ON gi.id = go.instance_id
+               JOIN gift_models gm ON gm.id = gi.model_id
+               WHERE (go.from_user_id=? OR go.to_user_id=?) AND go.status='pending'
+               ORDER BY go.created_at DESC""",
+            (user_id, user_id)
+        ) as cur:
+            return [dict(r) async for r in cur]
+
+
+async def update_offer_status(db_path: str, offer_id: int, status: str) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute("UPDATE gift_offers SET status=? WHERE id=?", (status, offer_id))
+        await db.commit()
+
+
+async def expire_old_offers(db_path: str) -> list[int]:
+    cutoff = int(time.time()) - 86400
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "SELECT id FROM gift_offers WHERE status='pending' AND created_at < ?", (cutoff,)
+        ) as cur:
+            rows = [r[0] async for r in cur]
+        if rows:
+            await db.execute(
+                f"UPDATE gift_offers SET status='expired' WHERE id IN ({','.join('?' for _ in rows)})",
+                rows
+            )
+            await db.commit()
+        return rows
+
+
+async def get_random_low_tier_bank_gift(db_path: str) -> dict | None:
+    import random
+    _BG_DROP_WEIGHTS = {"black": 1, "onyx": 2, "grape": 4, "emerald": 8, "midnight": 15, "orange": 30}
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT gi.id, gi.background, gm.model_rarity_pct
+               FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               WHERE gi.owner_id IS NULL AND gm.tier = 'low'""",
+        ) as cur:
+            candidates = [dict(r) async for r in cur]
+    if not candidates:
+        return None
+    weights = [
+        (1.0 / c["model_rarity_pct"]) * _BG_DROP_WEIGHTS[c["background"]]
+        for c in candidates
+    ]
+    chosen = random.choices(candidates, weights=weights, k=1)[0]
+    return await get_gift_instance(db_path, chosen["id"])
