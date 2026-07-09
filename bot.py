@@ -120,6 +120,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("rob",         cmd_rob))
     app.add_handler(CommandHandler("slots",       cmd_slots))
     app.add_handler(CommandHandler("coinflip",    cmd_coinflip))
+    app.add_handler(CommandHandler("cf",          cmd_coinflip))
     app.add_handler(CommandHandler("dice",        cmd_dice))
     app.add_handler(CommandHandler("blackjack",   cmd_blackjack))
     app.add_handler(CommandHandler("crash",       cmd_crash))
