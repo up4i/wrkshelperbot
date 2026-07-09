@@ -39,7 +39,7 @@ from handlers.economy import (
     cmd_rob, cmd_slots, cmd_coinflip, cmd_dice,
     cmd_blackjack, blackjack_callback,
     cmd_crash, cmd_cashout,
-    cmd_givewrk, cmd_setwrk,
+    cmd_give, cmd_givewrk, cmd_setwrk,
 )
 
 os.makedirs(os.path.dirname(config.LOG_FILE), exist_ok=True)
@@ -127,6 +127,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("bj",          cmd_blackjack))
     app.add_handler(CommandHandler("crash",       cmd_crash))
     app.add_handler(CommandHandler("cashout",     cmd_cashout))
+    app.add_handler(CommandHandler("give",        cmd_give))
     app.add_handler(CommandHandler("givewrk",     cmd_givewrk))
     app.add_handler(CommandHandler("setwrk",      cmd_setwrk))
     app.add_handler(CallbackQueryHandler(setup_callback,  pattern=r"^setup:"))

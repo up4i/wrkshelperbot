@@ -237,6 +237,47 @@ async def cmd_setwrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await msg.reply_text(f"✅ Set {name}'s balance to {new_bal:,} WRK$")
 
 
+# ── /give ─────────────────────────────────────────────────────────────────────
+
+async def cmd_give(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    wallet = await _ensure_wallet(user, config.DB_PATH)
+
+    if len(ctx.args) < 2 or not ctx.args[1].isdigit():
+        await msg.reply_text("Usage: `/give @username <amount>`", parse_mode="Markdown")
+        return
+
+    amount = int(ctx.args[1])
+    if amount <= 0:
+        await msg.reply_text("❌ Amount must be positive.")
+        return
+    if wallet["balance"] < amount:
+        await msg.reply_text(f"❌ Not enough WRK$. Your balance: {wallet['balance']:,}")
+        return
+
+    target_row = await db.get_user_by_username(config.DB_PATH, msg.chat.id, ctx.args[0])
+    if not target_row:
+        await msg.reply_text("❌ Can't find that user. They need to have sent a message first.")
+        return
+
+    target_id = target_row["user_id"]
+    target_name = target_row.get("full_name") or ctx.args[0]
+
+    if target_id == user.id:
+        await msg.reply_text("❌ You can't give money to yourself.")
+        return
+
+    await db.upsert_wallet(config.DB_PATH, target_id, None, None)
+    new_sender_bal = await db.update_balance(config.DB_PATH, user.id, -amount)
+    await db.update_balance(config.DB_PATH, target_id, amount)
+
+    await msg.reply_text(
+        f"💸 {display_name(user)} gave {target_name} {amount:,} WRK$!\n"
+        f"💰 Your balance: {new_sender_bal:,} WRK$"
+    )
+
+
 # ── /rob ──────────────────────────────────────────────────────────────────────
 
 _rob_cooldowns: dict[int, float] = {}  # user_id -> timestamp
@@ -290,10 +331,10 @@ async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     now = time.time()
     last_rob = _rob_cooldowns.get(robber.id, 0)
-    if now - last_rob < 3600:
-        remaining = int(3600 - (now - last_rob))
-        m = remaining // 60
-        await msg.reply_text(f"⏳ Rob cooldown: {m}m remaining.")
+    if now - last_rob < 900:
+        remaining = int(900 - (now - last_rob))
+        m, s = divmod(remaining, 60)
+        await msg.reply_text(f"⏳ Rob cooldown: {m}m {s}s remaining.")
         return
 
     if not ctx.args:
