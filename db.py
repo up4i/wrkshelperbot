@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS gift_instances (
     id          INTEGER PRIMARY KEY,
     model_id    INTEGER NOT NULL REFERENCES gift_models(id),
     background  TEXT NOT NULL,
+    gift_number INTEGER,
     owner_id    INTEGER,
     acquired_at INTEGER,
     UNIQUE(model_id, background)
@@ -468,6 +469,25 @@ async def seed_gifts(db_path: str, catalog: dict) -> None:
                        VALUES (?, ?, ?, ?, 0, ?)""",
                     (col_key, bg, col["base_price"], price, now)
                 )
+        # Assign per-collection sequential gift_numbers (ordered by model_number, then background tier)
+        await db.execute("""
+            UPDATE gift_instances SET gift_number = (
+                SELECT rn FROM (
+                    SELECT gi2.id,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY gm2.collection
+                               ORDER BY gm2.model_number,
+                                        CASE gi2.background
+                                            WHEN 'black' THEN 1 WHEN 'onyx' THEN 2 WHEN 'grape' THEN 3
+                                            WHEN 'emerald' THEN 4 WHEN 'midnight' THEN 5 WHEN 'orange' THEN 6
+                                            ELSE 99 END
+                           ) AS rn
+                    FROM gift_instances gi2
+                    JOIN gift_models gm2 ON gm2.id = gi2.model_id
+                ) ranked WHERE ranked.id = gift_instances.id
+            )
+            WHERE gift_number IS NULL
+        """)
         await db.commit()
 
 
@@ -482,13 +502,13 @@ async def get_user_gifts(db_path: str, user_id: int) -> list[dict]:
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            """SELECT gi.id, gi.background, gi.acquired_at,
+            """SELECT gi.id, gi.background, gi.gift_number, gi.acquired_at,
                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
                       gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                FROM gift_instances gi
                JOIN gift_models gm ON gm.id = gi.model_id
                WHERE gi.owner_id = ?
-               ORDER BY gm.collection, gm.model_number, gi.background""",
+               ORDER BY gm.collection, gi.gift_number""",
             (user_id,)
         ) as cur:
             return [dict(r) async for r in cur]
@@ -498,7 +518,7 @@ async def get_gift_instance(db_path: str, instance_id: int) -> dict | None:
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            """SELECT gi.id, gi.background, gi.owner_id, gi.acquired_at,
+            """SELECT gi.id, gi.background, gi.gift_number, gi.owner_id, gi.acquired_at,
                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
                       gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                FROM gift_instances gi
@@ -510,17 +530,17 @@ async def get_gift_instance(db_path: str, instance_id: int) -> dict | None:
             return dict(row) if row else None
 
 
-async def get_gift_instance_by_spec(db_path: str, collection: str, model_number: int, background: str) -> dict | None:
+async def get_gift_instance_by_number(db_path: str, collection: str, gift_number: int) -> dict | None:
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            """SELECT gi.id, gi.background, gi.owner_id, gi.acquired_at,
+            """SELECT gi.id, gi.background, gi.gift_number, gi.owner_id, gi.acquired_at,
                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
                       gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                FROM gift_instances gi
                JOIN gift_models gm ON gm.id = gi.model_id
-               WHERE gm.collection = ? AND gm.model_number = ? AND gi.background = ?""",
-            (collection, model_number, background)
+               WHERE gm.collection = ? AND gi.gift_number = ?""",
+            (collection, gift_number)
         ) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
@@ -540,22 +560,22 @@ async def get_bank_gifts(db_path: str, collection: str | None = None) -> list[di
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         if collection:
-            sql = """SELECT gi.id, gi.background,
+            sql = """SELECT gi.id, gi.background, gi.gift_number,
                             gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
                             gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                      FROM gift_instances gi
                      JOIN gift_models gm ON gm.id = gi.model_id
                      WHERE gi.owner_id IS NULL AND gm.collection = ?
-                     ORDER BY gm.model_number, gi.background"""
+                     ORDER BY gm.model_number, gi.gift_number"""
             params = (collection,)
         else:
-            sql = """SELECT gi.id, gi.background,
+            sql = """SELECT gi.id, gi.background, gi.gift_number,
                             gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
                             gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                      FROM gift_instances gi
                      JOIN gift_models gm ON gm.id = gi.model_id
                      WHERE gi.owner_id IS NULL
-                     ORDER BY gm.collection, gm.model_number, gi.background"""
+                     ORDER BY gm.collection, gm.model_number, gi.gift_number"""
             params = ()
         async with db.execute(sql, params) as cur:
             return [dict(r) async for r in cur]
@@ -636,7 +656,7 @@ async def get_offers_for_user(db_path: str, user_id: int) -> list[dict]:
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            """SELECT go.*, gi.background,
+            """SELECT go.*, gi.background, gi.gift_number,
                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji, gm.custom_emoji_id
                FROM gift_offers go
                JOIN gift_instances gi ON gi.id = go.instance_id
