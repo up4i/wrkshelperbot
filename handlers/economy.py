@@ -355,18 +355,17 @@ async def cmd_coinflip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     pick = ctx.args[1].lower() if len(ctx.args) > 1 and ctx.args[1].lower() in ("heads", "tails") else None
     result = random.choice(["heads", "tails"])
+    won = (pick == result) if pick else (random.random() < 0.50)
 
-    won = random.random() < 0.50
+    pick_line = f"You picked {pick}. " if pick else ""
     if won:
         new_bal = await db.update_balance(config.DB_PATH, user.id, bet)
-        pick_line = f"You picked {pick}. " if pick else ""
         await msg.reply_text(
             f"🪙 **{result.capitalize()}**\n\n{pick_line}You won! +{bet:,} WRK$\n💰 {new_bal:,} WRK$",
             parse_mode="Markdown"
         )
     else:
         new_bal = await db.update_balance(config.DB_PATH, user.id, -bet)
-        pick_line = f"You picked {pick}. " if pick else ""
         await msg.reply_text(
             f"🪙 **{result.capitalize()}**\n\n{pick_line}You lost! -{bet:,} WRK$\n💰 {new_bal:,} WRK$",
             parse_mode="Markdown"
