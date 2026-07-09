@@ -401,7 +401,13 @@ async def cmd_coinflip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(f"❌ Not enough WRK$. Your balance: {wallet['balance']:,}")
         return
 
-    pick = ctx.args[1].lower() if len(ctx.args) > 1 and ctx.args[1].lower() in ("heads", "tails") else None
+    pick = None
+    if len(ctx.args) > 1:
+        pick = ctx.args[1].lower()
+        if pick not in ("heads", "tails"):
+            await msg.reply_text("❌ Invalid pick — use `heads` or `tails`.", parse_mode="Markdown")
+            return
+
     result = random.choice(["heads", "tails"])
     won = (pick == result) if pick else (random.random() < 0.50)
 
