@@ -210,3 +210,23 @@ async def cmd_setlog(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await db.upsert_group(config.DB_PATH, chat_id)
     await db.update_group(config.DB_PATH, chat_id, log_channel_id=channel_id)
     await msg.reply_text(f"✅ Log channel set to `{channel}` (`{channel_id}`).", parse_mode="Markdown")
+
+
+async def cmd_halos(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    chat_id = msg.chat.id
+
+    if not await is_admin(ctx.bot, chat_id, update.effective_user.id):
+        return
+
+    halos = await db.get_halos(config.DB_PATH, chat_id)
+    if not halos:
+        await msg.reply_text("No users have a halo in this chat.")
+        return
+
+    lines = []
+    for h in halos:
+        name = h.get("full_name") or h.get("username") or str(h["user_id"])
+        lines.append(f"• {name} (`{h['user_id']}`)")
+
+    await msg.reply_text("😇 *Halo users:*\n" + "\n".join(lines), parse_mode="Markdown")

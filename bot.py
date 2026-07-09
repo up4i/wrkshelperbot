@@ -23,7 +23,7 @@ from handlers.protection import (
     cmd_antiraid, cmd_setantiraid,
     on_protection_check, on_antiraid_check,
 )
-from handlers.admin import cmd_id, cmd_info, cmd_setlog, cmd_help, help_callback, on_any_message, on_service_message
+from handlers.admin import cmd_id, cmd_info, cmd_setlog, cmd_halos, cmd_help, help_callback, on_any_message, on_service_message
 from handlers.utility import (
     cmd_admins, cmd_rules, cmd_setrules, cmd_me, cmd_dlog, cmd_cleanservice,
     cmd_givehalo, cmd_removehalo,
@@ -85,6 +85,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("goodbye",        cmd_goodbye))
     app.add_handler(CommandHandler("givehalo",       cmd_givehalo))
     app.add_handler(CommandHandler("removehalo",     cmd_removehalo))
+    app.add_handler(CommandHandler("halos",          cmd_halos))
     app.add_handler(CommandHandler("exportsettings", cmd_exportsettings))
     app.add_handler(CommandHandler("importsettings", cmd_importsettings))
     app.add_handler(CommandHandler("inactives",        cmd_inactives))

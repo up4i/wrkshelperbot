@@ -190,6 +190,19 @@ async def remove_halo(db_path: str, chat_id: int, user_id: int) -> None:
         )
         await db.commit()
 
+async def get_halos(db_path: str, chat_id: int) -> list[dict]:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT h.user_id, a.full_name, a.username
+               FROM halo_users h
+               LEFT JOIN user_activity a ON a.chat_id = h.chat_id AND a.user_id = h.user_id
+               WHERE h.chat_id = ?""",
+            (chat_id,),
+        ) as cur:
+            return [dict(r) async for r in cur]
+
+
 async def has_halo(db_path: str, chat_id: int, user_id: int) -> bool:
     async with aiosqlite.connect(db_path) as db:
         async with db.execute(
@@ -276,6 +289,17 @@ async def get_autoreplies(db_path: str, chat_id: int) -> list[dict]:
             "SELECT * FROM autoreplies WHERE chat_id = ? ORDER BY trigger", (chat_id,)
         ) as cur:
             return [dict(r) async for r in cur]
+
+async def get_user_by_username(db_path: str, chat_id: int, username: str) -> dict | None:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT user_id, full_name FROM user_activity WHERE chat_id = ? AND LOWER(username) = LOWER(?)",
+            (chat_id, username.lstrip("@")),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
 
 async def get_inactives(db_path: str, chat_id: int, since_ts: int) -> list[dict]:
     async with aiosqlite.connect(db_path) as db:

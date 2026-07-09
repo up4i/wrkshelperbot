@@ -45,11 +45,11 @@ async def _resolve_target(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if ctx.args:
         first = ctx.args[0]
         if first.startswith("@"):
-            try:
-                user = await ctx.bot.get_chat(first)
-                return user.id, user.full_name or first, ctx.args[1:]
-            except Exception:
-                return None, first, ctx.args[1:]
+            chat_id = msg.chat.id
+            row = await db.get_user_by_username(config.DB_PATH, chat_id, first)
+            if row:
+                return row["user_id"], row["full_name"] or first, ctx.args[1:]
+            return None, first, ctx.args[1:]
     return None, None, ctx.args
 
 
