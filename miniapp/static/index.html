@@ -476,6 +476,88 @@
   }
   .welcome-card h2 { font-size: 20px; margin-bottom: 4px; }
   .welcome-card p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  /* ── Jobs / Work page ── */
+  .job-hero {
+    background: linear-gradient(135deg, rgba(139,92,246,.18), rgba(6,182,212,.08));
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 24px 20px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .job-title { font-size: 20px; font-weight: 800; }
+  .job-earn-range { font-size: 13px; color: var(--muted); }
+  .job-next {
+    font-size: 12px;
+    color: var(--primary);
+    background: rgba(139,92,246,.1);
+    border-radius: 20px;
+    padding: 4px 12px;
+  }
+  .tier-bar-wrap { width: 100%; background: var(--card2); border-radius: 8px; height: 6px; overflow: hidden; }
+  .tier-bar-fill { height: 100%; background: var(--primary); border-radius: 8px; transition: width .4s; }
+
+  .shift-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 4px;
+  }
+  .shift-earned { font-size: 28px; font-weight: 800; color: var(--gold); }
+  .shift-taps { font-size: 13px; color: var(--muted); }
+  .shift-progress-wrap { background: var(--card2); border-radius: 8px; height: 8px; overflow: hidden; margin-bottom: 16px; }
+  .shift-progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #06b6d4); border-radius: 8px; transition: width .2s; }
+
+  .tap-zone-wrap { display: flex; justify-content: center; padding: 8px 0 16px; }
+  .tap-zone {
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: radial-gradient(circle at center, rgba(139,92,246,.25), transparent 70%);
+    border: 2px solid var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 72px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform .08s, box-shadow .08s;
+    box-shadow: 0 0 20px rgba(139,92,246,.2);
+  }
+  .tap-zone:active { transform: scale(0.91); box-shadow: 0 0 40px rgba(139,92,246,.5); }
+
+  .cooldown-card {
+    text-align: center;
+    padding: 32px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .cooldown-icon { font-size: 48px; }
+  .cooldown-label { font-size: 13px; color: var(--muted); }
+  .cooldown-timer { font-size: 36px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--primary); }
+
+  /* floating +X animation */
+  .float-earn {
+    position: fixed;
+    pointer-events: none;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--gold);
+    text-shadow: 0 1px 4px rgba(0,0,0,.6);
+    z-index: 999;
+    animation: float-earn .9s ease-out forwards;
+  }
+  @keyframes float-earn {
+    0%   { opacity: 1; transform: translateY(0) scale(1); }
+    30%  { opacity: 1; transform: translateY(-20px) scale(1.1); }
+    100% { opacity: 0; transform: translateY(-70px) scale(.9); }
+  }
 </style>
 </head>
 <body>
@@ -580,6 +662,29 @@
       </div>
       <div id="profileContent" style="display:none;display:flex;flex-direction:column;gap:12px"></div>
     </div>
+
+    <!-- WORK / JOBS -->
+    <div class="page" id="page-work">
+      <div>
+        <div class="section-title">Work</div>
+        <div class="section-sub">Tap to earn — shifts unlock higher-paying jobs</div>
+      </div>
+
+      <!-- login wall -->
+      <div id="workLoginWall" class="card">
+        <div class="card-title">Sign in first</div>
+        <div class="search-row">
+          <input class="input" id="workUserId" placeholder="Your Telegram user ID" type="number">
+          <button class="btn" onclick="loginFromWork()">Set</button>
+        </div>
+        <div class="user-id-hint" style="margin-top:10px">
+          Send <strong>/id</strong> in the bot to get your ID.
+        </div>
+      </div>
+
+      <!-- dynamic job content (hidden until logged in) -->
+      <div id="workContent" style="display:none;flex-direction:column;gap:14px"></div>
+    </div>
   </main>
 
   <nav>
@@ -594,6 +699,9 @@
     </button>
     <button class="nav-btn" onclick="showPage('profile',this)" data-page="profile">
       <span class="icon">👤</span>Profile
+    </button>
+    <button class="nav-btn" onclick="showPage('work',this)" data-page="work">
+      <span class="icon">💼</span>Work
     </button>
   </nav>
 </div>
@@ -695,6 +803,7 @@ function showPage(id, btn) {
   document.getElementById('page-' + id).classList.add('active');
   btn.classList.add('active');
   if (id === 'lb') loadLeaderboard(state.lbTab);
+  if (id === 'work') openWorkPage();
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -995,6 +1104,253 @@ function fmt(n) { return Number(n).toLocaleString(); }
 function fmtK(n) { if (n >= 1_000_000) return (n/1_000_000).toFixed(1)+'M'; if (n >= 1000) return (n/1000).toFixed(1)+'K'; return fmt(n); }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Work / Jobs ───────────────────────────────────────────────────────────────
+let workState = {
+  status: null,
+  localTaps: 0,
+  localEarned: 0,
+  totalEarned: 0,
+  totalTaps: 0,
+  syncing: false,
+  cooldownInterval: null,
+  jobEmoji: '💼',
+};
+
+async function openWorkPage() {
+  if (!state.userId) {
+    document.getElementById('workLoginWall').style.display = '';
+    document.getElementById('workContent').style.display = 'none';
+    return;
+  }
+  document.getElementById('workLoginWall').style.display = 'none';
+  document.getElementById('workContent').style.display = 'flex';
+  await refreshWorkStatus();
+}
+
+function loginFromWork() {
+  const v = document.getElementById('workUserId').value.trim();
+  if (!v) return;
+  setUser(v);
+  openWorkPage();
+}
+
+async function refreshWorkStatus() {
+  if (!state.userId) return;
+  try {
+    const s = await api(`/api/work/status/${state.userId}`);
+    workState.status = s;
+    renderWorkPage(s);
+  } catch(e) {
+    document.getElementById('workContent').innerHTML = `<div class="error-msg">${e.message}</div>`;
+  }
+}
+
+const JOB_EMOJIS = ['🧑‍🎓','📈','🌾','🔍','⚙️','🦈','👑'];
+
+function renderWorkPage(s) {
+  const content = document.getElementById('workContent');
+  clearInterval(workState.cooldownInterval);
+
+  const emojiRaw = JOB_EMOJIS[s.job.tier_index] || '💼';
+  workState.jobEmoji = emojiRaw;
+
+  const nextJob = s.next_job;
+  const tierPct = nextJob
+    ? Math.min(100, Math.round((1 - nextJob.taps_remaining / nextJob.taps_required) * 100))
+    : 100;
+  const nextLabel = nextJob
+    ? `${nextJob.taps_remaining} taps to ${nextJob.title}`
+    : '👑 Max tier!';
+
+  const jobHero = `
+    <div class="job-hero">
+      <div style="font-size:48px">${emojiRaw}</div>
+      <div class="job-title">${esc(s.job.title)}</div>
+      <div class="job-earn-range">${fmt(s.job.earn_low)}–${fmt(s.job.earn_high)} WRK$ per tap</div>
+      <div class="job-next">${esc(nextLabel)}</div>
+      <div class="tier-bar-wrap" style="margin-top:4px">
+        <div class="tier-bar-fill" style="width:${tierPct}%"></div>
+      </div>
+    </div>`;
+
+  // ── active shift ──
+  if (s.session) {
+    workState.totalTaps = s.session.taps + workState.localTaps;
+    workState.totalEarned = s.session.earned + workState.localEarned;
+    const pct = Math.min(100, Math.round(workState.totalTaps / 50 * 100));
+    content.innerHTML = `
+      ${jobHero}
+      <div class="card">
+        <div class="shift-header">
+          <div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Earned this shift</div>
+            <div class="shift-earned" id="shiftEarned">${fmt(workState.totalEarned)} WRK$</div>
+          </div>
+          <div class="shift-taps" id="shiftTaps">${workState.totalTaps} / 50 taps</div>
+        </div>
+        <div class="shift-progress-wrap">
+          <div class="shift-progress-fill" id="shiftProgress" style="width:${pct}%"></div>
+        </div>
+        <div class="tap-zone-wrap">
+          <div class="tap-zone" id="tapZone" onclick="handleTap(event)">${emojiRaw}</div>
+        </div>
+        <button class="btn outline" style="width:100%" onclick="collectShift()">🏁 Collect Early</button>
+      </div>`;
+    return;
+  }
+
+  // ── cooldown ──
+  if (s.cooldown_remaining > 0) {
+    content.innerHTML = `
+      ${jobHero}
+      <div class="card cooldown-card">
+        <div class="cooldown-icon">⏳</div>
+        <div class="cooldown-label">Next shift available in</div>
+        <div class="cooldown-timer" id="cdTimer">${fmtCountdown(s.cooldown_remaining)}</div>
+      </div>`;
+    let remaining = s.cooldown_remaining;
+    workState.cooldownInterval = setInterval(() => {
+      remaining--;
+      const el = document.getElementById('cdTimer');
+      if (!el) { clearInterval(workState.cooldownInterval); return; }
+      if (remaining <= 0) {
+        clearInterval(workState.cooldownInterval);
+        refreshWorkStatus();
+        return;
+      }
+      el.textContent = fmtCountdown(remaining);
+    }, 1000);
+    return;
+  }
+
+  // ── ready ──
+  content.innerHTML = `
+    ${jobHero}
+    <button class="btn" style="width:100%;padding:16px;font-size:16px" onclick="startShift()">
+      🟢 Start Shift
+    </button>
+    <div style="text-align:center;font-size:12px;color:var(--muted)">
+      Earn up to ${fmt(s.job.earn_high * 50)} WRK$ per shift · 15 min cooldown
+    </div>`;
+}
+
+function fmtCountdown(secs) {
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+async function startShift() {
+  workState.localTaps = 0;
+  workState.localEarned = 0;
+  workState.totalTaps = 0;
+  workState.totalEarned = 0;
+  try {
+    const s = await api('/api/work/start', { method:'POST', json:{ user_id:+state.userId } });
+    workState.status = s;
+    renderWorkPage(s);
+  } catch(e) {
+    alert(e.message);
+  }
+}
+
+function handleTap(evt) {
+  const s = workState.status;
+  if (!s || !s.session) return;
+  if (workState.totalTaps >= 50) return;
+
+  const lo = s.job.earn_low;
+  const hi = s.job.earn_high;
+  const earned = Math.floor(Math.random() * (hi - lo + 1)) + lo;
+
+  workState.localTaps++;
+  workState.localEarned += earned;
+  workState.totalTaps++;
+  workState.totalEarned += earned;
+
+  const earnEl = document.getElementById('shiftEarned');
+  const tapsEl = document.getElementById('shiftTaps');
+  const progEl = document.getElementById('shiftProgress');
+  if (earnEl) earnEl.textContent = `${fmt(workState.totalEarned)} WRK$`;
+  if (tapsEl) tapsEl.textContent = `${workState.totalTaps} / 50 taps`;
+  if (progEl) progEl.style.width = `${Math.min(100, Math.round(workState.totalTaps / 50 * 100))}%`;
+
+  spawnFloatText(`+${fmt(earned)}`, evt.clientX, evt.clientY);
+
+  if (workState.localTaps % 5 === 0) {
+    syncBatch();
+  }
+}
+
+function spawnFloatText(text, x, y) {
+  const el = document.createElement('div');
+  el.className = 'float-earn';
+  el.textContent = text;
+  el.style.left = `${x - 20}px`;
+  el.style.top = `${y - 20}px`;
+  document.body.appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
+}
+
+async function syncBatch() {
+  if (workState.syncing || workState.localTaps === 0) return;
+  workState.syncing = true;
+  const batchTaps = workState.localTaps;
+  const batchEarned = workState.localEarned;
+  workState.localTaps = 0;
+  workState.localEarned = 0;
+  try {
+    const result = await api('/api/work/sync', {
+      method: 'POST',
+      json: { user_id: +state.userId, taps_delta: batchTaps, earned_delta: batchEarned },
+    });
+    if (result.auto_ended) {
+      handleShiftComplete(result);
+      return;
+    }
+    workState.status.session = result.session;
+    workState.totalTaps = result.session.taps + workState.localTaps;
+    workState.totalEarned = result.session.earned + workState.localEarned;
+  } catch(e) {
+    workState.localTaps += batchTaps;
+    workState.localEarned += batchEarned;
+  }
+  workState.syncing = false;
+}
+
+async function collectShift() {
+  if (workState.localTaps > 0) {
+    await syncBatch();
+  }
+  try {
+    const result = await api('/api/work/end', { method:'POST', json:{ user_id:+state.userId } });
+    handleShiftComplete(result);
+  } catch(e) {
+    alert(e.message);
+  }
+}
+
+function handleShiftComplete(result) {
+  workState.localTaps = 0;
+  workState.localEarned = 0;
+  workState.syncing = false;
+  state.balance = result.new_balance;
+  refreshHeaderBal();
+
+  const content = document.getElementById('workContent');
+  const promoLine = result.promoted ? `<div style="color:var(--primary);font-weight:700;margin-top:8px">🎉 Promoted to ${esc(result.new_job)}!</div>` : '';
+  content.innerHTML = `
+    <div class="card" style="text-align:center;padding:28px 20px;display:flex;flex-direction:column;align-items:center;gap:10px">
+      <div style="font-size:48px">🏁</div>
+      <div style="font-size:22px;font-weight:800">Shift Complete!</div>
+      <div style="font-size:28px;font-weight:800;color:var(--gold)">+${fmt(result.collected)} WRK$</div>
+      <div style="font-size:13px;color:var(--muted)">${result.taps} taps · Balance: ${fmt(result.new_balance)} WRK$</div>
+      ${promoLine}
+    </div>`;
+
+  setTimeout(() => refreshWorkStatus(), 2000);
+}
 
 boot();
 </script>
