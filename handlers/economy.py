@@ -289,6 +289,171 @@ async def cmd_give(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
 
 
+# ── /hack ─────────────────────────────────────────────────────────────────────
+
+_WORDLIST = [
+    ("seed",        "The 12-24 word key to your entire crypto kingdom."),
+    ("phrase",      "What you never screenshot. What you never share. Starts with 'ph'."),
+    ("wallet",      "Where your bags live on-chain."),
+    ("hodl",        "A typo that became a crypto religion."),
+    ("whale",       "Someone who moves markets just by breathing."),
+    ("mempool",     "The waiting room for unconfirmed transactions."),
+    ("airdrop",     "Free tokens that land in your wallet out of nowhere."),
+    ("rugpull",     "The dev said 'we're not going anywhere.' Then they went anywhere."),
+    ("halving",     "When Bitcoin's block reward gets cut in half."),
+    ("staking",     "Locking up tokens to earn passive income."),
+    ("validator",   "Keeps the network honest. Gets paid to do it."),
+    ("nominator",   "Backs a validator with their stake on TON."),
+    ("jetton",      "TON's version of a token standard."),
+    ("workchain",   "A parallel chain in the TON architecture."),
+    ("genesis",     "The very first block of a blockchain."),
+    ("liquidity",   "The lifeblood of every DEX pool."),
+    ("tokenomics",  "The economics behind a token's supply and distribution."),
+    ("whitepaper",  "The document where every project promises to change the world."),
+    ("defi",        "Banking, but the bank is a smart contract."),
+    ("mainnet",     "The real network, not the playground."),
+    ("testnet",     "Where devs break things before breaking the real thing."),
+    ("hash",        "A fixed-length fingerprint of data."),
+    ("fork",        "When a blockchain splits and takes a different path."),
+    ("dao",         "A community that governs itself through votes and tokens."),
+    ("degen",       "Someone who apes into anything with triple-digit APY."),
+    ("moonshot",    "A bet so wild it either 100xs or goes to zero."),
+    ("rekt",        "When the trade goes the wrong way. Very wrong."),
+    ("shill",       "Promoting a token you hold and hope others buy."),
+    ("gas",         "The fee that powers every Ethereum transaction."),
+    ("altcoin",     "Any crypto that isn't Bitcoin."),
+    ("bullish",     "Confident the price is going up."),
+    ("bearish",     "Expecting the price to go down."),
+    ("pump",        "When a coin's price spikes fast, usually suspiciously."),
+    ("dump",        "What happens right after the pump."),
+    ("nft",         "A unique digital asset on-chain. Three letters."),
+    ("gram",        "TON's rebranded ticker. The coin in this very bot."),
+    ("node",        "A computer that participates in a blockchain network."),
+    ("block",       "A bundle of transactions added to the chain."),
+    ("miner",       "Solves puzzles to add blocks and earn rewards."),
+    ("ledger",      "A record of all transactions. Also a cold wallet brand."),
+    ("satoshi",     "The smallest unit of Bitcoin. Also Bitcoin's creator."),
+    ("ethereum",    "Home of smart contracts. Gas fees hit different here."),
+    ("bitcoin",     "The original. The OG. The one that started it all."),
+    ("sniper",      "A bot that buys a token the millisecond it launches."),
+    ("bridge",      "Moves assets from one chain to another."),
+    ("coldwallet",  "A hardware device that keeps your keys offline."),
+    ("multisig",    "Requires multiple keys to sign a transaction."),
+    ("slippage",    "The difference between the price you expect and what you get."),
+]
+
+_hack_cooldowns: dict[int, float] = {}   # user_id -> timestamp
+_hack_games: dict[int, dict] = {}        # user_id -> active game state
+
+
+def _hack_display(word: str, revealed: set[int]) -> str:
+    return " ".join(c if i in revealed else "_" for i, c in enumerate(word))
+
+
+async def cmd_hack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    await _ensure_wallet(user, config.DB_PATH)
+
+    now = time.time()
+    last = _hack_cooldowns.get(user.id, 0)
+    if now - last < 3600:
+        remaining = int(3600 - (now - last))
+        m, s = divmod(remaining, 60)
+        await msg.reply_text(f"⏳ Hack cooldown: {m}m {s}s remaining.")
+        return
+
+    if user.id in _hack_games:
+        game = _hack_games[user.id]
+        display = _hack_display(game["word"], game["revealed"])
+        await msg.reply_text(
+            f"🖥️ You already have an active hack session!\n\n"
+            f"`{display}`\n_{game['clue']}_\n\n"
+            f"Attempts left: {game['attempts']}\nUse `/guess <word>` to answer.",
+            parse_mode="Markdown"
+        )
+        return
+
+    word, clue = random.choice(_WORDLIST)
+    reward = random.randint(800, 2500)
+    revealed = {0}  # always reveal first letter
+
+    _hack_games[user.id] = {
+        "word": word,
+        "clue": clue,
+        "reward": reward,
+        "attempts": 3,
+        "revealed": revealed,
+    }
+
+    display = _hack_display(word, revealed)
+    await msg.reply_text(
+        f"🖥️ *Hacking a wallet...*\n\n"
+        f"Clue: _{clue}_\n\n"
+        f"`{display}` ({len(word)} letters)\n\n"
+        f"You have 3 attempts. Use `/guess <word>` to crack it.\n"
+        f"💰 Reward: {reward:,} WRK$",
+        parse_mode="Markdown"
+    )
+
+
+async def cmd_guess(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+
+    game = _hack_games.get(user.id)
+    if not game:
+        await msg.reply_text("❌ No active hack session. Start one with `/hack`.", parse_mode="Markdown")
+        return
+
+    if not ctx.args:
+        await msg.reply_text("Usage: `/guess <word>`", parse_mode="Markdown")
+        return
+
+    guess = " ".join(ctx.args).lower().strip()
+    word = game["word"]
+
+    if guess == word:
+        del _hack_games[user.id]
+        _hack_cooldowns[user.id] = time.time()
+        reward = game["reward"]
+        new_bal = await db.update_balance(config.DB_PATH, user.id, reward)
+        await msg.reply_text(
+            f"✅ *ACCESS GRANTED*\n\n"
+            f"The word was `{word}`.\n"
+            f"You cracked the seed phrase and drained the wallet!\n\n"
+            f"💰 +{reward:,} WRK$ earned\n"
+            f"Balance: {new_bal:,} WRK$",
+            parse_mode="Markdown"
+        )
+        return
+
+    game["attempts"] -= 1
+
+    if game["attempts"] <= 0:
+        del _hack_games[user.id]
+        _hack_cooldowns[user.id] = time.time()
+        await msg.reply_text(
+            f"❌ *CONNECTION TERMINATED*\n\n"
+            f"The word was `{word}`.\n"
+            f"You got traced. Better luck next time.",
+            parse_mode="Markdown"
+        )
+        return
+
+    # Reveal another letter on wrong guess
+    unrevealed = [i for i in range(len(word)) if i not in game["revealed"]]
+    if unrevealed:
+        game["revealed"].add(random.choice(unrevealed))
+
+    display = _hack_display(word, game["revealed"])
+    await msg.reply_text(
+        f"❌ Wrong. {game['attempts']} attempt(s) left.\n\n"
+        f"`{display}`\n_{game['clue']}_",
+        parse_mode="Markdown"
+    )
+
+
 # ── /rob ──────────────────────────────────────────────────────────────────────
 
 _rob_cooldowns: dict[int, float] = {}  # user_id -> timestamp
