@@ -102,6 +102,20 @@ CREATE TABLE IF NOT EXISTS gift_offers (
 """
 
 async def _migrate(db) -> None:
+    # economy table migrations
+    async with db.execute("PRAGMA table_info(economy)") as cur:
+        econ_cols = {row[1] async for row in cur}
+    econ_new = {
+        "last_work":  "INTEGER NOT NULL DEFAULT 0",
+        "last_beg":   "INTEGER NOT NULL DEFAULT 0",
+        "work_count": "INTEGER NOT NULL DEFAULT 0",
+    }
+    for col, typedef in econ_new.items():
+        if col not in econ_cols:
+            await db.execute(f"ALTER TABLE economy ADD COLUMN {col} {typedef}")
+            await db.commit()
+
+    # groups table migrations
     async with db.execute("PRAGMA table_info(groups)") as cur:
         cols = {row[1] async for row in cur}
     new_cols = {
@@ -380,7 +394,7 @@ async def get_wallet(db_path: str, user_id: int) -> dict | None:
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT user_id, username, full_name, balance, streak, last_daily FROM economy WHERE user_id = ?",
+            "SELECT user_id, username, full_name, balance, streak, last_daily, last_work, last_beg, work_count FROM economy WHERE user_id = ?",
             (user_id,),
         ) as cur:
             row = await cur.fetchone()
@@ -415,6 +429,30 @@ async def get_leaderboard(db_path: str, limit: int = 10) -> list[dict]:
             (limit,),
         ) as cur:
             return [dict(r) async for r in cur]
+
+
+async def claim_work(db_path: str, user_id: int, amount: int, timestamp: int) -> tuple[int, int]:
+    """Returns (new_balance, new_work_count)."""
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "UPDATE economy SET balance = balance + ?, last_work = ?, work_count = work_count + 1 "
+            "WHERE user_id = ? RETURNING balance, work_count",
+            (amount, timestamp, user_id),
+        ) as cur:
+            row = await cur.fetchone()
+        await db.commit()
+        return (row[0], row[1]) if row else (0, 0)
+
+
+async def claim_beg(db_path: str, user_id: int, amount: int, timestamp: int) -> int:
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "UPDATE economy SET balance = balance + ?, last_beg = ? WHERE user_id = ? RETURNING balance",
+            (amount, timestamp, user_id),
+        ) as cur:
+            row = await cur.fetchone()
+        await db.commit()
+        return row[0] if row else 0
 
 
 async def claim_daily(db_path: str, user_id: int, amount: int, streak: int, timestamp: int) -> int:

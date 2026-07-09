@@ -227,6 +227,167 @@ async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
 
 
+# ── /work + /jobs ─────────────────────────────────────────────────────────────
+
+_JOBS = [
+    (0,   "🧑‍🎓 Crypto Intern",      100,  400),
+    (10,  "📈 Degen Trader",         250,  700),
+    (25,  "🌾 Yield Farmer",         400, 1000),
+    (50,  "🔍 On-Chain Analyst",     600, 1400),
+    (100, "⚙️ Protocol Dev",         900, 2000),
+    (200, "🦈 Blockchain Shark",    1300, 2800),
+    (500, "👑 Blockchain Baron",    2000, 4000),
+]
+
+_WORK_LINES = [
+    "you audited a smart contract and caught a reentrancy bug",
+    "you wrote a thread about {token} and it got 200 likes",
+    "you ran a node for 4 hours and collected validator rewards",
+    "you reviewed a whitepaper and submitted a report",
+    "you deployed a test contract on the testnet",
+    "you spotted a MEV opportunity in the mempool",
+    "you yield-farmed on a DEX for a shift",
+    "you answered support tickets in a crypto Discord",
+    "you backtested a trading strategy and it printed",
+    "you traced a suspicious wallet for a security firm",
+    "you minted a batch of NFTs and listed them above floor",
+    "you ran arbitrage between two DEX pools",
+]
+
+_WORK_TOKENS = ["GRAM", "TON", "BTC", "ETH", "SOL"]
+
+_WORK_COOLDOWN = 4 * 3600  # 4 hours
+
+
+def _get_job(work_count: int) -> tuple:
+    job = _JOBS[0]
+    for tier in _JOBS:
+        if work_count >= tier[0]:
+            job = tier
+    return job
+
+
+def _next_job(work_count: int) -> tuple | None:
+    for i, tier in enumerate(_JOBS):
+        if work_count < tier[0]:
+            return tier
+    return None
+
+
+@topic_gated
+async def cmd_work(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    wallet = await _ensure_wallet(user, config.DB_PATH)
+
+    now = time.time()
+    last = wallet.get("last_work", 0) or 0
+    remaining = _WORK_COOLDOWN - (now - last)
+
+    work_count = wallet.get("work_count", 0) or 0
+    _, title, low, high = _get_job(work_count)
+    next_tier = _next_job(work_count)
+    next_line = f"\n📊 {next_tier[0] - work_count} shift(s) until promotion to {next_tier[1]}" if next_tier else "\n👑 You've reached the top tier!"
+
+    if remaining > 0:
+        m, s = divmod(int(remaining), 60)
+        h, m = divmod(m, 60)
+        time_str = f"{h}h {m}m" if h else f"{m}m {s}s"
+        await msg.reply_text(
+            f"⏳ You're off the clock for {time_str}.\n\n"
+            f"Current job: {title}\n"
+            f"Next shift pays: {low:,}–{high:,} WRK${next_line}",
+            parse_mode="Markdown"
+        )
+        return
+
+    kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton(f"⚙️ Clock In ({low:,}–{high:,} WRK$)", callback_data=f"work:claim:{user.id}")
+    ]])
+    await msg.reply_text(
+        f"💼 *{title}*\n\n"
+        f"Shift #{work_count + 1} is ready. Clock in to collect your pay.{next_line}",
+        parse_mode="Markdown",
+        reply_markup=kb
+    )
+
+
+async def work_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    _, action, uid_str = query.data.split(":")
+    user_id = int(uid_str)
+
+    if query.from_user.id != user_id:
+        await query.answer("Not your shift.", show_alert=True)
+        return
+
+    await query.answer()
+
+    wallet = await db.get_wallet(config.DB_PATH, user_id)
+    if not wallet:
+        await query.edit_message_text("No wallet found.")
+        return
+
+    now = time.time()
+    last = wallet.get("last_work", 0) or 0
+    if now - last < _WORK_COOLDOWN:
+        remaining = int(_WORK_COOLDOWN - (now - last))
+        m, s = divmod(remaining, 60)
+        h, m = divmod(m, 60)
+        time_str = f"{h}h {m}m" if h else f"{m}m {s}s"
+        await query.edit_message_text(f"⏳ Already clocked in. Next shift in {time_str}.")
+        return
+
+    work_count = wallet.get("work_count", 0) or 0
+    _, title, low, high = _get_job(work_count)
+    earned = random.randint(low, high)
+
+    new_bal, new_count = await db.claim_work(config.DB_PATH, user_id, earned, int(now))
+
+    flavor = random.choice(_WORK_LINES).format(token=random.choice(_WORK_TOKENS))
+    next_tier = _next_job(new_count)
+
+    promo_line = ""
+    if next_tier and _get_job(work_count)[1] != _get_job(new_count)[1]:
+        promo_line = f"\n\n🎉 *Promoted to {_get_job(new_count)[1]}!*"
+    elif next_tier:
+        promo_line = f"\n📊 {next_tier[0] - new_count} shift(s) until {next_tier[1]}"
+    else:
+        promo_line = "\n👑 Max rank achieved!"
+
+    await query.edit_message_text(
+        f"💼 *Shift complete!*\n\n"
+        f"You {flavor}.\n\n"
+        f"💰 +{earned:,} WRK$ earned\n"
+        f"Balance: {new_bal:,} WRK$"
+        f"{promo_line}",
+        parse_mode="Markdown"
+    )
+
+
+@topic_gated
+async def cmd_jobs(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    wallet = await _ensure_wallet(user, config.DB_PATH)
+    work_count = wallet.get("work_count", 0) or 0
+
+    lines = ["👔 *Job Board*\n"]
+    for min_shifts, title, low, high in _JOBS:
+        if work_count >= min_shifts:
+            marker = "▶ " if _get_job(work_count)[1] == title else "✅ "
+        else:
+            marker = f"🔒 {min_shifts} shifts — "
+        lines.append(f"{marker}{title}  ({low:,}–{high:,} WRK$/shift)")
+
+    lines.append(f"\n🔧 Your shifts completed: {work_count}")
+    next_tier = _next_job(work_count)
+    if next_tier:
+        lines.append(f"📊 {next_tier[0] - work_count} more shift(s) to unlock {next_tier[1]}")
+
+    await msg.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
 # ── /leaderboard ──────────────────────────────────────────────────────────────
 
 @topic_gated

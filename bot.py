@@ -42,6 +42,7 @@ from handlers.economy import (
     cmd_crash, cmd_cashout,
     cmd_give, cmd_givewrk, cmd_setwrk,
     cmd_hack, cmd_guess,
+    cmd_work, cmd_jobs, work_callback,
 )
 from handlers.gifts import (
     cmd_seedgifts,
@@ -142,6 +143,8 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("cashout",     cmd_cashout))
     app.add_handler(CommandHandler("hack",        cmd_hack))
     app.add_handler(CommandHandler("guess",       cmd_guess))
+    app.add_handler(CommandHandler("work",        cmd_work))
+    app.add_handler(CommandHandler("jobs",        cmd_jobs))
     app.add_handler(CommandHandler("give",        cmd_give))
     app.add_handler(CommandHandler("givewrk",     cmd_givewrk))
     app.add_handler(CommandHandler("setwrk",      cmd_setwrk))
@@ -158,6 +161,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(dsetup_callback, pattern=r"^dsetup:"))
     app.add_handler(CallbackQueryHandler(help_callback,   pattern=r"^help:"))
     app.add_handler(CallbackQueryHandler(blackjack_callback, pattern=r"^bj:"))
+    app.add_handler(CallbackQueryHandler(work_callback,      pattern=r"^work:"))
     app.add_handler(CallbackQueryHandler(gifts_callback,      pattern=r"^gifts:"))
     app.add_handler(CallbackQueryHandler(gift_offer_callback, pattern=r"^gift_offer:"))
     app.add_handler(CallbackQueryHandler(shop_callback,       pattern=r"^shop:"))
