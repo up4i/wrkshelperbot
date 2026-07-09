@@ -515,7 +515,11 @@ async def cmd_dice(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 def _bj_render(player_hand, dealer_hand, hide_dealer=True) -> str:
     def fmt_hand(hand):
         return " ".join(f"{r}{s}" for r, s in hand)
-    dealer_display = f"{dealer_hand[0][0]}{dealer_hand[0][1]} ??" if hide_dealer else fmt_hand(dealer_hand)
+    if hide_dealer:
+        visible_value = _bj_hand_value([dealer_hand[0]])
+        dealer_display = f"{dealer_hand[0][0]}{dealer_hand[0][1]} ?? = **{visible_value}+?**"
+    else:
+        dealer_display = f"{fmt_hand(dealer_hand)} = **{_bj_hand_value(dealer_hand)}**"
     return (
         f"🃏 *Blackjack*\n\n"
         f"Your hand: {fmt_hand(player_hand)} = **{_bj_hand_value(player_hand)}**\n"
