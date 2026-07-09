@@ -82,7 +82,7 @@ def test_bj_is_blackjack_false_21_not_natural():
 def test_generate_crash_point_range():
     for _ in range(200):
         point = _generate_crash_point()
-        assert 1.0 <= point <= 2500.0
+        assert 1.5 <= point <= 2500.0
 
 def test_crash_multiplier_starts_at_one():
     assert _crash_multiplier(0) == 1.0

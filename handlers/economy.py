@@ -67,16 +67,18 @@ def _bj_is_blackjack(hand: list[tuple[str, str]]) -> bool:
 
 def _generate_crash_point() -> float:
     r = random.random()
-    if r < 0.50:
-        return round(random.uniform(1.0, 2.0), 2)
-    elif r < 0.75:
-        return round(random.uniform(2.0, 5.0), 2)
-    elif r < 0.90:
-        return round(random.uniform(5.0, 20.0), 2)
+    if r < 0.35:
+        return round(random.uniform(1.5, 3.0), 2)
+    elif r < 0.60:
+        return round(random.uniform(3.0, 8.0), 2)
+    elif r < 0.78:
+        return round(random.uniform(8.0, 25.0), 2)
+    elif r < 0.91:
+        return round(random.uniform(25.0, 150.0), 2)
     elif r < 0.98:
-        return round(random.uniform(20.0, 100.0), 2)
+        return round(random.uniform(150.0, 750.0), 2)
     else:
-        return round(random.uniform(100.0, 2500.0), 2)
+        return round(random.uniform(750.0, 2500.0), 2)
 
 
 def _crash_multiplier(ticks: int) -> float:
