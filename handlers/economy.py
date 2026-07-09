@@ -469,8 +469,12 @@ async def cmd_leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     for i, row in enumerate(rows):
         prefix = medals[i] if i < 3 else f"{i + 1}."
         name = row.get("full_name") or row.get("username") or str(row["user_id"])
-        mention = f"[{name}](tg://user?id={row['user_id']})"
-        lines.append(f"{prefix} {mention} — {row['balance']:,} WRK$")
+        username = row.get("username")
+        if username:
+            display = f"[{name}](https://t.me/{username.lstrip('@')})"
+        else:
+            display = name
+        lines.append(f"{prefix} {display} — {row['balance']:,} WRK$")
     await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
