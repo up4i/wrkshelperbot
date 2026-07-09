@@ -34,6 +34,12 @@ from handlers.welcome import (
     cmd_setwelcome, cmd_setgoodbye, cmd_welcome, cmd_goodbye,
     on_new_member, on_member_left,
 )
+from handlers.economy import (
+    cmd_balance, cmd_daily, cmd_leaderboard,
+    cmd_rob, cmd_slots, cmd_coinflip, cmd_dice,
+    cmd_blackjack, blackjack_callback,
+    cmd_crash, cmd_cashout,
+)
 
 os.makedirs(os.path.dirname(config.LOG_FILE), exist_ok=True)
 os.makedirs(os.path.dirname(config.DB_PATH), exist_ok=True)
@@ -106,9 +112,20 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("locks",              cmd_locks))
     app.add_handler(CommandHandler("antiraid",           cmd_antiraid))
     app.add_handler(CommandHandler("setantiraid",        cmd_setantiraid))
+    app.add_handler(CommandHandler("balance",     cmd_balance))
+    app.add_handler(CommandHandler("daily",       cmd_daily))
+    app.add_handler(CommandHandler("leaderboard", cmd_leaderboard))
+    app.add_handler(CommandHandler("rob",         cmd_rob))
+    app.add_handler(CommandHandler("slots",       cmd_slots))
+    app.add_handler(CommandHandler("coinflip",    cmd_coinflip))
+    app.add_handler(CommandHandler("dice",        cmd_dice))
+    app.add_handler(CommandHandler("blackjack",   cmd_blackjack))
+    app.add_handler(CommandHandler("crash",       cmd_crash))
+    app.add_handler(CommandHandler("cashout",     cmd_cashout))
     app.add_handler(CallbackQueryHandler(setup_callback,  pattern=r"^setup:"))
     app.add_handler(CallbackQueryHandler(dsetup_callback, pattern=r"^dsetup:"))
     app.add_handler(CallbackQueryHandler(help_callback,   pattern=r"^help:"))
+    app.add_handler(CallbackQueryHandler(blackjack_callback, pattern=r"^bj:"))
     app.add_handler(MessageHandler(filters.ChatType.GROUPS & filters.ALL, on_any_message))
     app.add_handler(
         MessageHandler(filters.ChatType.GROUPS & filters.StatusUpdate.ALL, on_service_message),
