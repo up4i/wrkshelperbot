@@ -228,251 +228,229 @@ async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 # ── /work + /jobs ─────────────────────────────────────────────────────────────
-# Each job tier has its own mini-game. Players answer a quick question (3 options)
-# and always earn something — correct earns full reward, wrong earns 30% consolation.
-# Cooldown: 2 minutes between plays, so it's quickly repeatable for small checks.
+# Tap-to-earn clicker in DMs. Start a shift → tap ⚡ Work repeatedly to
+# accumulate earnings → tap 🏁 End Shift to collect. Max 50 taps per shift,
+# 15-minute cooldown between shifts. Total lifetime taps unlock promotions.
 
-# (min_shifts, title, win_low, win_high)
+# (min_taps, title, earn_low, earn_high)  — earn per tap in WRK$
 _JOBS = [
-    (0,   "🧑‍🎓 Crypto Intern",    50,   200),
-    (10,  "📈 Degen Trader",       100,  400),
-    (25,  "🌾 Yield Farmer",       200,  700),
-    (50,  "🔍 On-Chain Analyst",   350, 1000),
-    (100, "⚙️ Protocol Dev",       500, 1500),
-    (200, "🦈 Blockchain Shark",   800, 2200),
-    (500, "👑 Blockchain Baron",  1200, 3000),
+    (0,    "🧑‍🎓 Crypto Intern",    5,   15),
+    (100,  "📈 Degen Trader",       10,  30),
+    (300,  "🌾 Yield Farmer",       20,  60),
+    (600,  "🔍 On-Chain Analyst",   35, 100),
+    (1000, "⚙️ Protocol Dev",       55, 150),
+    (2000, "🦈 Blockchain Shark",   85, 220),
+    (5000, "👑 Blockchain Baron",  130, 320),
 ]
 
-_WORK_COOLDOWN = 120   # 2 minutes
-_WORK_CONSOLATION = 0.3  # 30% of win reward on wrong answer
-_work_games: dict[int, dict] = {}  # user_id -> active game state
-_work_cooldowns: dict[int, float] = {}  # user_id -> last claimed timestamp
-
-_TOKENS = ["BTC", "ETH", "SOL", "TON", "GRAM", "MATIC", "AVAX", "ARB"]
-_PROTOCOLS = ["Uniswap", "Curve", "Aave", "Compound", "Lido", "Yearn", "dYdX"]
-_PAIRS = ["ETH/USDC", "BTC/ETH", "SOL/USDC", "TON/USDT", "GRAM/TON", "ARB/ETH"]
+_SHIFT_MAX_TAPS = 50
+_SHIFT_COOLDOWN = 15 * 60   # 15 min between shifts
+_work_sessions: dict[int, dict] = {}   # user_id -> active shift state
+_work_cooldowns: dict[int, float] = {} # user_id -> shift-end timestamp
 
 
-def _get_job(work_count: int) -> tuple:
+def _get_job(tap_count: int) -> tuple:
     job = _JOBS[0]
     for tier in _JOBS:
-        if work_count >= tier[0]:
+        if tap_count >= tier[0]:
             job = tier
     return job
 
 
-def _next_job(work_count: int) -> tuple | None:
+def _next_job(tap_count: int) -> tuple | None:
     for tier in _JOBS:
-        if work_count < tier[0]:
+        if tap_count < tier[0]:
             return tier
     return None
 
 
-def _gen_game(tier_index: int) -> dict:
-    """Generate a mini-game for the given tier. Returns {prompt, options, correct}."""
-    if tier_index == 0:
-        # Intern: find the cheapest gas fee
-        fees = sorted([random.randint(10, 200) for _ in range(3)])
-        shuffled = fees[:]
-        random.shuffle(shuffled)
-        correct = shuffled.index(min(shuffled))
-        return {
-            "prompt": "⛽ *Mempool is congested.* Which pending TX has the lowest gas fee?\n\n"
-                      + "\n".join(f"TX #{i+1} — {shuffled[i]} gwei" for i in range(3)),
-            "options": [f"TX #{i+1}" for i in range(3)],
-            "correct": correct,
-        }
-
-    if tier_index == 1:
-        # Degen Trader: find the best-performing token
-        tokens = random.sample(_TOKENS, 3)
-        changes = [round(random.uniform(-20, 40), 1) for _ in range(3)]
-        correct = max(range(3), key=lambda i: changes[i])
-        return {
-            "prompt": "📈 *One trade left today.* Which token is pumping the hardest?\n\n"
-                      + "\n".join(f"{tokens[i]}: {changes[i]:+.1f}%" for i in range(3)),
-            "options": tokens,
-            "correct": correct,
-        }
-
-    if tier_index == 2:
-        # Yield Farmer: find the highest APY farm
-        protocols = random.sample(_PROTOCOLS, 3)
-        apys = [round(random.uniform(2, 180), 1) for _ in range(3)]
-        correct = max(range(3), key=lambda i: apys[i])
-        return {
-            "prompt": "🌾 *LP slot open.* Which farm has the best APY right now?\n\n"
-                      + "\n".join(f"{protocols[i]}: {apys[i]}% APY" for i in range(3)),
-            "options": protocols,
-            "correct": correct,
-        }
-
-    if tier_index == 3:
-        # Analyst: spot the whale (largest ETH balance)
-        labels = [f"Wallet {chr(65+i)}" for i in range(3)]
-        balances = [round(random.uniform(0.5, 500), 1) for _ in range(3)]
-        correct = max(range(3), key=lambda i: balances[i])
-        return {
-            "prompt": "🔍 *Suspicious wallets flagged.* Which one is the whale?\n\n"
-                      + "\n".join(f"{labels[i]}: {balances[i]} ETH" for i in range(3)),
-            "options": labels,
-            "correct": correct,
-        }
-
-    if tier_index == 4:
-        # Protocol Dev: most gas-efficient function (lowest gas used)
-        funcs = [f"func_{chr(65+i)}()" for i in range(3)]
-        gas = [random.randint(21_000, 600_000) for _ in range(3)]
-        correct = min(range(3), key=lambda i: gas[i])
-        return {
-            "prompt": "⚙️ *Code review.* Which function is the most gas-efficient?\n\n"
-                      + "\n".join(f"`{funcs[i]}` — {gas[i]:,} gas" for i in range(3)),
-            "options": funcs,
-            "correct": correct,
-        }
-
-    if tier_index == 5:
-        # Blockchain Shark: deepest liquidity pool (highest TVL)
-        pairs = random.sample(_PAIRS, 3)
-        tvls = [round(random.uniform(0.5, 80), 2) for _ in range(3)]
-        correct = max(range(3), key=lambda i: tvls[i])
-        return {
-            "prompt": "🦈 *Big trade incoming.* Which pool has the deepest liquidity?\n\n"
-                      + "\n".join(f"{pairs[i]}: ${tvls[i]}M TVL" for i in range(3)),
-            "options": pairs,
-            "correct": correct,
-        }
-
-    # tier_index == 6: Baron: best risk-adjusted return (highest Sharpe)
-    assets = random.sample(_TOKENS, 3)
-    rets = [round(random.uniform(-5, 45), 1) for _ in range(3)]
-    vols = [round(random.uniform(5, 50), 1) for _ in range(3)]
-    sharpes = [round(rets[i] / vols[i], 2) for i in range(3)]
-    correct = max(range(3), key=lambda i: sharpes[i])
-    return {
-        "prompt": "👑 *Rebalance time.* Which asset has the best risk-adjusted return?\n\n"
-                  + "\n".join(
-                      f"{assets[i]}: return {rets[i]:+.1f}%  vol {vols[i]:.1f}%  → Sharpe {sharpes[i]:.2f}"
-                      for i in range(3)
-                  ),
-        "options": assets,
-        "correct": correct,
-    }
+def _shift_message(session: dict) -> str:
+    _, title, lo, hi = session["job"]
+    taps = session["taps"]
+    earned = session["earned"]
+    tap_count = session["tap_count_start"] + taps
+    next_tier = _next_job(tap_count)
+    promo = (
+        f"\n📊 {next_tier[0] - tap_count} taps to unlock {next_tier[1]}"
+        if next_tier else "\n👑 Max tier achieved!"
+    )
+    bar_filled = int(taps / _SHIFT_MAX_TAPS * 10)
+    bar = "█" * bar_filled + "░" * (10 - bar_filled)
+    return (
+        f"💼 *{title}*\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"💰 Earned: *{earned:,} WRK$*\n"
+        f"👆 Taps: {taps}/{_SHIFT_MAX_TAPS}  [{bar}]\n"
+        f"⚡ {lo}–{hi} WRK$ per tap"
+        f"{promo}"
+    )
 
 
-def _tier_index(work_count: int) -> int:
-    idx = 0
-    for i, tier in enumerate(_JOBS):
-        if work_count >= tier[0]:
-            idx = i
-    return idx
-
-
-@topic_gated
 async def cmd_work(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
-    wallet = await _ensure_wallet(user, config.DB_PATH)
 
-    now = time.time()
-    remaining = _WORK_COOLDOWN - (now - _work_cooldowns.get(user.id, 0))
-    if remaining > 0:
-        m, s = divmod(int(remaining), 60)
-        await msg.reply_text(f"⏳ Next shift available in *{m}m {s}s*.", parse_mode="Markdown")
+    if msg.chat.type != "private":
+        await msg.reply_text("💼 Use /work in DMs with me to start your shift!")
         return
 
-    work_count = wallet.get("work_count", 0) or 0
-    _, title, win_low, win_high = _get_job(work_count)
-    win_reward = random.randint(win_low, win_high)
-    consolation = max(10, int(win_reward * _WORK_CONSOLATION))
-    tidx = _tier_index(work_count)
-    game = _gen_game(tidx)
+    if user.id in _work_sessions:
+        session = _work_sessions[user.id]
+        kb = InlineKeyboardMarkup([[
+            InlineKeyboardButton("⚡ Work", callback_data=f"work:tap:{user.id}"),
+            InlineKeyboardButton("🏁 End Shift", callback_data=f"work:end:{user.id}"),
+        ]])
+        await msg.reply_text(
+            "You have an active shift!\n\n" + _shift_message(session),
+            parse_mode="Markdown", reply_markup=kb
+        )
+        return
 
-    _work_games[user.id] = {
-        "correct": game["correct"],
-        "win_reward": win_reward,
-        "consolation": consolation,
-        "work_count": work_count,
+    now = time.time()
+    remaining = _SHIFT_COOLDOWN - (now - _work_cooldowns.get(user.id, 0))
+    if remaining > 0:
+        m, s = divmod(int(remaining), 60)
+        await msg.reply_text(f"⏳ Next shift starts in *{m}m {s}s*.", parse_mode="Markdown")
+        return
+
+    wallet = await _ensure_wallet(user, config.DB_PATH)
+    tap_count = wallet.get("work_count", 0) or 0
+    job = _get_job(tap_count)
+
+    _work_sessions[user.id] = {
+        "job": job,
+        "taps": 0,
+        "earned": 0,
+        "tap_count_start": tap_count,
     }
 
     kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton(opt, callback_data=f"work:pick:{user.id}:{i}")
-        for i, opt in enumerate(game["options"])
+        InlineKeyboardButton("⚡ Work", callback_data=f"work:tap:{user.id}"),
+        InlineKeyboardButton("🏁 End Shift", callback_data=f"work:end:{user.id}"),
     ]])
-    next_tier = _next_job(work_count)
-    promo = f"\n📊 {next_tier[0] - work_count} shifts to {next_tier[1]}" if next_tier else "\n👑 Max tier"
     await msg.reply_text(
-        f"💼 *{title}* — Shift #{work_count + 1}\n"
-        f"✅ Correct: +{win_reward:,} WRK$  ·  ❌ Wrong: +{consolation:,} WRK$\n\n"
-        f"{game['prompt']}{promo}",
-        parse_mode="Markdown",
-        reply_markup=kb
+        "🟢 *Shift started!* Keep tapping ⚡ Work to earn.\n\n"
+        + _shift_message(_work_sessions[user.id]),
+        parse_mode="Markdown", reply_markup=kb
     )
 
 
 async def work_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    parts = query.data.split(":")
-    # format: work:pick:<user_id>:<choice>
-    _, _, uid_str, choice_str = parts
+    _, action, uid_str = query.data.split(":")
     user_id = int(uid_str)
 
     if query.from_user.id != user_id:
         await query.answer("Not your shift.", show_alert=True)
         return
 
-    game = _work_games.pop(user_id, None)
-    if not game:
-        await query.answer("This shift already ended.", show_alert=True)
+    session = _work_sessions.get(user_id)
+
+    # ── tap ──
+    if action == "tap":
+        if not session:
+            await query.answer("No active shift. Use /work to start one.", show_alert=True)
+            return
+
+        _, _, lo, hi = session["job"]
+        earned_this_tap = random.randint(lo, hi)
+        session["taps"] += 1
+        session["earned"] += earned_this_tap
+
+        await query.answer(f"+{earned_this_tap:,} WRK$ 💰")
+
+        # update message every 5 taps or on last tap to stay under Telegram rate limits
+        if session["taps"] % 5 == 0 or session["taps"] >= _SHIFT_MAX_TAPS:
+            kb = InlineKeyboardMarkup([[
+                InlineKeyboardButton("⚡ Work", callback_data=f"work:tap:{user_id}"),
+                InlineKeyboardButton("🏁 End Shift", callback_data=f"work:end:{user_id}"),
+            ]])
+            try:
+                await query.edit_message_text(
+                    _shift_message(session), parse_mode="Markdown", reply_markup=kb
+                )
+            except TelegramError:
+                pass
+
+        if session["taps"] >= _SHIFT_MAX_TAPS:
+            # auto-end shift
+            await _end_shift(query, user_id, session, auto=True)
         return
 
-    await query.answer()
+    # ── end ──
+    if action == "end":
+        if not session:
+            await query.answer("No active shift.", show_alert=True)
+            return
+        await query.answer()
+        await _end_shift(query, user_id, session, auto=False)
 
-    choice = int(choice_str)
-    correct = game["correct"]
-    won = choice == correct
-    earned = game["win_reward"] if won else game["consolation"]
 
+async def _end_shift(query, user_id: int, session: dict, auto: bool):
+    _work_sessions.pop(user_id, None)
     _work_cooldowns[user_id] = time.time()
-    new_bal, new_count = await db.claim_work(config.DB_PATH, user_id, earned, int(time.time()))
 
-    result_line = f"✅ *Correct!* +{earned:,} WRK$" if won else f"❌ Wrong answer. +{earned:,} WRK$ consolation"
+    total = session["earned"]
+    taps = session["taps"]
 
-    old_title = _get_job(game["work_count"])[1]
-    new_title = _get_job(new_count)[1]
+    if total == 0:
+        await query.edit_message_text("You ended your shift without earning anything. Tap ⚡ next time!")
+        return
+
+    new_bal, new_tap_count = await db.claim_work(config.DB_PATH, user_id, total, int(time.time()))
+
+    # update work_count by taps — claim_work only adds 1; we need to add taps-1 more
+    # simplest: call update_balance(0) won't help; instead handle in DB directly
+    # Actually claim_work adds 1 to work_count per call; for tap counting we need to
+    # add (taps - 1) more to work_count after the fact
+    if taps > 1:
+        # update_balance only touches balance; use a direct work_count bump
+        async with __import__('aiosqlite').connect(config.DB_PATH) as _db:
+            await _db.execute(
+                "UPDATE economy SET work_count = work_count + ? WHERE user_id = ?",
+                (taps - 1, user_id)
+            )
+            await _db.commit()
+        new_tap_count = new_tap_count + (taps - 1)
+
+    old_title = session["job"][1]
+    new_title = _get_job(new_tap_count)[1]
     promo_line = f"\n\n🎉 *Promoted to {new_title}!*" if new_title != old_title else ""
 
-    next_tier = _next_job(new_count)
-    progress = f"\n📊 {next_tier[0] - new_count} shifts to {next_tier[1]}" if next_tier and not promo_line else ("\n👑 Max tier!" if not next_tier else "")
+    next_tier = _next_job(new_tap_count)
+    progress = f"\n📊 {next_tier[0] - new_tap_count} taps to {next_tier[1]}" if next_tier else "\n👑 Max tier!"
 
+    prefix = "⏰ Max taps reached! Shift auto-ended.\n\n" if auto else "🏁 *Shift complete!*\n\n"
     await query.edit_message_text(
-        f"{result_line}\n"
+        f"{prefix}"
+        f"👆 Taps this shift: {taps}\n"
+        f"💰 Collected: *{total:,} WRK$*\n"
         f"Balance: {new_bal:,} WRK$"
         f"{promo_line}{progress}\n\n"
-        f"_Correct answer: option #{correct + 1}_",
+        f"_Next shift available in 15 minutes._",
         parse_mode="Markdown"
     )
 
 
-@topic_gated
 async def cmd_jobs(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
     wallet = await _ensure_wallet(user, config.DB_PATH)
-    work_count = wallet.get("work_count", 0) or 0
+    tap_count = wallet.get("work_count", 0) or 0
 
     lines = ["👔 *Job Board*\n"]
-    for i, (min_shifts, title, win_low, win_high) in enumerate(_JOBS):
-        if work_count >= min_shifts:
-            marker = "▶ " if _tier_index(work_count) == i else "✅ "
+    current_title = _get_job(tap_count)[1]
+    for min_taps, title, lo, hi in _JOBS:
+        if tap_count >= min_taps:
+            marker = "▶ " if title == current_title else "✅ "
         else:
-            marker = f"🔒 {min_shifts} shifts — "
-        lines.append(f"{marker}{title}  (+{win_low:,}–{win_high:,} WRK$ per game)")
+            marker = f"🔒 {min_taps} taps — "
+        lines.append(f"{marker}{title}  ({lo}–{hi} WRK$/tap)")
 
-    lines.append(f"\n🔧 Total shifts: {work_count}")
-    next_tier = _next_job(work_count)
+    lines.append(f"\n👆 Your lifetime taps: {tap_count}")
+    next_tier = _next_job(tap_count)
     if next_tier:
-        lines.append(f"📊 {next_tier[0] - work_count} more to unlock {next_tier[1]}")
+        lines.append(f"📊 {next_tier[0] - tap_count} more taps to unlock {next_tier[1]}")
 
     await msg.reply_text("\n".join(lines), parse_mode="Markdown")
 
