@@ -338,54 +338,36 @@ async def cmd_give(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # ── /hack ─────────────────────────────────────────────────────────────────────
 
 _WORDLIST = [
-    ("seed",        "The 12-24 word key to your entire crypto kingdom."),
-    ("phrase",      "What you never screenshot. What you never share. Starts with 'ph'."),
-    ("wallet",      "Where your bags live on-chain."),
-    ("hodl",        "A typo that became a crypto religion."),
-    ("whale",       "Someone who moves markets just by breathing."),
-    ("mempool",     "The waiting room for unconfirmed transactions."),
-    ("airdrop",     "Free tokens that land in your wallet out of nowhere."),
-    ("rugpull",     "The dev said 'we're not going anywhere.' Then they went anywhere."),
-    ("halving",     "When Bitcoin's block reward gets cut in half."),
-    ("staking",     "Locking up tokens to earn passive income."),
-    ("validator",   "Keeps the network honest. Gets paid to do it."),
-    ("nominator",   "Backs a validator with their stake on TON."),
-    ("jetton",      "TON's version of a token standard."),
-    ("workchain",   "A parallel chain in the TON architecture."),
-    ("genesis",     "The very first block of a blockchain."),
-    ("liquidity",   "The lifeblood of every DEX pool."),
-    ("tokenomics",  "The economics behind a token's supply and distribution."),
-    ("whitepaper",  "The document where every project promises to change the world."),
-    ("defi",        "Banking, but the bank is a smart contract."),
-    ("mainnet",     "The real network, not the playground."),
-    ("testnet",     "Where devs break things before breaking the real thing."),
-    ("hash",        "A fixed-length fingerprint of data."),
-    ("fork",        "When a blockchain splits and takes a different path."),
-    ("dao",         "A community that governs itself through votes and tokens."),
-    ("degen",       "Someone who apes into anything with triple-digit APY."),
-    ("moonshot",    "A bet so wild it either 100xs or goes to zero."),
-    ("rekt",        "When the trade goes the wrong way. Very wrong."),
-    ("shill",       "Promoting a token you hold and hope others buy."),
-    ("gas",         "The fee that powers every Ethereum transaction."),
-    ("altcoin",     "Any crypto that isn't Bitcoin."),
-    ("bullish",     "Confident the price is going up."),
-    ("bearish",     "Expecting the price to go down."),
-    ("pump",        "When a coin's price spikes fast, usually suspiciously."),
-    ("dump",        "What happens right after the pump."),
-    ("nft",         "A unique digital asset on-chain. Three letters."),
-    ("gram",        "TON's rebranded ticker. The coin in this very bot."),
-    ("node",        "A computer that participates in a blockchain network."),
-    ("block",       "A bundle of transactions added to the chain."),
-    ("miner",       "Solves puzzles to add blocks and earn rewards."),
-    ("ledger",      "A record of all transactions. Also a cold wallet brand."),
-    ("satoshi",     "The smallest unit of Bitcoin. Also Bitcoin's creator."),
-    ("ethereum",    "Home of smart contracts. Gas fees hit different here."),
-    ("bitcoin",     "The original. The OG. The one that started it all."),
-    ("sniper",      "A bot that buys a token the millisecond it launches."),
-    ("bridge",      "Moves assets from one chain to another."),
-    ("coldwallet",  "A hardware device that keeps your keys offline."),
-    ("multisig",    "Requires multiple keys to sign a transaction."),
-    ("slippage",    "The difference between the price you expect and what you get."),
+    ("whale",  "Someone who moves markets just by breathing."),
+    ("degen",  "Someone who apes into anything with triple-digit APY."),
+    ("shill",  "Promoting a token you hold and hope others buy."),
+    ("block",  "A bundle of transactions added to the chain."),
+    ("miner",  "Solves puzzles to add blocks and earn rewards."),
+    ("stake",  "Locking tokens to earn passive income."),
+    ("yield",  "The return you earn on a DeFi position."),
+    ("token",  "The unit of value native to a blockchain."),
+    ("alpha",  "Trading before the crowd catches on. Being early is everything."),
+    ("chart",  "Where every degen spends half their waking hours."),
+    ("trade",  "Buy low, sell high. Simple in theory."),
+    ("vault",  "Where DeFi stores your funds. Hopefully."),
+    ("chain",  "The backbone. It's in the name."),
+    ("proof",  "The mechanism that keeps a blockchain honest."),
+    ("audit",  "When a dev firm checks if the code won't rug you."),
+    ("floor",  "The lowest price an NFT collection will sell for."),
+    ("layer",  "L2s sit on top of L1s to make things faster and cheaper."),
+    ("short",  "Betting the price goes down. High risk, high reward."),
+    ("crash",  "When the market decides to humble everyone at once."),
+    ("rally",  "A sudden surge upward. WAGMI season."),
+    ("greed",  "The emotion that buys tops and sells bottoms."),
+    ("limit",  "An order that only executes at your chosen price."),
+    ("burns",  "Destroying tokens to reduce supply and pump holders."),
+    ("runes",  "Bitcoin's answer to tokens. Inscribed, not bridged."),
+    ("nodes",  "The machines keeping the network alive and verified."),
+    ("pools",  "Where liquidity lives in a DEX. Provide at your own risk."),
+    ("proxy",  "A contract that points to another. Used for upgradeable protocols."),
+    ("coins",  "The currency of the chain. Not tokens — native coins."),
+    ("smart",  "As in contract. The code that runs without humans."),
+    ("ratio",  "Risk/reward. The one number degens ignore."),
 ]
 
 _hack_cooldowns: dict[int, float] = {}   # user_id -> timestamp
@@ -435,7 +417,7 @@ async def cmd_hack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "word": word,
         "clue": clue,
         "reward": reward,
-        "attempts": 3,
+        "attempts": 5,
         "revealed": revealed,
         "started_at": now,
     }
@@ -445,7 +427,7 @@ async def cmd_hack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"🖥️ *Hacking a wallet...*\n\n"
         f"Clue: _{clue}_\n\n"
         f"`{display}` ({len(word)} letters)\n\n"
-        f"You have 3 attempts. Use `/guess <word>` to crack it.\n"
+        f"You have 5 attempts. Use `/guess <word>` to crack it.\n"
         f"💰 Reward: {reward:,} WRK$",
         parse_mode="Markdown"
     )
@@ -1020,10 +1002,10 @@ async def cmd_crash(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await db.update_balance(config.DB_PATH, user.id, -bet)
 
     sent = await msg.reply_text(
-        f"🚀 *{display_name(user)} started Crash!*\n"
-        f"Type `/crash <bet>` to join.\n\n"
+        f"🚀 <b>{escape(display_name(user))} started Crash!</b>\n"
+        f"Type /crash &lt;bet&gt; to join.\n\n"
         f"Starting in 10...",
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
     _crash_games[chat_id]["announcement_id"] = sent.message_id
 
@@ -1053,11 +1035,11 @@ async def _crash_countdown_tick(ctx: ContextTypes.DEFAULT_TYPE):
                 chat_id=chat_id,
                 message_id=data["announcement_id"],
                 text=(
-                    f"🚀 *Crash starting soon!*\n"
-                    f"Type `/crash <bet>` to join.\n\n"
+                    f"🚀 <b>Crash starting soon!</b>\n"
+                    f"Type /crash &lt;bet&gt; to join.\n\n"
                     f"Starting in {remaining}..."
                 ),
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
         except TelegramError:
             pass
@@ -1067,13 +1049,13 @@ async def _crash_countdown_tick(ctx: ContextTypes.DEFAULT_TYPE):
     game["state"] = "running"
 
     player_list = "\n".join(
-        f"  • {p['name']} ({p['bet']:,} WRK$)" for p in game["players"].values()
+        f"  • {escape(p['name'])} ({p['bet']:,} WRK$)" for p in game["players"].values()
     )
     sent = await ctx.bot.send_message(
         chat_id=chat_id,
         message_thread_id=game.get("thread_id"),
-        text=f"🚀 *CRASH IS LIVE!*\n\nMultiplier: **1.00x**\n\nPlayers:\n{player_list}\n\nType /cashout to lock in!",
-        parse_mode="Markdown"
+        text=f"🚀 <b>CRASH IS LIVE!</b>\n\nMultiplier: <b>1.00x</b>\n\nPlayers:\n{player_list}\n\nType /cashout to lock in!",
+        parse_mode="HTML"
     )
     game["live_msg_id"] = sent.message_id
 
@@ -1107,12 +1089,12 @@ async def _crash_game_tick(ctx: ContextTypes.DEFAULT_TYPE):
         await _crash_end(ctx.bot, chat_id, game, crashed_at=mult)
         return
 
-    active_lines = "\n".join(f"  • {p['name']} ({p['bet']:,} WRK$)" for p in active)
+    active_lines = "\n".join(f"  • {escape(p['name'])} ({p['bet']:,} WRK$)" for p in active)
     cashed_lines = "\n".join(
-        f"  ✅ {p['name']} cashed @ {p['cash_out_mult']}x"
+        f"  ✅ {escape(p['name'])} cashed @ {p['cash_out_mult']}x"
         for p in game["players"].values() if p["cashed_out"]
     )
-    body = f"🚀 *CRASH LIVE — {mult}x*\n\nIn:\n{active_lines}"
+    body = f"🚀 <b>CRASH LIVE — {mult}x</b>\n\nIn:\n{active_lines}"
     if cashed_lines:
         body += f"\n\nCashed out:\n{cashed_lines}"
     body += "\n\nType /cashout to lock in!"
@@ -1122,10 +1104,10 @@ async def _crash_game_tick(ctx: ContextTypes.DEFAULT_TYPE):
             chat_id=chat_id,
             message_id=game["live_msg_id"],
             text=body,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
-    except TelegramError:
-        pass
+    except TelegramError as e:
+        log.warning("crash tick edit failed chat=%s: %s", chat_id, e)
 
 
 @topic_gated
@@ -1161,22 +1143,22 @@ async def cmd_cashout(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def _crash_end(bot, chat_id: int, game: dict, crashed_at: float):
     game["state"] = "crashed"
-    lines = ["💥 *CRASHED @ {:.2f}x*\n".format(crashed_at)]
+    lines = [f"💥 <b>CRASHED @ {crashed_at:.2f}x</b>\n"]
     for uid, p in game["players"].items():
         if p["cashed_out"]:
             profit = int(p["bet"] * p["cash_out_mult"]) - p["bet"]
-            lines.append(f"✅ {p['name']} — cashed @ {p['cash_out_mult']}x (+{profit:,} WRK$)")
+            lines.append(f"✅ {escape(p['name'])} — cashed @ {p['cash_out_mult']}x (+{profit:,} WRK$)")
         else:
-            lines.append(f"💀 {p['name']} — lost {p['bet']:,} WRK$")
+            lines.append(f"💀 {escape(p['name'])} — lost {p['bet']:,} WRK$")
 
     try:
         await bot.edit_message_text(
             chat_id=chat_id,
             message_id=game["live_msg_id"],
             text="\n".join(lines),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
     except TelegramError:
-        await bot.send_message(chat_id=chat_id, message_thread_id=game.get("thread_id"), text="\n".join(lines), parse_mode="Markdown")
+        await bot.send_message(chat_id=chat_id, message_thread_id=game.get("thread_id"), text="\n".join(lines), parse_mode="HTML")
 
     del _crash_games[chat_id]

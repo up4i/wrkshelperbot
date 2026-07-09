@@ -133,7 +133,7 @@ _PAGES = {
         "└ On fail: fine, bail, or clean getaway\n"
         "└ Victim needs ≥500 WRK$ to be robbable\n"
         "`/hack` — guess a crypto word to crack a wallet (1h cooldown)\n"
-        "└ 3 attempts · hints reveal letters on wrong guess\n"
+        "└ 5 attempts · hints reveal letters on wrong guess\n"
         "└ Reward: 800–2500 WRK$ on success\n"
         "`/guess <word>` — submit your answer during a hack session\n\n"
         "🎰 *Gambling* — use `all` as bet to go all-in\n"
