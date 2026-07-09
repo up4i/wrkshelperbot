@@ -196,12 +196,12 @@ async def cmd_setlog(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     if not ctx.args:
-        await msg.reply_text("Usage: `/setlog @channelname`", parse_mode="Markdown")
+        await msg.reply_text("Usage: `/setlog @channelname` or `/setlog -100xxxxxxxxxx`", parse_mode="Markdown")
         return
 
     channel = ctx.args[0]
     try:
-        chat = await ctx.bot.get_chat(channel)
+        chat = await ctx.bot.get_chat(int(channel) if channel.lstrip("-").isdigit() else channel)
         channel_id = chat.id
     except Exception as e:
         await msg.reply_text(f"Couldn't find that channel: {e}")
