@@ -195,10 +195,13 @@ def _collect_shift(db, user_id: int, taps: int, earned: int) -> dict:
     """Delete active session, credit economy, return result dict."""
     db.execute("DELETE FROM work_sessions WHERE user_id = ?", (user_id,))
     now = int(time.time())
-    db.execute(
+    cur = db.execute(
         "UPDATE economy SET balance = balance + ?, last_work = ?, work_count = work_count + ? WHERE user_id = ?",
         (earned, now, taps, user_id),
     )
+    if cur.rowcount == 0:
+        db.rollback()
+        raise HTTPException(500, "Economy record missing")
     row = db.execute("SELECT balance, work_count FROM economy WHERE user_id = ?", (user_id,)).fetchone()
     db.commit()
     new_work_count = row["work_count"] if row else 0
@@ -369,15 +372,16 @@ def work_sync(req: WorkSyncRequest):
         new_earned = session["earned"] + req.earned_delta
         if new_taps > _SHIFT_MAX_TAPS:
             raise HTTPException(400, f"Would exceed max taps ({_SHIFT_MAX_TAPS})")
+        if new_taps >= _SHIFT_MAX_TAPS:
+            # Skip intermediate commit — _collect_shift handles deletion + credit atomically
+            result = _collect_shift(db, req.user_id, new_taps, new_earned)
+            result["auto_ended"] = True
+            return result
         db.execute(
             "UPDATE work_sessions SET taps = ?, earned = ? WHERE user_id = ?",
             (new_taps, new_earned, req.user_id),
         )
         db.commit()
-        if new_taps >= _SHIFT_MAX_TAPS:
-            result = _collect_shift(db, req.user_id, new_taps, new_earned)
-            result["auto_ended"] = True
-            return result
         return {
             "session": {**session, "taps": new_taps, "earned": new_earned},
             "auto_ended": False,
