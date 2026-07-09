@@ -498,3 +498,209 @@ async def blackjack_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"{result}\n💰 {new_bal:,} WRK$",
             parse_mode="Markdown"
         )
+
+
+# ── /crash ────────────────────────────────────────────────────────────────────
+
+async def cmd_crash(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    chat_id = msg.chat.id
+    wallet = await _ensure_wallet(user, config.DB_PATH)
+
+    if not ctx.args or not ctx.args[0].isdigit():
+        await msg.reply_text("Usage: `/crash <bet>`", parse_mode="Markdown")
+        return
+    bet = int(ctx.args[0])
+    if bet < 10:
+        await msg.reply_text("❌ Minimum bet is 10 WRK$.")
+        return
+    if wallet["balance"] < bet:
+        await msg.reply_text(f"❌ Not enough WRK$. Your balance: {wallet['balance']:,}")
+        return
+
+    if chat_id in _crash_games:
+        game = _crash_games[chat_id]
+        if game["state"] != "joining":
+            await msg.reply_text("❌ Crash is already in progress, wait for next round.")
+            return
+        if user.id in game["players"]:
+            await msg.reply_text("❌ You're already in this game.")
+            return
+        game["players"][user.id] = {"bet": bet, "name": display_name(user), "cashed_out": False, "cash_out_mult": None}
+        await db.update_balance(config.DB_PATH, user.id, -bet)
+        await msg.reply_text(f"✅ Joined crash with {bet:,} WRK$ bet!")
+        return
+
+    crash_point = _generate_crash_point()
+    _crash_games[chat_id] = {
+        "state": "joining",
+        "crash_point": crash_point,
+        "ticks": 0,
+        "players": {
+            user.id: {"bet": bet, "name": display_name(user), "cashed_out": False, "cash_out_mult": None}
+        },
+        "announcement_id": None,
+        "live_msg_id": None,
+    }
+    await db.update_balance(config.DB_PATH, user.id, -bet)
+
+    sent = await msg.reply_text(
+        f"🚀 *{display_name(user)} started Crash!*\n"
+        f"Type `/crash <bet>` to join.\n\n"
+        f"Starting in 10...",
+        parse_mode="Markdown"
+    )
+    _crash_games[chat_id]["announcement_id"] = sent.message_id
+
+    ctx.application.job_queue.run_repeating(
+        _crash_countdown_tick,
+        interval=1,
+        first=1,
+        data={"chat_id": chat_id, "tick": 0, "announcement_id": sent.message_id},
+        name=f"crash_countdown_{chat_id}",
+    )
+
+
+async def _crash_countdown_tick(ctx: ContextTypes.DEFAULT_TYPE):
+    data = ctx.job.data
+    chat_id = data["chat_id"]
+    data["tick"] += 1
+    remaining = 10 - data["tick"]
+
+    game = _crash_games.get(chat_id)
+    if not game:
+        ctx.job.schedule_removal()
+        return
+
+    if remaining > 0:
+        try:
+            await ctx.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=data["announcement_id"],
+                text=(
+                    f"🚀 *Crash starting soon!*\n"
+                    f"Type `/crash <bet>` to join.\n\n"
+                    f"Starting in {remaining}..."
+                ),
+                parse_mode="Markdown"
+            )
+        except TelegramError:
+            pass
+        return
+
+    ctx.job.schedule_removal()
+    game["state"] = "running"
+
+    player_list = "\n".join(
+        f"  • {p['name']} ({p['bet']:,} WRK$)" for p in game["players"].values()
+    )
+    sent = await ctx.bot.send_message(
+        chat_id=chat_id,
+        text=f"🚀 *CRASH IS LIVE!*\n\nMultiplier: **1.00x**\n\nPlayers:\n{player_list}\n\nType /cashout to lock in!",
+        parse_mode="Markdown"
+    )
+    game["live_msg_id"] = sent.message_id
+
+    ctx.application.job_queue.run_repeating(
+        _crash_game_tick,
+        interval=1.5,
+        first=1.5,
+        data={"chat_id": chat_id},
+        name=f"crash_tick_{chat_id}",
+    )
+
+
+async def _crash_game_tick(ctx: ContextTypes.DEFAULT_TYPE):
+    chat_id = ctx.job.data["chat_id"]
+    game = _crash_games.get(chat_id)
+    if not game or game["state"] != "running":
+        ctx.job.schedule_removal()
+        return
+
+    game["ticks"] += 1
+    mult = _crash_multiplier(game["ticks"])
+
+    if mult >= game["crash_point"]:
+        ctx.job.schedule_removal()
+        await _crash_end(ctx.bot, chat_id, game, crashed_at=game["crash_point"])
+        return
+
+    active = [p for p in game["players"].values() if not p["cashed_out"]]
+    if not active:
+        ctx.job.schedule_removal()
+        await _crash_end(ctx.bot, chat_id, game, crashed_at=mult)
+        return
+
+    active_lines = "\n".join(f"  • {p['name']} ({p['bet']:,} WRK$)" for p in active)
+    cashed_lines = "\n".join(
+        f"  ✅ {p['name']} cashed @ {p['cash_out_mult']}x"
+        for p in game["players"].values() if p["cashed_out"]
+    )
+    body = f"🚀 *CRASH LIVE — {mult}x*\n\nIn:\n{active_lines}"
+    if cashed_lines:
+        body += f"\n\nCashed out:\n{cashed_lines}"
+    body += "\n\nType /cashout to lock in!"
+
+    try:
+        await ctx.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=game["live_msg_id"],
+            text=body,
+            parse_mode="Markdown"
+        )
+    except TelegramError:
+        pass
+
+
+async def cmd_cashout(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    chat_id = msg.chat.id
+
+    game = _crash_games.get(chat_id)
+    if not game or game["state"] != "running":
+        await msg.reply_text("No crash game running right now.")
+        return
+
+    player = game["players"].get(user.id)
+    if not player:
+        await msg.reply_text("You're not in this crash game.")
+        return
+    if player["cashed_out"]:
+        await msg.reply_text("You've already cashed out.")
+        return
+
+    mult = _crash_multiplier(game["ticks"])
+    winnings = int(player["bet"] * mult)
+    player["cashed_out"] = True
+    player["cash_out_mult"] = mult
+
+    new_bal = await db.update_balance(config.DB_PATH, user.id, winnings)
+    await msg.reply_text(
+        f"💰 Cashed out @ {mult}x! +{winnings:,} WRK$\n"
+        f"Balance: {new_bal:,} WRK$"
+    )
+
+
+async def _crash_end(bot, chat_id: int, game: dict, crashed_at: float):
+    game["state"] = "crashed"
+    lines = ["💥 *CRASHED @ {:.2f}x*\n".format(crashed_at)]
+    for uid, p in game["players"].items():
+        if p["cashed_out"]:
+            profit = int(p["bet"] * p["cash_out_mult"]) - p["bet"]
+            lines.append(f"✅ {p['name']} — cashed @ {p['cash_out_mult']}x (+{profit:,} WRK$)")
+        else:
+            lines.append(f"💀 {p['name']} — lost {p['bet']:,} WRK$")
+
+    try:
+        await bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=game["live_msg_id"],
+            text="\n".join(lines),
+            parse_mode="Markdown"
+        )
+    except TelegramError:
+        await bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="Markdown")
+
+    del _crash_games[chat_id]
