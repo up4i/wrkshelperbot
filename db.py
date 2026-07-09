@@ -83,6 +83,7 @@ async def _migrate(db) -> None:
         "antiraid_limit": "INTEGER DEFAULT 5",
         "antiraid_window": "INTEGER DEFAULT 30",
         "antiraid_mute_duration": "INTEGER DEFAULT 600",
+        "bot_topic_id": "INTEGER",
     }
     for col, typedef in new_cols.items():
         if col not in cols:

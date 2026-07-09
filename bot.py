@@ -23,7 +23,7 @@ from handlers.protection import (
     cmd_antiraid, cmd_setantiraid,
     on_protection_check, on_antiraid_check,
 )
-from handlers.admin import cmd_id, cmd_info, cmd_setlog, cmd_halos, cmd_help, cmd_econhelp, help_callback, on_any_message, on_service_message
+from handlers.admin import cmd_id, cmd_info, cmd_setlog, cmd_halos, cmd_help, cmd_econhelp, cmd_setbottopic, cmd_clearbottopic, help_callback, on_any_message, on_service_message
 from handlers.utility import (
     cmd_admins, cmd_rules, cmd_setrules, cmd_me, cmd_dlog, cmd_cleanservice,
     cmd_givehalo, cmd_removehalo,
@@ -82,6 +82,8 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("id",           cmd_id))
     app.add_handler(CommandHandler("info",         cmd_info))
     app.add_handler(CommandHandler("setlog",       cmd_setlog))
+    app.add_handler(CommandHandler("setbottopic",  cmd_setbottopic))
+    app.add_handler(CommandHandler("clearbottopic", cmd_clearbottopic))
     app.add_handler(CommandHandler("admins",       cmd_admins))
     app.add_handler(CommandHandler("rules",        cmd_rules))
     app.add_handler(CommandHandler("setrules",     cmd_setrules))

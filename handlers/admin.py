@@ -204,6 +204,38 @@ async def help_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(content, parse_mode="Markdown", reply_markup=_PAGE_BACK)
 
 
+async def cmd_setbottopic(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    chat_id = msg.chat.id
+
+    if not await is_admin(ctx.bot, chat_id, update.effective_user.id):
+        return
+
+    if msg.chat.type not in ("group", "supergroup"):
+        await msg.reply_text("❌ This command only works in groups with topics enabled.")
+        return
+
+    thread_id = msg.message_thread_id
+    if not thread_id:
+        await msg.reply_text("❌ Run this command inside a topic, not in General.")
+        return
+
+    await db.upsert_group(config.DB_PATH, chat_id)
+    await db.update_group(config.DB_PATH, chat_id, bot_topic_id=thread_id)
+    await msg.reply_text(f"✅ Bot topic set. Economy commands will only work here (thread {thread_id}).")
+
+
+async def cmd_clearbottopic(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    chat_id = msg.chat.id
+
+    if not await is_admin(ctx.bot, chat_id, update.effective_user.id):
+        return
+
+    await db.update_group(config.DB_PATH, chat_id, bot_topic_id=None)
+    await msg.reply_text("✅ Bot topic restriction cleared. Economy commands work everywhere again.")
+
+
 async def on_any_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Auto-register new groups and track user activity."""
     chat_id = update.effective_chat.id

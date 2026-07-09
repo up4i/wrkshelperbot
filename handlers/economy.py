@@ -124,8 +124,35 @@ async def _ensure_wallet(user: object, db_path: str) -> dict:
     return await db.get_wallet(db_path, user.id)
 
 
+async def _check_topic(msg) -> bool:
+    """Returns True if the message is in the right place. Replies and returns False if not."""
+    if msg.chat.type not in ("group", "supergroup"):
+        return True
+    group = await db.get_group(config.DB_PATH, msg.chat.id)
+    if not group:
+        return True
+    bot_topic_id = group.get("bot_topic_id")
+    if not bot_topic_id:
+        return True
+    if msg.message_thread_id != bot_topic_id:
+        await msg.reply_text("⚠️ Economy commands only work in the bot topic.")
+        return False
+    return True
+
+
+def topic_gated(func):
+    """Decorator: blocks economy commands outside the configured bot topic."""
+    async def wrapper(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+        if not await _check_topic(update.effective_message):
+            return
+        return await func(update, ctx)
+    wrapper.__name__ = func.__name__
+    return wrapper
+
+
 # ── /balance ──────────────────────────────────────────────────────────────────
 
+@topic_gated
 async def cmd_balance(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     wallet = await _ensure_wallet(user, config.DB_PATH)
@@ -141,6 +168,7 @@ async def cmd_balance(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /daily ────────────────────────────────────────────────────────────────────
 
+@topic_gated
 async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     wallet = await _ensure_wallet(user, config.DB_PATH)
@@ -185,6 +213,7 @@ async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /leaderboard ──────────────────────────────────────────────────────────────
 
+@topic_gated
 async def cmd_leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     rows = await db.get_leaderboard(config.DB_PATH, limit=10)
     if not rows:
@@ -250,6 +279,7 @@ async def cmd_setwrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /give ─────────────────────────────────────────────────────────────────────
 
+@topic_gated
 async def cmd_give(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -350,6 +380,7 @@ def _hack_display(word: str, revealed: set[int]) -> str:
     return " ".join(c if i in revealed else "_" for i, c in enumerate(word))
 
 
+@topic_gated
 async def cmd_hack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -397,6 +428,7 @@ async def cmd_hack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
 
 
+@topic_gated
 async def cmd_guess(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -500,6 +532,7 @@ _ROB_GETAWAY = [
     ("🧊", "{robber} fumbled the job on {target} but kept their cool and disappeared. No loss."),
 ]
 
+@topic_gated
 async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     robber = update.effective_user
@@ -568,6 +601,7 @@ async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /slots ────────────────────────────────────────────────────────────────────
 
+@topic_gated
 async def cmd_slots(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -602,6 +636,7 @@ async def cmd_slots(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /coinflip ─────────────────────────────────────────────────────────────────
 
+@topic_gated
 async def cmd_coinflip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -645,6 +680,7 @@ async def cmd_coinflip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /dice ─────────────────────────────────────────────────────────────────────
 
+@topic_gated
 async def cmd_dice(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -701,6 +737,7 @@ def _bj_keyboard(user_id: int) -> InlineKeyboardMarkup:
     ]])
 
 
+@topic_gated
 async def cmd_blackjack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -817,6 +854,7 @@ async def blackjack_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /crash ────────────────────────────────────────────────────────────────────
 
+@topic_gated
 async def cmd_crash(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -847,11 +885,13 @@ async def cmd_crash(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(f"✅ Joined crash with {bet:,} WRK$ bet!")
         return
 
+    thread_id = msg.message_thread_id
     crash_point = _generate_crash_point()
     _crash_games[chat_id] = {
         "state": "joining",
         "crash_point": crash_point,
         "ticks": 0,
+        "thread_id": thread_id,
         "players": {
             user.id: {"bet": bet, "name": display_name(user), "cashed_out": False, "cash_out_mult": None}
         },
@@ -872,7 +912,7 @@ async def cmd_crash(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         _crash_countdown_tick,
         interval=1,
         first=1,
-        data={"chat_id": chat_id, "tick": 0, "announcement_id": sent.message_id},
+        data={"chat_id": chat_id, "tick": 0, "announcement_id": sent.message_id, "thread_id": thread_id},
         name=f"crash_countdown_{chat_id}",
     )
 
@@ -912,6 +952,7 @@ async def _crash_countdown_tick(ctx: ContextTypes.DEFAULT_TYPE):
     )
     sent = await ctx.bot.send_message(
         chat_id=chat_id,
+        message_thread_id=game.get("thread_id"),
         text=f"🚀 *CRASH IS LIVE!*\n\nMultiplier: **1.00x**\n\nPlayers:\n{player_list}\n\nType /cashout to lock in!",
         parse_mode="Markdown"
     )
@@ -968,6 +1009,7 @@ async def _crash_game_tick(ctx: ContextTypes.DEFAULT_TYPE):
         pass
 
 
+@topic_gated
 async def cmd_cashout(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -1016,6 +1058,6 @@ async def _crash_end(bot, chat_id: int, game: dict, crashed_at: float):
             parse_mode="Markdown"
         )
     except TelegramError:
-        await bot.send_message(chat_id=chat_id, text="\n".join(lines), parse_mode="Markdown")
+        await bot.send_message(chat_id=chat_id, message_thread_id=game.get("thread_id"), text="\n".join(lines), parse_mode="Markdown")
 
     del _crash_games[chat_id]
