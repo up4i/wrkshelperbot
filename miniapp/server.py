@@ -1,6 +1,7 @@
 import random
 import sqlite3
 import sys
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -157,6 +158,62 @@ def stats():
 
 _SLOT_SYMBOLS = ["🍒", "🍋", "7️⃣", "💎", "🍀", "⭐"]
 
+# ── Work / Jobs ───────────────────────────────────────────────────────────────
+
+_JOBS = [
+    (0,    "🧑‍🎓 Crypto Intern",    60,   120),
+    (100,  "📈 Degen Trader",       120,  250),
+    (300,  "🌾 Yield Farmer",       250,  500),
+    (600,  "🔍 On-Chain Analyst",   400,  800),
+    (1000, "⚙️ Protocol Dev",       600, 1200),
+    (2000, "🦈 Blockchain Shark",   900, 1800),
+    (5000, "👑 Blockchain Baron",  1500, 3000),
+]
+_SHIFT_MAX_TAPS = 50
+_SHIFT_COOLDOWN = 15 * 60  # seconds
+
+
+def _get_tier_index(work_count: int) -> int:
+    idx = 0
+    for i, (min_taps, *_) in enumerate(_JOBS):
+        if work_count >= min_taps:
+            idx = i
+    return idx
+
+
+def _job_payload(work_count: int) -> dict:
+    idx = _get_tier_index(work_count)
+    _, title, lo, hi = _JOBS[idx]
+    next_job = None
+    if idx + 1 < len(_JOBS):
+        next_min, next_title, *_ = _JOBS[idx + 1]
+        next_job = {"title": next_title, "taps_required": next_min, "taps_remaining": next_min - work_count}
+    return {"title": title, "tier_index": idx, "earn_low": lo, "earn_high": hi, "next_job": next_job}
+
+
+def _collect_shift(db, user_id: int, taps: int, earned: int) -> dict:
+    """Delete active session, credit economy, return result dict."""
+    db.execute("DELETE FROM work_sessions WHERE user_id = ?", (user_id,))
+    now = int(time.time())
+    db.execute(
+        "UPDATE economy SET balance = balance + ?, last_work = ?, work_count = work_count + ? WHERE user_id = ?",
+        (earned, now, taps, user_id),
+    )
+    row = db.execute("SELECT balance, work_count FROM economy WHERE user_id = ?", (user_id,)).fetchone()
+    db.commit()
+    new_work_count = row["work_count"] if row else 0
+    new_balance = row["balance"] if row else 0
+    old_tier = _get_tier_index(new_work_count - taps)
+    new_tier = _get_tier_index(new_work_count)
+    return {
+        "collected": earned,
+        "new_balance": new_balance,
+        "taps": taps,
+        "promoted": new_tier > old_tier,
+        "new_job": _JOBS[new_tier][1] if new_tier > old_tier else None,
+        "auto_ended": False,
+    }
+
 
 def _slot_payout(reels: list[str]) -> tuple[str, int]:
     if reels == ["7️⃣", "7️⃣", "7️⃣"]:
@@ -177,6 +234,18 @@ class CoinflipRequest(BaseModel):
     user_id: int
     bet: int
     choice: str
+
+
+class WorkStartRequest(BaseModel):
+    user_id: int
+
+class WorkSyncRequest(BaseModel):
+    user_id: int
+    taps_delta: int
+    earned_delta: int
+
+class WorkEndRequest(BaseModel):
+    user_id: int
 
 
 def _deduct_and_check(db, user_id: int, bet: int) -> int:
@@ -217,6 +286,114 @@ def play_coinflip(req: CoinflipRequest):
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
         db.commit()
         return {"result": result, "won": won, "delta": delta, "new_balance": new_bal}
+
+
+# ── Work / Jobs endpoints ─────────────────────────────────────────────────────
+
+@app.get("/api/work/status/{user_id}")
+def work_status(user_id: int):
+    with db_conn() as db:
+        row = db.execute(
+            "SELECT work_count, last_work FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "User not found")
+        now = int(time.time())
+        cooldown_remaining = max(0, _SHIFT_COOLDOWN - (now - (row["last_work"] or 0)))
+        work_count = row["work_count"] or 0
+        session_row = db.execute(
+            "SELECT * FROM work_sessions WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        job = _job_payload(work_count)
+        return {
+            "session": dict(session_row) if session_row else None,
+            "cooldown_remaining": cooldown_remaining,
+            "job": {k: v for k, v in job.items() if k != "next_job"},
+            "next_job": job["next_job"],
+            "lifetime_taps": work_count,
+        }
+
+
+@app.post("/api/work/start")
+def work_start(req: WorkStartRequest):
+    with db_conn() as db:
+        row = db.execute(
+            "SELECT work_count, last_work FROM economy WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "User not found — use the bot first")
+        now = int(time.time())
+        cooldown_remaining = max(0, _SHIFT_COOLDOWN - (now - (row["last_work"] or 0)))
+        if cooldown_remaining > 0:
+            raise HTTPException(400, f"Shift on cooldown for {cooldown_remaining}s")
+        existing = db.execute(
+            "SELECT user_id FROM work_sessions WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if existing:
+            raise HTTPException(400, "Shift already active")
+        work_count = row["work_count"] or 0
+        tier_index = _get_tier_index(work_count)
+        db.execute(
+            "INSERT INTO work_sessions (user_id, taps, earned, started_at, job_tier_index, tap_count_start) "
+            "VALUES (?, 0, 0, ?, ?, ?)",
+            (req.user_id, now, tier_index, work_count),
+        )
+        db.commit()
+        job = _job_payload(work_count)
+        return {
+            "session": {"user_id": req.user_id, "taps": 0, "earned": 0,
+                        "started_at": now, "job_tier_index": tier_index, "tap_count_start": work_count},
+            "cooldown_remaining": 0,
+            "job": {k: v for k, v in job.items() if k != "next_job"},
+            "next_job": job["next_job"],
+            "lifetime_taps": work_count,
+        }
+
+
+@app.post("/api/work/sync")
+def work_sync(req: WorkSyncRequest):
+    if req.taps_delta < 1 or req.taps_delta > _SHIFT_MAX_TAPS:
+        raise HTTPException(400, "taps_delta out of range")
+    with db_conn() as db:
+        session_row = db.execute(
+            "SELECT * FROM work_sessions WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if not session_row:
+            raise HTTPException(404, "No active shift")
+        session = dict(session_row)
+        _, _, lo, hi = _JOBS[session["job_tier_index"]]
+        max_plausible = req.taps_delta * hi * 1.1
+        if req.earned_delta > max_plausible or req.earned_delta < 0:
+            raise HTTPException(400, "Earnings out of plausible range")
+        new_taps = session["taps"] + req.taps_delta
+        new_earned = session["earned"] + req.earned_delta
+        if new_taps > _SHIFT_MAX_TAPS:
+            raise HTTPException(400, f"Would exceed max taps ({_SHIFT_MAX_TAPS})")
+        db.execute(
+            "UPDATE work_sessions SET taps = ?, earned = ? WHERE user_id = ?",
+            (new_taps, new_earned, req.user_id),
+        )
+        db.commit()
+        if new_taps >= _SHIFT_MAX_TAPS:
+            result = _collect_shift(db, req.user_id, new_taps, new_earned)
+            result["auto_ended"] = True
+            return result
+        return {
+            "session": {**session, "taps": new_taps, "earned": new_earned},
+            "auto_ended": False,
+        }
+
+
+@app.post("/api/work/end")
+def work_end(req: WorkEndRequest):
+    with db_conn() as db:
+        session_row = db.execute(
+            "SELECT * FROM work_sessions WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if not session_row:
+            raise HTTPException(404, "No active shift")
+        session = dict(session_row)
+        return _collect_shift(db, req.user_id, session["taps"], session["earned"])
 
 
 # ── Serve SPA ─────────────────────────────────────────────────────────────────
