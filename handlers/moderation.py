@@ -452,27 +452,15 @@ async def cmd_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         + (f"\nReason: {reason}" if reason else "")
     )
 
-    admins = await ctx.bot.get_chat_administrators(chat_id)
-
     if log_channel_id:
         try:
             await ctx.bot.send_message(log_channel_id, header, parse_mode="Markdown")
-            await ctx.bot.copy_message(log_channel_id, chat_id, target.message_id)
+            await ctx.bot.forward_message(log_channel_id, chat_id, target.message_id)
         except TelegramError:
             pass
+        await msg.reply_text("✅ Report sent to the log channel.")
     else:
-        for m in admins:
-            if m.user.is_bot:
-                continue
-            try:
-                await ctx.bot.send_message(m.user.id, header, parse_mode="Markdown")
-                await ctx.bot.copy_message(m.user.id, chat_id, target.message_id)
-            except TelegramError:
-                pass
-
-    tags = [f"@{m.user.username}" for m in admins if m.user.username and not m.user.is_bot]
-    ack = "✅ Report sent to admins." + ("\n" + " ".join(tags) if tags else "")
-    await msg.reply_text(ack)
+        await msg.reply_text("⚠️ No log channel set. Ask an admin to run /setlog.")
 
 
 async def _delete_msg_job(ctx: ContextTypes.DEFAULT_TYPE):
