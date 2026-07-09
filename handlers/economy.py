@@ -205,10 +205,11 @@ async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif streak < 30:
         next_milestone = f"\n📅 {30 - streak} day(s) until 4x daily bonus"
 
-    # 25% chance at a random low-tier gift drop
+    # 25% chance at a gift drop; of those, 1% upgrade to mid-tier
     gift_line = ""
     if await db.is_gifts_seeded(config.DB_PATH) and random.random() < 0.25:
-        dropped = await db.get_random_low_tier_bank_gift(config.DB_PATH)
+        tier = "mid" if random.random() < 0.01 else "low"
+        dropped = await db.get_random_bank_gift(config.DB_PATH, tier)
         if dropped:
             await db.transfer_gift(config.DB_PATH, dropped["id"], user.id)
             from handlers.gifts import _collection_display_name, _bg_emoji, _bg_label, _model_emoji_html

@@ -787,26 +787,20 @@ async def expire_old_offers(db_path: str) -> list[int]:
         return rows
 
 
-async def get_random_low_tier_bank_gift(db_path: str) -> dict | None:
+async def get_random_bank_gift(db_path: str, tier: str) -> dict | None:
     import random
-    _BG_DROP_WEIGHTS = {"black": 1, "onyx": 2, "grape": 4, "emerald": 8, "midnight": 15, "orange": 30}
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            """SELECT gi.id, gi.background, gm.model_rarity_pct
-               FROM gift_instances gi
+            """SELECT gi.id FROM gift_instances gi
                JOIN gift_models gm ON gm.id = gi.model_id
-               WHERE gi.owner_id IS NULL AND gm.tier = 'low'""",
+               WHERE gi.owner_id IS NULL AND gm.tier = ?""",
+            (tier,),
         ) as cur:
-            candidates = [dict(r) async for r in cur]
-    if not candidates:
+            ids = [r["id"] async for r in cur]
+    if not ids:
         return None
-    weights = [
-        (1.0 / c["model_rarity_pct"]) * _BG_DROP_WEIGHTS[c["background"]]
-        for c in candidates
-    ]
-    chosen = random.choices(candidates, weights=weights, k=1)[0]
-    return await get_gift_instance(db_path, chosen["id"])
+    return await get_gift_instance(db_path, random.choice(ids))
 
 
 async def toggle_work_reminder(db_path: str, user_id: int) -> int:
