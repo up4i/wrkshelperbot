@@ -246,8 +246,6 @@ _JOBS = [
 
 _SHIFT_MAX_TAPS = 50
 _SHIFT_COOLDOWN = 15 * 60   # 15 min between shifts
-_work_sessions: dict[int, dict] = {}   # user_id -> active shift state
-_work_cooldowns: dict[int, float] = {} # user_id -> shift-end timestamp
 
 
 def _get_job(tap_count: int) -> tuple:
@@ -266,7 +264,8 @@ def _next_job(tap_count: int) -> tuple | None:
 
 
 def _shift_message(session: dict) -> str:
-    _, title, lo, hi = session["job"]
+    job = _JOBS[session["job_tier_index"]]
+    _, title, lo, hi = job
     taps = session["taps"]
     earned = session["earned"]
     tap_count = session["tap_count_start"] + taps
@@ -295,8 +294,8 @@ async def cmd_work(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("💼 Use /work in DMs with me to start your shift!")
         return
 
-    if user.id in _work_sessions:
-        session = _work_sessions[user.id]
+    session = await db.get_work_session(config.DB_PATH, user.id)
+    if session:
         kb = InlineKeyboardMarkup([[
             InlineKeyboardButton("⚡ Work", callback_data=f"work:tap:{user.id}"),
             InlineKeyboardButton("🏁 End Shift", callback_data=f"work:end:{user.id}"),
@@ -307,23 +306,19 @@ async def cmd_work(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    wallet = await _ensure_wallet(user, config.DB_PATH)
     now = time.time()
-    remaining = _SHIFT_COOLDOWN - (now - _work_cooldowns.get(user.id, 0))
+    remaining = _SHIFT_COOLDOWN - (now - (wallet.get("last_work") or 0))
     if remaining > 0:
         m, s = divmod(int(remaining), 60)
         await msg.reply_text(f"⏳ Next shift starts in *{m}m {s}s*.", parse_mode="Markdown")
         return
 
-    wallet = await _ensure_wallet(user, config.DB_PATH)
     tap_count = wallet.get("work_count", 0) or 0
     job = _get_job(tap_count)
+    tier_index = _JOBS.index(job)
 
-    _work_sessions[user.id] = {
-        "job": job,
-        "taps": 0,
-        "earned": 0,
-        "tap_count_start": tap_count,
-    }
+    session = await db.start_work_session(config.DB_PATH, user.id, tap_count_start=tap_count, job_tier_index=tier_index)
 
     kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("⚡ Work", callback_data=f"work:tap:{user.id}"),
@@ -331,7 +326,7 @@ async def cmd_work(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ]])
     await msg.reply_text(
         "🟢 *Shift started!* Keep tapping ⚡ Work to earn.\n\n"
-        + _shift_message(_work_sessions[user.id]),
+        + _shift_message(session),
         parse_mode="Markdown", reply_markup=kb
     )
 
@@ -345,7 +340,7 @@ async def work_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await query.answer("Not your shift.", show_alert=True)
         return
 
-    session = _work_sessions.get(user_id)
+    session = await db.get_work_session(config.DB_PATH, user_id)
 
     # ── tap ──
     if action == "tap":
@@ -353,14 +348,12 @@ async def work_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await query.answer("No active shift. Use /work to start one.", show_alert=True)
             return
 
-        _, _, lo, hi = session["job"]
+        _, _, lo, hi = _JOBS[session["job_tier_index"]]
         earned_this_tap = random.randint(lo, hi)
-        session["taps"] += 1
-        session["earned"] += earned_this_tap
 
+        session = await db.sync_work_session(config.DB_PATH, user_id, taps_delta=1, earned_delta=earned_this_tap)
         await query.answer(f"+{earned_this_tap:,} WRK$ 💰")
 
-        # update message every 5 taps or on last tap to stay under Telegram rate limits
         if session["taps"] % 5 == 0 or session["taps"] >= _SHIFT_MAX_TAPS:
             kb = InlineKeyboardMarkup([[
                 InlineKeyboardButton("⚡ Work", callback_data=f"work:tap:{user_id}"),
@@ -374,7 +367,6 @@ async def work_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 pass
 
         if session["taps"] >= _SHIFT_MAX_TAPS:
-            # auto-end shift
             await _end_shift(query, user_id, session, auto=True)
         return
 
@@ -388,11 +380,12 @@ async def work_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def _end_shift(query, user_id: int, session: dict, auto: bool):
-    _work_sessions.pop(user_id, None)
-    _work_cooldowns[user_id] = time.time()
+    final = await db.end_work_session(config.DB_PATH, user_id)
+    if not final:
+        return
 
-    total = session["earned"]
-    taps = session["taps"]
+    total = final["earned"]
+    taps = final["taps"]
 
     if total == 0:
         await query.edit_message_text("You ended your shift without earning anything. Tap ⚡ next time!")
@@ -400,12 +393,7 @@ async def _end_shift(query, user_id: int, session: dict, auto: bool):
 
     new_bal, new_tap_count = await db.claim_work(config.DB_PATH, user_id, total, int(time.time()))
 
-    # update work_count by taps — claim_work only adds 1; we need to add taps-1 more
-    # simplest: call update_balance(0) won't help; instead handle in DB directly
-    # Actually claim_work adds 1 to work_count per call; for tap counting we need to
-    # add (taps - 1) more to work_count after the fact
     if taps > 1:
-        # update_balance only touches balance; use a direct work_count bump
         async with __import__('aiosqlite').connect(config.DB_PATH) as _db:
             await _db.execute(
                 "UPDATE economy SET work_count = work_count + ? WHERE user_id = ?",
@@ -414,7 +402,7 @@ async def _end_shift(query, user_id: int, session: dict, auto: bool):
             await _db.commit()
         new_tap_count = new_tap_count + (taps - 1)
 
-    old_title = session["job"][1]
+    old_title = _JOBS[final["job_tier_index"]][1]
     new_title = _get_job(new_tap_count)[1]
     promo_line = f"\n\n🎉 *Promoted to {new_title}!*" if new_title != old_title else ""
 
@@ -427,8 +415,7 @@ async def _end_shift(query, user_id: int, session: dict, auto: bool):
         f"👆 Taps this shift: {taps}\n"
         f"💰 Collected: *{total:,} WRK$*\n"
         f"Balance: {new_bal:,} WRK$"
-        f"{promo_line}{progress}\n\n"
-        f"_Next shift available in 15 minutes._",
+        f"{promo_line}{progress}",
         parse_mode="Markdown"
     )
 
