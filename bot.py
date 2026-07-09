@@ -124,6 +124,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("cf",          cmd_coinflip))
     app.add_handler(CommandHandler("dice",        cmd_dice))
     app.add_handler(CommandHandler("blackjack",   cmd_blackjack))
+    app.add_handler(CommandHandler("bj",          cmd_blackjack))
     app.add_handler(CommandHandler("crash",       cmd_crash))
     app.add_handler(CommandHandler("cashout",     cmd_cashout))
     app.add_handler(CommandHandler("givewrk",     cmd_givewrk))
