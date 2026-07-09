@@ -26,7 +26,7 @@ def _parse_buttons(text: str) -> tuple[str, InlineKeyboardMarkup | None]:
 
 
 def _matches(trigger: str, text: str) -> bool:
-    return bool(re.search(r'\b' + re.escape(trigger) + r'\b', text, re.IGNORECASE))
+    return text.strip().lower() == trigger.lower()
 
 
 async def on_message_autoreply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
