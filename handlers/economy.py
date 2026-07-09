@@ -208,6 +208,7 @@ _ROB_SUCCESS = [
     ("🏦", "{robber} bribed {target}'s validator and quietly skimmed {amount} WRK$!"),
     ("🧠", "{robber} talked {target} into a 'collab' and bounced with {amount} WRK$!"),
     ("💣", "{robber} flash-loaned their way into {target}'s liquidity pool and escaped with {amount} WRK$!"),
+    ("😿", "{target} panic-listed their scared cat on MRKT under floor and {robber} scooped it for {amount} WRK$ profit!"),
 ]
 
 _ROB_FINE = [
