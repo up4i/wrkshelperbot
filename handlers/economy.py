@@ -189,6 +189,54 @@ async def cmd_leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
+# ── Economy admin (owner only) ────────────────────────────────────────────────
+
+async def cmd_givewrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    if update.effective_user.id != config.OWNER_ID:
+        return
+
+    if len(ctx.args) < 2 or not ctx.args[1].lstrip("-").isdigit():
+        await msg.reply_text("Usage: `/givewrk @username <amount>`", parse_mode="Markdown")
+        return
+
+    target_row = await db.get_user_by_username(config.DB_PATH, msg.chat.id, ctx.args[0])
+    if not target_row:
+        await msg.reply_text("❌ User not found in this chat's activity log.")
+        return
+
+    amount = int(ctx.args[1])
+    await db.upsert_wallet(config.DB_PATH, target_row["user_id"], None, None)
+    new_bal = await db.update_balance(config.DB_PATH, target_row["user_id"], amount)
+    name = target_row.get("full_name") or ctx.args[0]
+    action = f"+{amount:,}" if amount >= 0 else f"{amount:,}"
+    await msg.reply_text(f"✅ {action} WRK$ → {name}\n💰 New balance: {new_bal:,} WRK$")
+
+
+async def cmd_setwrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    if update.effective_user.id != config.OWNER_ID:
+        return
+
+    if len(ctx.args) < 2 or not ctx.args[1].isdigit():
+        await msg.reply_text("Usage: `/setwrk @username <amount>`", parse_mode="Markdown")
+        return
+
+    target_row = await db.get_user_by_username(config.DB_PATH, msg.chat.id, ctx.args[0])
+    if not target_row:
+        await msg.reply_text("❌ User not found in this chat's activity log.")
+        return
+
+    target_id = target_row["user_id"]
+    await db.upsert_wallet(config.DB_PATH, target_id, None, None)
+    wallet = await db.get_wallet(config.DB_PATH, target_id)
+    new_amount = int(ctx.args[1])
+    delta = new_amount - wallet["balance"]
+    new_bal = await db.update_balance(config.DB_PATH, target_id, delta)
+    name = target_row.get("full_name") or ctx.args[0]
+    await msg.reply_text(f"✅ Set {name}'s balance to {new_bal:,} WRK$")
+
+
 # ── /rob ──────────────────────────────────────────────────────────────────────
 
 _rob_cooldowns: dict[int, float] = {}  # user_id -> timestamp
