@@ -99,6 +99,14 @@ CREATE TABLE IF NOT EXISTS gift_offers (
     status       TEXT NOT NULL DEFAULT 'pending',
     created_at   INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS work_sessions (
+    user_id         INTEGER PRIMARY KEY,
+    taps            INTEGER NOT NULL DEFAULT 0,
+    earned          INTEGER NOT NULL DEFAULT 0,
+    started_at      INTEGER NOT NULL,
+    job_tier_index  INTEGER NOT NULL DEFAULT 0,
+    tap_count_start INTEGER NOT NULL DEFAULT 0
+);
 """
 
 async def _migrate(db) -> None:
@@ -442,6 +450,57 @@ async def claim_work(db_path: str, user_id: int, amount: int, timestamp: int) ->
             row = await cur.fetchone()
         await db.commit()
         return (row[0], row[1]) if row else (0, 0)
+
+
+async def get_work_session(db_path: str, user_id: int) -> dict | None:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM work_sessions WHERE user_id = ?", (user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def start_work_session(db_path: str, user_id: int, tap_count_start: int, job_tier_index: int) -> dict:
+    now = int(time.time())
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO work_sessions "
+            "(user_id, taps, earned, started_at, job_tier_index, tap_count_start) "
+            "VALUES (?, 0, 0, ?, ?, ?)",
+            (user_id, now, job_tier_index, tap_count_start),
+        )
+        await db.commit()
+    return {
+        "user_id": user_id, "taps": 0, "earned": 0,
+        "started_at": now, "job_tier_index": job_tier_index,
+        "tap_count_start": tap_count_start,
+    }
+
+
+async def sync_work_session(db_path: str, user_id: int, taps_delta: int, earned_delta: int) -> dict | None:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "UPDATE work_sessions SET taps = taps + ?, earned = earned + ? "
+            "WHERE user_id = ? RETURNING *",
+            (taps_delta, earned_delta, user_id),
+        ) as cur:
+            row = await cur.fetchone()
+        await db.commit()
+        return dict(row) if row else None
+
+
+async def end_work_session(db_path: str, user_id: int) -> dict | None:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "DELETE FROM work_sessions WHERE user_id = ? RETURNING *", (user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        await db.commit()
+        return dict(row) if row else None
 
 
 async def claim_beg(db_path: str, user_id: int, amount: int, timestamp: int) -> int:
