@@ -2,6 +2,7 @@ import math
 import random
 import time
 import logging
+from html import escape
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -210,19 +211,19 @@ async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         dropped = await db.get_random_low_tier_bank_gift(config.DB_PATH)
         if dropped:
             await db.transfer_gift(config.DB_PATH, dropped["id"], user.id)
-            from handlers.gifts import _collection_display_name, _bg_emoji, _bg_label
-            col_name = _collection_display_name(dropped["collection"])
+            from handlers.gifts import _collection_display_name, _bg_emoji, _bg_label, _model_emoji_html
+            col_name = escape(_collection_display_name(dropped["collection"]))
             gift_line = (
-                f"\n\n🎁 *Gift Drop!*\n"
-                f"{dropped['model_emoji']} {col_name} #{dropped['model_number']} "
-                f"{_bg_emoji(dropped['background'])} {_bg_label(dropped['background'])}"
+                f"\n\n🎁 <b>Gift Drop!</b>\n"
+                f"{_model_emoji_html(dropped)} {col_name} #{dropped['model_number']} "
+                f"{_bg_emoji(dropped['background'])} {escape(_bg_label(dropped['background']))}"
             )
 
     await update.effective_message.reply_text(
         f"✅ Daily claimed! +{earned:,} WRK${bonus_note}\n"
         f"🔥 Streak: {streak} day(s)\n"
         f"💰 {new_balance:,} WRK${next_milestone}{gift_line}",
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
 
 

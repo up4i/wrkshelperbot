@@ -484,7 +484,7 @@ async def get_user_gifts(db_path: str, user_id: int) -> list[dict]:
         async with db.execute(
             """SELECT gi.id, gi.background, gi.acquired_at,
                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
-                      gm.model_rarity_pct, gm.tier
+                      gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                FROM gift_instances gi
                JOIN gift_models gm ON gm.id = gi.model_id
                WHERE gi.owner_id = ?
@@ -500,7 +500,7 @@ async def get_gift_instance(db_path: str, instance_id: int) -> dict | None:
         async with db.execute(
             """SELECT gi.id, gi.background, gi.owner_id, gi.acquired_at,
                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
-                      gm.model_rarity_pct, gm.tier
+                      gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                FROM gift_instances gi
                JOIN gift_models gm ON gm.id = gi.model_id
                WHERE gi.id = ?""",
@@ -516,7 +516,7 @@ async def get_gift_instance_by_spec(db_path: str, collection: str, model_number:
         async with db.execute(
             """SELECT gi.id, gi.background, gi.owner_id, gi.acquired_at,
                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
-                      gm.model_rarity_pct, gm.tier
+                      gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                FROM gift_instances gi
                JOIN gift_models gm ON gm.id = gi.model_id
                WHERE gm.collection = ? AND gm.model_number = ? AND gi.background = ?""",
@@ -542,7 +542,7 @@ async def get_bank_gifts(db_path: str, collection: str | None = None) -> list[di
         if collection:
             sql = """SELECT gi.id, gi.background,
                             gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
-                            gm.model_rarity_pct, gm.tier
+                            gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                      FROM gift_instances gi
                      JOIN gift_models gm ON gm.id = gi.model_id
                      WHERE gi.owner_id IS NULL AND gm.collection = ?
@@ -551,7 +551,7 @@ async def get_bank_gifts(db_path: str, collection: str | None = None) -> list[di
         else:
             sql = """SELECT gi.id, gi.background,
                             gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
-                            gm.model_rarity_pct, gm.tier
+                            gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                      FROM gift_instances gi
                      JOIN gift_models gm ON gm.id = gi.model_id
                      WHERE gi.owner_id IS NULL
@@ -628,7 +628,7 @@ async def get_offers_for_user(db_path: str, user_id: int) -> list[dict]:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT go.*, gi.background,
-                      gm.collection, gm.model_number, gm.model_name, gm.model_emoji
+                      gm.collection, gm.model_number, gm.model_name, gm.model_emoji, gm.custom_emoji_id
                FROM gift_offers go
                JOIN gift_instances gi ON gi.id = go.instance_id
                JOIN gift_models gm ON gm.id = gi.model_id

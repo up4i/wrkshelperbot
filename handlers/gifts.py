@@ -1,6 +1,7 @@
 import random
 import time
 import logging
+from html import escape
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
@@ -48,15 +49,24 @@ def _price_floor(base_price: int) -> int:
 def _price_ceiling(base_price: int) -> int:
     return int(base_price * 5.0)
 
+def _model_emoji_html(instance: dict) -> str:
+    eid = instance.get("custom_emoji_id")
+    fallback = escape(instance["model_emoji"])
+    if eid:
+        return f'<tg-emoji emoji-id="{eid}">{fallback}</tg-emoji>'
+    return fallback
+
 def _format_gift_card(instance: dict, current_price: int) -> str:
-    col_name = _collection_display_name(instance["collection"])
+    col_name = escape(_collection_display_name(instance["collection"]))
     num = instance["model_number"]
     bg_emoji = _bg_emoji(instance["background"])
-    bg_label = _bg_label(instance["background"])
+    bg_label = escape(_bg_label(instance["background"]))
     bg_mult = _BG_MULTIPLIERS.get(instance["background"], 1.0)
+    model_e = _model_emoji_html(instance)
+    model_name = escape(instance["model_name"])
     return (
-        f"{instance['model_emoji']} *{col_name} #{num}*\n\n"
-        f"Model: {instance['model_emoji']} {instance['model_name']} · {instance['model_rarity_pct']}%\n"
+        f"{model_e} <b>{col_name} #{num}</b>\n\n"
+        f"Model: {model_e} {model_name} · {instance['model_rarity_pct']}%\n"
         f"Background: {bg_emoji} {bg_label} · {bg_mult}x\n"
         f"Rarity: {_tier_label(instance['tier'])}\n\n"
         f"💰 Current value: {current_price:,} WRK$"
@@ -103,13 +113,13 @@ async def cmd_inventory(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     gifts = await db.get_user_gifts(config.DB_PATH, user.id)
     if not gifts:
-        await msg.reply_text("🎁 Your gift inventory is empty. Try `/daily` or `/shop`!", parse_mode="Markdown")
+        await msg.reply_text("🎁 Your gift inventory is empty. Try /daily or /shop!", parse_mode="HTML")
         return
     kb = _inv_keyboard(gifts, page=0, user_id=user.id)
     total_pages = (len(gifts) + _GIFTS_PER_PAGE - 1) // _GIFTS_PER_PAGE
     await msg.reply_text(
-        f"🎁 *Your Gifts* ({len(gifts)} total · page 1/{total_pages})",
-        parse_mode="Markdown",
+        f"🎁 <b>Your Gifts</b> ({len(gifts)} total · page 1/{total_pages})",
+        parse_mode="HTML",
         reply_markup=kb
     )
 
@@ -132,8 +142,8 @@ async def gifts_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         kb = _inv_keyboard(gifts, page=page, user_id=caller_id)
         total_pages = (len(gifts) + _GIFTS_PER_PAGE - 1) // _GIFTS_PER_PAGE
         await query.edit_message_text(
-            f"🎁 *Your Gifts* ({len(gifts)} total · page {page + 1}/{total_pages})",
-            parse_mode="Markdown",
+            f"🎁 <b>Your Gifts</b> ({len(gifts)} total · page {page + 1}/{total_pages})",
+            parse_mode="HTML",
             reply_markup=kb
         )
 
@@ -150,7 +160,7 @@ async def gifts_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         back_kb = InlineKeyboardMarkup([[
             InlineKeyboardButton("⬅️ Back", callback_data=f"gifts:page:{caller_id}:{page}")
         ]])
-        await query.edit_message_text(card, parse_mode="Markdown", reply_markup=back_kb)
+        await query.edit_message_text(card, parse_mode="HTML", reply_markup=back_kb)
 
 
 # ── /gift <collection> <number> [background] ─────────────────────────────────
@@ -161,8 +171,8 @@ async def cmd_gift(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if not ctx.args or len(ctx.args) < 2:
         await msg.reply_text(
-            "Usage: `/gift <collection> <number> [background]`\nExample: `/gift scared_cat 12 black`",
-            parse_mode="Markdown"
+            "Usage: <code>/gift &lt;collection&gt; &lt;number&gt; [background]</code>\nExample: <code>/gift scared_cat 12 black</code>",
+            parse_mode="HTML"
         )
         return
 
@@ -195,7 +205,7 @@ async def cmd_gift(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     price_row = await db.get_gift_price(config.DB_PATH, instance["collection"], instance["background"])
     current_price = price_row["current_price"] if price_row else 0
     card = _format_gift_card(instance, current_price)
-    await msg.reply_text(f"✨ {display_name(user)} is flexing:\n\n{card}", parse_mode="Markdown")
+    await msg.reply_text(f"✨ {display_name(user)} is flexing:\n\n{card}", parse_mode="HTML")
 
 
 # ── /shop ─────────────────────────────────────────────────────────────────────
@@ -212,7 +222,7 @@ async def cmd_shop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(f"❌ No {col_name} gifts available from the bank right now.")
             return
 
-        lines = [f"🏪 *{_collection_display_name(collection)} — Bank Stock*\n"]
+        lines = [f"🏪 <b>{escape(_collection_display_name(collection))} — Bank Stock</b>\n"]
         seen = set()
         for g in bank_gifts:
             key = (g["model_number"], g["background"])
@@ -222,21 +232,21 @@ async def cmd_shop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             price_row = await db.get_gift_price(config.DB_PATH, g["collection"], g["background"])
             price = price_row["current_price"] if price_row else 0
             lines.append(
-                f"{g['model_emoji']} #{g['model_number']} {g['model_name']} "
-                f"{_bg_emoji(g['background'])} {_bg_label(g['background'])} "
+                f"{_model_emoji_html(g)} #{g['model_number']} {escape(g['model_name'])} "
+                f"{_bg_emoji(g['background'])} {escape(_bg_label(g['background']))} "
                 f"— {price:,} WRK$"
             )
-        await msg.reply_text("\n".join(lines), parse_mode="Markdown")
+        await msg.reply_text("\n".join(lines), parse_mode="HTML")
     else:
         bank_gifts = await db.get_bank_gifts(config.DB_PATH)
         if not bank_gifts:
             await msg.reply_text("🏪 Bank has no gifts in stock.")
             return
         collections_in_stock = sorted({g["collection"] for g in bank_gifts})
-        lines = ["🏪 *Bank Stock — Collections Available*\n"]
-        lines += [f"• `{c}` — {_collection_display_name(c)}" for c in collections_in_stock]
-        lines.append("\nUse `/shop <collection>` to see models and prices.")
-        await msg.reply_text("\n".join(lines), parse_mode="Markdown")
+        lines = ["🏪 <b>Bank Stock — Collections Available</b>\n"]
+        lines += [f"• <code>{c}</code> — {escape(_collection_display_name(c))}" for c in collections_in_stock]
+        lines.append("\nUse <code>/shop &lt;collection&gt;</code> to see models and prices.")
+        await msg.reply_text("\n".join(lines), parse_mode="HTML")
 
 
 # ── /buy ──────────────────────────────────────────────────────────────────────
@@ -247,8 +257,8 @@ async def cmd_buy(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if len(ctx.args) < 3:
         await msg.reply_text(
-            "Usage: `/buy <collection> <number> <background>`\nExample: `/buy scared_cat 12 black`",
-            parse_mode="Markdown"
+            "Usage: <code>/buy &lt;collection&gt; &lt;number&gt; &lt;background&gt;</code>\nExample: <code>/buy scared_cat 12 black</code>",
+            parse_mode="HTML"
         )
         return
 
@@ -268,7 +278,7 @@ async def cmd_buy(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❌ Gift not found.")
         return
     if instance["owner_id"] is not None:
-        await msg.reply_text("❌ That gift is already owned by someone. Use `/offer` to trade with them.")
+        await msg.reply_text("❌ That gift is already owned by someone. Use /offer to trade with them.")
         return
 
     price_row = await db.get_gift_price(config.DB_PATH, collection, background)
@@ -279,7 +289,7 @@ async def cmd_buy(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     wallet = await db.get_wallet(config.DB_PATH, user.id)
     if not wallet:
-        await msg.reply_text("❌ You don't have a wallet yet. Use `/daily` to create one.")
+        await msg.reply_text("❌ You don't have a wallet yet. Use /daily to create one.")
         return
     if wallet["balance"] < price:
         await msg.reply_text(f"❌ Not enough WRK$. Price: {price:,} · Your balance: {wallet['balance']:,}")
@@ -289,13 +299,13 @@ async def cmd_buy(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await db.transfer_gift(config.DB_PATH, instance["id"], user.id)
     await db.apply_demand_pressure(config.DB_PATH, collection, background, +1)
 
-    col_name = _collection_display_name(collection)
+    col_name = escape(_collection_display_name(collection))
     await msg.reply_text(
         f"✅ Purchased!\n\n"
-        f"{instance['model_emoji']} *{col_name} #{model_number}* {_bg_emoji(background)} {_bg_label(background)}\n"
+        f"{_model_emoji_html(instance)} <b>{col_name} #{model_number}</b> {_bg_emoji(background)} {escape(_bg_label(background))}\n"
         f"Paid: {price:,} WRK$\n"
         f"💰 Balance: {new_bal:,} WRK$",
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
 
 
@@ -307,8 +317,8 @@ async def cmd_sell(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if len(ctx.args) < 3:
         await msg.reply_text(
-            "Usage: `/sell <collection> <number> <background>`\nExample: `/sell scared_cat 12 black`",
-            parse_mode="Markdown"
+            "Usage: <code>/sell &lt;collection&gt; &lt;number&gt; &lt;background&gt;</code>\nExample: <code>/sell scared_cat 12 black</code>",
+            parse_mode="HTML"
         )
         return
 
@@ -335,13 +345,13 @@ async def cmd_sell(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     new_bal = await db.update_balance(config.DB_PATH, user.id, sell_price)
     await db.apply_demand_pressure(config.DB_PATH, collection, background, -1)
 
-    col_name = _collection_display_name(collection)
+    col_name = escape(_collection_display_name(collection))
     await msg.reply_text(
         f"✅ Sold to bank!\n\n"
-        f"{instance['model_emoji']} *{col_name} #{model_number}* {_bg_emoji(background)} {_bg_label(background)}\n"
+        f"{_model_emoji_html(instance)} <b>{col_name} #{model_number}</b> {_bg_emoji(background)} {escape(_bg_label(background))}\n"
         f"You received: {sell_price:,} WRK$ (80% of market)\n"
         f"💰 Balance: {new_bal:,} WRK$",
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
 
 
@@ -353,9 +363,9 @@ async def cmd_offer(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if len(ctx.args) < 6 or ctx.args[2].lower() != "for":
         await msg.reply_text(
-            "Usage: `/offer @username <amount> for <collection> <number> <background>`\n"
-            "Example: `/offer @jerry 5000 for scared_cat 12 black`",
-            parse_mode="Markdown"
+            "Usage: <code>/offer @username &lt;amount&gt; for &lt;collection&gt; &lt;number&gt; &lt;background&gt;</code>\n"
+            "Example: <code>/offer @jerry 5000 for scared_cat 12 black</code>",
+            parse_mode="HTML"
         )
         return
 
@@ -404,11 +414,11 @@ async def cmd_offer(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     offer_id = await db.create_offer(config.DB_PATH, user.id, target_id, instance["id"], wrk_amount)
 
-    col_name = _collection_display_name(collection)
+    col_name = escape(_collection_display_name(collection))
     offer_text = (
-        f"💌 *Offer from {display_name(user)}*\n\n"
-        f"{instance['model_emoji']} {col_name} #{model_number} "
-        f"{_bg_emoji(background)} {_bg_label(background)}\n"
+        f"💌 <b>Offer from {escape(display_name(user))}</b>\n\n"
+        f"{_model_emoji_html(instance)} {col_name} #{model_number} "
+        f"{_bg_emoji(background)} {escape(_bg_label(background))}\n"
         f"Offer: {wrk_amount:,} WRK$\n"
         f"Market value: {market_price:,} WRK$\n\n"
         f"Offer expires in 24 hours."
@@ -419,7 +429,7 @@ async def cmd_offer(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     ]])
 
     try:
-        await ctx.bot.send_message(target_id, offer_text, parse_mode="Markdown", reply_markup=offer_kb)
+        await ctx.bot.send_message(target_id, offer_text, parse_mode="HTML", reply_markup=offer_kb)
         await msg.reply_text(f"✅ Offer sent to {target_name}!")
     except TelegramError:
         await db.update_offer_status(config.DB_PATH, offer_id, "declined")
@@ -473,15 +483,16 @@ async def gift_offer_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await db.transfer_gift(config.DB_PATH, offer["instance_id"], from_user_id)
     await db.update_offer_status(config.DB_PATH, offer_id, "accepted")
 
-    col_name = _collection_display_name(instance["collection"])
-    gift_label = f"{instance['model_emoji']} {col_name} #{instance['model_number']} {_bg_emoji(instance['background'])}"
+    col_name = escape(_collection_display_name(instance["collection"]))
+    gift_label = f"{_model_emoji_html(instance)} {col_name} #{instance['model_number']} {_bg_emoji(instance['background'])}"
 
     await query.answer()
-    await query.edit_message_text(f"✅ Trade complete! You sold {gift_label} for {offer['wrk_offered']:,} WRK$.")
+    await query.edit_message_text(f"✅ Trade complete! You sold {gift_label} for {offer['wrk_offered']:,} WRK$.", parse_mode="HTML")
     try:
         await ctx.bot.send_message(
             from_user_id,
-            f"✅ Trade accepted! You received {gift_label}.\nPaid: {offer['wrk_offered']:,} WRK$"
+            f"✅ Trade accepted! You received {gift_label}.\nPaid: {offer['wrk_offered']:,} WRK$",
+            parse_mode="HTML"
         )
     except TelegramError:
         pass
@@ -498,12 +509,12 @@ async def cmd_offers(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("📭 No pending offers.")
         return
 
-    lines = ["📬 *Pending Offers*\n"]
+    lines = ["📬 <b>Pending Offers</b>\n"]
     for o in offers:
-        col_name = _collection_display_name(o["collection"])
+        col_name = escape(_collection_display_name(o["collection"]))
         direction = "→ you" if o["to_user_id"] == user.id else "from you"
         lines.append(
-            f"{o['model_emoji']} {col_name} #{o['model_number']} "
+            f"{_model_emoji_html(o)} {col_name} #{o['model_number']} "
             f"{_bg_emoji(o['background'])} — {o['wrk_offered']:,} WRK$ ({direction})"
         )
-    await msg.reply_text("\n".join(lines), parse_mode="Markdown")
+    await msg.reply_text("\n".join(lines), parse_mode="HTML")
