@@ -118,6 +118,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("bal",         cmd_balance))
     app.add_handler(CommandHandler("daily",       cmd_daily))
     app.add_handler(CommandHandler("leaderboard", cmd_leaderboard))
+    app.add_handler(CommandHandler("lb",          cmd_leaderboard))
     app.add_handler(CommandHandler("rob",         cmd_rob))
     app.add_handler(CommandHandler("slots",       cmd_slots))
     app.add_handler(CommandHandler("coinflip",    cmd_coinflip))
