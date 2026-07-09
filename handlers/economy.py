@@ -187,3 +187,75 @@ async def cmd_leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         name = row.get("full_name") or row.get("username") or str(row["user_id"])
         lines.append(f"{prefix} {name} — {row['balance']:,} WRK$")
     await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+# ── /rob ──────────────────────────────────────────────────────────────────────
+
+_rob_cooldowns: dict[int, float] = {}  # user_id -> timestamp
+
+async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    robber = update.effective_user
+    robber_wallet = await _ensure_wallet(robber, config.DB_PATH)
+
+    now = time.time()
+    last_rob = _rob_cooldowns.get(robber.id, 0)
+    if now - last_rob < 3600:
+        remaining = int(3600 - (now - last_rob))
+        m = remaining // 60
+        await msg.reply_text(f"⏳ Rob cooldown: {m}m remaining.")
+        return
+
+    if not ctx.args:
+        await msg.reply_text("Usage: `/rob @username`", parse_mode="Markdown")
+        return
+
+    target_username = ctx.args[0]
+    target_row = await db.get_user_by_username(config.DB_PATH, msg.chat.id, target_username)
+    if not target_row:
+        await msg.reply_text("❌ Can't find that user. They need to have sent a message first.")
+        return
+
+    target_id = target_row["user_id"]
+    target_name = target_row["full_name"] or target_username
+
+    if target_id == robber.id:
+        await msg.reply_text("❌ You can't rob yourself.")
+        return
+
+    target_wallet = await db.get_wallet(config.DB_PATH, target_id)
+    if not target_wallet or target_wallet["balance"] < 500:
+        await msg.reply_text(f"❌ {target_name} doesn't have enough WRK$ to rob (minimum 500).")
+        return
+
+    _rob_cooldowns[robber.id] = now
+    success = random.random() < 0.50
+    result = _rob_outcome(success, robber_wallet["balance"], target_wallet["balance"])
+
+    if result["outcome"] == "success":
+        amount = result["amount"]
+        await db.update_balance(config.DB_PATH, target_id, -amount)
+        new_bal = await db.update_balance(config.DB_PATH, robber.id, amount)
+        await msg.reply_text(
+            f"🥷 Success! You robbed {target_name} for {amount:,} WRK$.\n"
+            f"💰 Your balance: {new_bal:,} WRK$"
+        )
+    elif result["outcome"] == "fine":
+        amount = result["amount"]
+        new_bal = await db.update_balance(config.DB_PATH, robber.id, -amount)
+        await msg.reply_text(
+            f"🚔 You got chased off! Lost {amount:,} WRK$ running away.\n"
+            f"💰 Your balance: {new_bal:,} WRK$"
+        )
+    elif result["outcome"] == "bail":
+        amount = result["amount"]
+        new_bal = await db.update_balance(config.DB_PATH, robber.id, -amount)
+        await msg.reply_text(
+            f"🚨 Busted! You were arrested and had to bail out. Lost {amount:,} WRK$.\n"
+            f"💰 Your balance: {new_bal:,} WRK$"
+        )
+    else:  # getaway
+        await msg.reply_text(
+            f"😮‍💨 You failed the rob but made a clean getaway. No loss.\n"
+            f"💰 Your balance: {robber_wallet['balance']:,} WRK$"
+        )
