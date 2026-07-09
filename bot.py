@@ -114,6 +114,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("antiraid",           cmd_antiraid))
     app.add_handler(CommandHandler("setantiraid",        cmd_setantiraid))
     app.add_handler(CommandHandler("balance",     cmd_balance))
+    app.add_handler(CommandHandler("bal",         cmd_balance))
     app.add_handler(CommandHandler("daily",       cmd_daily))
     app.add_handler(CommandHandler("leaderboard", cmd_leaderboard))
     app.add_handler(CommandHandler("rob",         cmd_rob))
