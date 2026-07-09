@@ -49,6 +49,16 @@ def _price_floor(base_price: int) -> int:
 def _price_ceiling(base_price: int) -> int:
     return int(base_price * 5.0)
 
+def _parse_args(args: list[str]) -> tuple[str, list[str]]:
+    """Split args into (collection_key, remaining_args).
+    Collection key is everything before the first numeric token, joined with '_'.
+    Allows '/shop scared cat' and '/shop scared_cat' to both work.
+    """
+    for i, arg in enumerate(args):
+        if arg.isdigit():
+            return "_".join(args[:i]).lower(), args[i:]
+    return "_".join(args).lower(), []
+
 def _model_emoji_html(instance: dict) -> str:
     eid = instance.get("custom_emoji_id")
     fallback = escape(instance["model_emoji"])
@@ -176,12 +186,12 @@ async def cmd_gift(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    collection = ctx.args[0].lower()
-    if not ctx.args[1].isdigit():
+    collection, rest = _parse_args(ctx.args)
+    if not rest or not rest[0].isdigit():
         await msg.reply_text("❌ Model number must be a number.")
         return
-    model_number = int(ctx.args[1])
-    background = ctx.args[2].lower() if len(ctx.args) > 2 else None
+    model_number = int(rest[0])
+    background = rest[1].lower() if len(rest) > 1 else None
 
     if background and background not in _BACKGROUNDS:
         await msg.reply_text(f"❌ Invalid background. Choose: {', '.join(_BACKGROUNDS)}")
@@ -213,7 +223,7 @@ async def cmd_gift(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_shop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
 
-    collection = ctx.args[0].lower() if ctx.args else None
+    collection, _ = _parse_args(ctx.args) if ctx.args else (None, [])
 
     if collection:
         bank_gifts = await db.get_bank_gifts(config.DB_PATH, collection)
@@ -262,12 +272,12 @@ async def cmd_buy(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    collection = ctx.args[0].lower()
-    if not ctx.args[1].isdigit():
+    collection, rest = _parse_args(ctx.args)
+    if len(rest) < 2 or not rest[0].isdigit():
         await msg.reply_text("❌ Model number must be a number.")
         return
-    model_number = int(ctx.args[1])
-    background = ctx.args[2].lower()
+    model_number = int(rest[0])
+    background = rest[1].lower()
 
     if background not in _BACKGROUNDS:
         await msg.reply_text(f"❌ Invalid background. Choose: {', '.join(_BACKGROUNDS)}")
@@ -322,12 +332,12 @@ async def cmd_sell(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    collection = ctx.args[0].lower()
-    if not ctx.args[1].isdigit():
+    collection, rest = _parse_args(ctx.args)
+    if len(rest) < 2 or not rest[0].isdigit():
         await msg.reply_text("❌ Model number must be a number.")
         return
-    model_number = int(ctx.args[1])
-    background = ctx.args[2].lower()
+    model_number = int(rest[0])
+    background = rest[1].lower()
 
     if background not in _BACKGROUNDS:
         await msg.reply_text(f"❌ Invalid background. Choose: {', '.join(_BACKGROUNDS)}")
@@ -361,25 +371,34 @@ async def cmd_offer(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
 
-    if len(ctx.args) < 6 or ctx.args[2].lower() != "for":
+    args = ctx.args
+    try:
+        for_idx = next(i for i, a in enumerate(args) if a.lower() == "for")
+    except StopIteration:
+        for_idx = -1
+
+    if for_idx < 2 or len(args) <= for_idx + 1:
         await msg.reply_text(
             "Usage: <code>/offer @username &lt;amount&gt; for &lt;collection&gt; &lt;number&gt; &lt;background&gt;</code>\n"
-            "Example: <code>/offer @jerry 5000 for scared_cat 12 black</code>",
+            "Example: <code>/offer @jerry 5000 for scared cat 12 black</code>",
             parse_mode="HTML"
         )
         return
 
-    target_username = ctx.args[0]
-    if not ctx.args[1].isdigit():
+    target_username = args[0]
+    if not args[1].isdigit():
         await msg.reply_text("❌ Amount must be a number.")
         return
-    wrk_amount = int(ctx.args[1])
-    collection = ctx.args[3].lower()
-    if not ctx.args[4].isdigit():
+    wrk_amount = int(args[1])
+    collection, rest = _parse_args(args[for_idx + 1:])
+    if not rest or not rest[0].isdigit():
         await msg.reply_text("❌ Model number must be a number.")
         return
-    model_number = int(ctx.args[4])
-    background = ctx.args[5].lower()
+    model_number = int(rest[0])
+    if len(rest) < 2:
+        await msg.reply_text("❌ Background required.")
+        return
+    background = rest[1].lower()
 
     if background not in _BACKGROUNDS:
         await msg.reply_text(f"❌ Invalid background. Choose: {', '.join(_BACKGROUNDS)}")
