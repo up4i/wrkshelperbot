@@ -190,7 +190,7 @@ async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         streak = 0
     streak += 1
 
-    base = random.randint(500, 1500)
+    base = random.randint(3000, 8000)
     mult = _daily_streak_multiplier(streak)
     earned = base * mult
 
@@ -233,14 +233,15 @@ async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # 15-minute cooldown between shifts. Total lifetime taps unlock promotions.
 
 # (min_taps, title, earn_low, earn_high)  — earn per tap in WRK$
+# Tuned so a full 50-tap Intern shift ≈ 4,500 WRK$ avg → low-tier gift in ~2h active play
 _JOBS = [
-    (0,    "🧑‍🎓 Crypto Intern",    5,   15),
-    (100,  "📈 Degen Trader",       10,  30),
-    (300,  "🌾 Yield Farmer",       20,  60),
-    (600,  "🔍 On-Chain Analyst",   35, 100),
-    (1000, "⚙️ Protocol Dev",       55, 150),
-    (2000, "🦈 Blockchain Shark",   85, 220),
-    (5000, "👑 Blockchain Baron",  130, 320),
+    (0,    "🧑‍🎓 Crypto Intern",     60,   120),
+    (100,  "📈 Degen Trader",        120,  250),
+    (300,  "🌾 Yield Farmer",        250,  500),
+    (600,  "🔍 On-Chain Analyst",    400,  800),
+    (1000, "⚙️ Protocol Dev",        600, 1200),
+    (2000, "🦈 Blockchain Shark",    900, 1800),
+    (5000, "👑 Blockchain Baron",   1500, 3000),
 ]
 
 _SHIFT_MAX_TAPS = 50
@@ -638,7 +639,7 @@ async def cmd_hack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
 
     word, clue = random.choice(_WORDLIST)
-    reward = random.randint(800, 2500)
+    reward = random.randint(5000, 15000)
     revealed = {0}  # always reveal first letter
 
     _hack_games[user.id] = {
