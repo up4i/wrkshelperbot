@@ -60,3 +60,18 @@ async def daily_price_update(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
     await db.reset_demand_pressure(config.DB_PATH)
     log.info("daily_price_update: updated %d price rows", len(prices))
+
+
+async def sweep_work_reminders(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    import time
+    now = int(time.time())
+    targets = await db.get_work_reminder_targets(config.DB_PATH, now)
+    for user_id in targets:
+        try:
+            await ctx.bot.send_message(
+                user_id,
+                "⚡ Your shift is ready! Use /work to start earning.",
+            )
+            await db.mark_reminder_sent(config.DB_PATH, user_id, now)
+        except TelegramError as e:
+            log.warning("work_reminder send failed for %s: %s", user_id, e)

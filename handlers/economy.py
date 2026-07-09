@@ -456,6 +456,21 @@ async def cmd_leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
+# ── /workreminder ─────────────────────────────────────────────────────────────
+
+async def cmd_workreminder(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    await _ensure_wallet(user, config.DB_PATH)
+    new_state = await db.toggle_work_reminder(config.DB_PATH, user.id)
+    if new_state:
+        await update.effective_message.reply_text(
+            "🔔 Work reminder *ON* — I'll DM you when your shift is ready!",
+            parse_mode="Markdown"
+        )
+    else:
+        await update.effective_message.reply_text("🔕 Work reminder *OFF*", parse_mode="Markdown")
+
+
 # ── Economy admin (owner only) ────────────────────────────────────────────────
 
 async def cmd_givewrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):

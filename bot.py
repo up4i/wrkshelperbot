@@ -7,7 +7,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 import config
 from db import init_db
 import datetime
-from jobs import sweep_punishments, daily_price_update
+from jobs import sweep_punishments, daily_price_update, sweep_work_reminders
 from handlers.moderation import (
     cmd_mute, cmd_dmute, cmd_unmute,
     cmd_ban, cmd_dban, cmd_unban,
@@ -42,7 +42,7 @@ from handlers.economy import (
     cmd_crash, cmd_cashout,
     cmd_give, cmd_givewrk, cmd_setwrk,
     cmd_hack, cmd_guess,
-    cmd_work, cmd_jobs, work_callback,
+    cmd_work, cmd_workreminder, cmd_jobs, work_callback,
 )
 from handlers.gifts import (
     cmd_seedgifts,
@@ -143,8 +143,9 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("cashout",     cmd_cashout))
     app.add_handler(CommandHandler("hack",        cmd_hack))
     app.add_handler(CommandHandler("guess",       cmd_guess))
-    app.add_handler(CommandHandler("work",        cmd_work))
-    app.add_handler(CommandHandler("jobs",        cmd_jobs))
+    app.add_handler(CommandHandler("work",         cmd_work))
+    app.add_handler(CommandHandler("workreminder", cmd_workreminder))
+    app.add_handler(CommandHandler("jobs",         cmd_jobs))
     app.add_handler(CommandHandler("give",        cmd_give))
     app.add_handler(CommandHandler("givewrk",     cmd_givewrk))
     app.add_handler(CommandHandler("setwrk",      cmd_setwrk))
@@ -192,6 +193,7 @@ def build_app() -> Application:
     )
 
     app.job_queue.run_repeating(sweep_punishments, interval=60, first=10)
+    app.job_queue.run_repeating(sweep_work_reminders, interval=60, first=30)
     app.job_queue.run_daily(daily_price_update, time=datetime.time(hour=0, minute=0))
 
     return app

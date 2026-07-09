@@ -114,9 +114,11 @@ async def _migrate(db) -> None:
     async with db.execute("PRAGMA table_info(economy)") as cur:
         econ_cols = {row[1] async for row in cur}
     econ_new = {
-        "last_work":  "INTEGER NOT NULL DEFAULT 0",
-        "last_beg":   "INTEGER NOT NULL DEFAULT 0",
-        "work_count": "INTEGER NOT NULL DEFAULT 0",
+        "last_work":           "INTEGER NOT NULL DEFAULT 0",
+        "last_beg":            "INTEGER NOT NULL DEFAULT 0",
+        "work_count":          "INTEGER NOT NULL DEFAULT 0",
+        "work_reminder":       "INTEGER NOT NULL DEFAULT 0",
+        "last_reminder_sent":  "INTEGER NOT NULL DEFAULT 0",
     }
     for col, typedef in econ_new.items():
         if col not in econ_cols:
@@ -805,3 +807,35 @@ async def get_random_low_tier_bank_gift(db_path: str) -> dict | None:
     ]
     chosen = random.choices(candidates, weights=weights, k=1)[0]
     return await get_gift_instance(db_path, chosen["id"])
+
+
+async def toggle_work_reminder(db_path: str, user_id: int) -> int:
+    """Flip work_reminder for user. Returns new value (0 or 1)."""
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "UPDATE economy SET work_reminder = 1 - work_reminder WHERE user_id = ? RETURNING work_reminder",
+            (user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+        await db.commit()
+        return row[0] if row else 0
+
+
+async def get_work_reminder_targets(db_path: str, now: int) -> list[int]:
+    """Return user_ids whose cooldown just expired and have reminders enabled."""
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "SELECT user_id FROM economy "
+            "WHERE work_reminder = 1 AND last_work > 0 "
+            "AND last_work + 900 <= ? AND last_reminder_sent < last_work",
+            (now,),
+        ) as cur:
+            return [row[0] async for row in cur]
+
+
+async def mark_reminder_sent(db_path: str, user_id: int, now: int) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "UPDATE economy SET last_reminder_sent = ? WHERE user_id = ?", (now, user_id)
+        )
+        await db.commit()
