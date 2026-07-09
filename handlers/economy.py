@@ -439,13 +439,14 @@ async def cmd_blackjack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def blackjack_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer()
     _, action, uid_str = query.data.split(":")
     user_id = int(uid_str)
 
     if query.from_user.id != user_id:
         await query.answer("This isn't your game.", show_alert=True)
         return
+
+    await query.answer()
 
     game = _bj_games.get(user_id)
     if not game:
