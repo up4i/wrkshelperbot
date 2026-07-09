@@ -259,3 +259,109 @@ async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"😮‍💨 You failed the rob but made a clean getaway. No loss.\n"
             f"💰 Your balance: {robber_wallet['balance']:,} WRK$"
         )
+
+
+# ── /slots ────────────────────────────────────────────────────────────────────
+
+async def cmd_slots(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    wallet = await _ensure_wallet(user, config.DB_PATH)
+
+    if not ctx.args or not ctx.args[0].isdigit():
+        await msg.reply_text("Usage: `/slots <bet>`", parse_mode="Markdown")
+        return
+    bet = int(ctx.args[0])
+    if bet < 10:
+        await msg.reply_text("❌ Minimum bet is 10 WRK$.")
+        return
+    if wallet["balance"] < bet:
+        await msg.reply_text(f"❌ Not enough WRK$. Your balance: {wallet['balance']:,}")
+        return
+
+    reels = [random.choice(SLOT_SYMBOLS) for _ in range(3)]
+    outcome, mult = _slots_result(reels)
+    display = " | ".join(reels)
+
+    if outcome == "no_match":
+        new_bal = await db.update_balance(config.DB_PATH, user.id, -bet)
+        await msg.reply_text(f"🎰 {display}\n\nNo match. Lost {bet:,} WRK$.\n💰 {new_bal:,} WRK$")
+    else:
+        winnings = bet * mult - bet
+        new_bal = await db.update_balance(config.DB_PATH, user.id, winnings)
+        label = {"jackpot": "🎉 JACKPOT!", "three_match": "Three of a kind!", "two_match": "Two of a kind!"}[outcome]
+        await msg.reply_text(
+            f"🎰 {display}\n\n{label} {mult}x → +{winnings:,} WRK$\n💰 {new_bal:,} WRK$"
+        )
+
+
+# ── /coinflip ─────────────────────────────────────────────────────────────────
+
+async def cmd_coinflip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    wallet = await _ensure_wallet(user, config.DB_PATH)
+
+    if not ctx.args or not ctx.args[0].isdigit():
+        await msg.reply_text("Usage: `/coinflip <bet> [heads|tails]`", parse_mode="Markdown")
+        return
+    bet = int(ctx.args[0])
+    if bet < 10:
+        await msg.reply_text("❌ Minimum bet is 10 WRK$.")
+        return
+    if wallet["balance"] < bet:
+        await msg.reply_text(f"❌ Not enough WRK$. Your balance: {wallet['balance']:,}")
+        return
+
+    pick = ctx.args[1].lower() if len(ctx.args) > 1 and ctx.args[1].lower() in ("heads", "tails") else None
+    result = random.choice(["heads", "tails"])
+
+    won = random.random() < 0.50
+    if won:
+        new_bal = await db.update_balance(config.DB_PATH, user.id, bet)
+        pick_line = f"You picked {pick}. " if pick else ""
+        await msg.reply_text(
+            f"🪙 **{result.capitalize()}**\n\n{pick_line}You won! +{bet:,} WRK$\n💰 {new_bal:,} WRK$",
+            parse_mode="Markdown"
+        )
+    else:
+        new_bal = await db.update_balance(config.DB_PATH, user.id, -bet)
+        pick_line = f"You picked {pick}. " if pick else ""
+        await msg.reply_text(
+            f"🪙 **{result.capitalize()}**\n\n{pick_line}You lost! -{bet:,} WRK$\n💰 {new_bal:,} WRK$",
+            parse_mode="Markdown"
+        )
+
+
+# ── /dice ─────────────────────────────────────────────────────────────────────
+
+async def cmd_dice(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    wallet = await _ensure_wallet(user, config.DB_PATH)
+
+    if not ctx.args or not ctx.args[0].isdigit():
+        await msg.reply_text("Usage: `/dice <bet>`", parse_mode="Markdown")
+        return
+    bet = int(ctx.args[0])
+    if bet < 10:
+        await msg.reply_text("❌ Minimum bet is 10 WRK$.")
+        return
+    if wallet["balance"] < bet:
+        await msg.reply_text(f"❌ Not enough WRK$. Your balance: {wallet['balance']:,}")
+        return
+
+    player_roll = random.randint(1, 6)
+    bot_roll = random.randint(1, 6)
+
+    if player_roll >= bot_roll:
+        winnings = int(bet * 0.8)
+        new_bal = await db.update_balance(config.DB_PATH, user.id, winnings)
+        await msg.reply_text(
+            f"🎲 You rolled {player_roll} | Bot rolled {bot_roll}\n\nYou win! +{winnings:,} WRK$\n💰 {new_bal:,} WRK$"
+        )
+    else:
+        new_bal = await db.update_balance(config.DB_PATH, user.id, -bet)
+        await msg.reply_text(
+            f"🎲 You rolled {player_roll} | Bot rolled {bot_roll}\n\nBot wins. -{bet:,} WRK$\n💰 {new_bal:,} WRK$"
+        )
