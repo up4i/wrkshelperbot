@@ -6,7 +6,8 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 
 import config
 from db import init_db
-from jobs import sweep_punishments
+import datetime
+from jobs import sweep_punishments, daily_price_update
 from handlers.moderation import (
     cmd_mute, cmd_dmute, cmd_unmute,
     cmd_ban, cmd_dban, cmd_unban,
@@ -41,6 +42,13 @@ from handlers.economy import (
     cmd_crash, cmd_cashout,
     cmd_give, cmd_givewrk, cmd_setwrk,
     cmd_hack, cmd_guess,
+)
+from handlers.gifts import (
+    cmd_seedgifts,
+    cmd_inventory, cmd_gift,
+    cmd_shop, cmd_buy, cmd_sell,
+    cmd_offer, cmd_offers,
+    gifts_callback, gift_offer_callback,
 )
 
 os.makedirs(os.path.dirname(config.LOG_FILE), exist_ok=True)
@@ -136,10 +144,21 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("give",        cmd_give))
     app.add_handler(CommandHandler("givewrk",     cmd_givewrk))
     app.add_handler(CommandHandler("setwrk",      cmd_setwrk))
+    app.add_handler(CommandHandler("seedgifts",  cmd_seedgifts))
+    app.add_handler(CommandHandler("inventory",  cmd_inventory))
+    app.add_handler(CommandHandler("inv",        cmd_inventory))
+    app.add_handler(CommandHandler("gift",       cmd_gift))
+    app.add_handler(CommandHandler("shop",       cmd_shop))
+    app.add_handler(CommandHandler("buy",        cmd_buy))
+    app.add_handler(CommandHandler("sell",       cmd_sell))
+    app.add_handler(CommandHandler("offer",      cmd_offer))
+    app.add_handler(CommandHandler("offers",     cmd_offers))
     app.add_handler(CallbackQueryHandler(setup_callback,  pattern=r"^setup:"))
     app.add_handler(CallbackQueryHandler(dsetup_callback, pattern=r"^dsetup:"))
     app.add_handler(CallbackQueryHandler(help_callback,   pattern=r"^help:"))
     app.add_handler(CallbackQueryHandler(blackjack_callback, pattern=r"^bj:"))
+    app.add_handler(CallbackQueryHandler(gifts_callback,      pattern=r"^gifts:"))
+    app.add_handler(CallbackQueryHandler(gift_offer_callback, pattern=r"^gift_offer:"))
     app.add_handler(MessageHandler(filters.ChatType.GROUPS & filters.ALL, on_any_message))
     app.add_handler(
         MessageHandler(filters.ChatType.GROUPS & filters.StatusUpdate.ALL, on_service_message),
@@ -167,6 +186,7 @@ def build_app() -> Application:
     )
 
     app.job_queue.run_repeating(sweep_punishments, interval=60, first=10)
+    app.job_queue.run_daily(daily_price_update, time=datetime.time(hour=0, minute=0))
 
     return app
 
