@@ -374,6 +374,7 @@ _WORDLIST = [
 
 _hack_cooldowns: dict[int, float] = {}   # user_id -> timestamp
 _hack_games: dict[int, dict] = {}        # user_id -> active game state
+_HACK_GAME_TTL = 3600  # abandon after 1 hour
 
 
 def _hack_display(word: str, revealed: set[int]) -> str:
@@ -396,14 +397,19 @@ async def cmd_hack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if user.id in _hack_games:
         game = _hack_games[user.id]
-        display = _hack_display(game["word"], game["revealed"])
-        await msg.reply_text(
-            f"🖥️ You already have an active hack session!\n\n"
-            f"`{display}`\n_{game['clue']}_\n\n"
-            f"Attempts left: {game['attempts']}\nUse `/guess <word>` to answer.",
-            parse_mode="Markdown"
-        )
-        return
+        # Auto-expire abandoned games older than 1 hour
+        if now - game.get("started_at", 0) > _HACK_GAME_TTL:
+            del _hack_games[user.id]
+            _hack_cooldowns[user.id] = now  # still apply cooldown
+        else:
+            display = _hack_display(game["word"], game["revealed"])
+            await msg.reply_text(
+                f"🖥️ You already have an active hack session!\n\n"
+                f"`{display}`\n_{game['clue']}_\n\n"
+                f"Attempts left: {game['attempts']}\nUse `/guess <word>` to answer.",
+                parse_mode="Markdown"
+            )
+            return
 
     word, clue = random.choice(_WORDLIST)
     reward = random.randint(800, 2500)
@@ -415,6 +421,7 @@ async def cmd_hack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "reward": reward,
         "attempts": 3,
         "revealed": revealed,
+        "started_at": now,
     }
 
     display = _hack_display(word, revealed)
