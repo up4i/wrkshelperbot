@@ -738,7 +738,15 @@ async def cmd_dice(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /blackjack ────────────────────────────────────────────────────────────────
 
-def _bj_render(player_hand, dealer_hand, hide_dealer=True) -> str:
+def _bj_card_points(rank: str) -> int:
+    if rank in ('J', 'Q', 'K'):
+        return 10
+    if rank == 'A':
+        return 11
+    return int(rank)
+
+
+def _bj_render(hands: list, dealer_hand: list, current_hand: int = 0, hide_dealer: bool = True) -> str:
     def fmt_hand(hand):
         return " ".join(f"{r}{s}" for r, s in hand)
     if hide_dealer:
@@ -746,18 +754,86 @@ def _bj_render(player_hand, dealer_hand, hide_dealer=True) -> str:
         dealer_display = f"{dealer_hand[0][0]}{dealer_hand[0][1]} ?? = **{visible_value}+?**"
     else:
         dealer_display = f"{fmt_hand(dealer_hand)} = **{_bj_hand_value(dealer_hand)}**"
-    return (
-        f"🃏 *Blackjack*\n\n"
-        f"Your hand: {fmt_hand(player_hand)} = **{_bj_hand_value(player_hand)}**\n"
-        f"Dealer: {dealer_display}"
-    )
+    lines = ["🃏 *Blackjack*\n"]
+    if len(hands) == 1:
+        lines.append(f"Your hand: {fmt_hand(hands[0])} = **{_bj_hand_value(hands[0])}**")
+    else:
+        for i, hand in enumerate(hands):
+            marker = "▶ " if i == current_hand else "   "
+            lines.append(f"{marker}Hand {i+1}: {fmt_hand(hand)} = **{_bj_hand_value(hand)}**")
+    lines.append(f"Dealer: {dealer_display}")
+    return "\n".join(lines)
 
 
-def _bj_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[
+def _bj_keyboard(user_id: int, can_double: bool = False, can_split: bool = False) -> InlineKeyboardMarkup:
+    row1 = [
         InlineKeyboardButton("👊 Hit", callback_data=f"bj:hit:{user_id}"),
         InlineKeyboardButton("✋ Stand", callback_data=f"bj:stand:{user_id}"),
-    ]])
+    ]
+    row2 = []
+    if can_double:
+        row2.append(InlineKeyboardButton("2️⃣ Double", callback_data=f"bj:double:{user_id}"))
+    if can_split:
+        row2.append(InlineKeyboardButton("✂️ Split", callback_data=f"bj:split:{user_id}"))
+    rows = [row1, row2] if row2 else [row1]
+    return InlineKeyboardMarkup(rows)
+
+
+def _bj_active_keyboard(game: dict, user_id: int, balance: int) -> InlineKeyboardMarkup:
+    hand = game["hands"][game["current_hand"]]
+    is_first_action = len(hand) == 2
+    can_double = is_first_action and balance >= game["bet"]
+    can_split = (
+        is_first_action
+        and len(game["hands"]) == 1
+        and _bj_card_points(hand[0][0]) == _bj_card_points(hand[1][0])
+        and balance >= game["bet"]
+    )
+    return _bj_keyboard(user_id, can_double=can_double, can_split=can_split)
+
+
+async def _bj_resolve(query, game: dict, user_id: int, wallet: dict):
+    del _bj_games[user_id]
+    dealer_hand = game["dealer"]
+    deck = game["deck"]
+
+    # Dealer plays out only if at least one player hand hasn't busted
+    if any(_bj_hand_value(h) <= 21 for h in game["hands"]):
+        while _bj_hand_value(dealer_hand) < 17:
+            dealer_hand.append(deck.pop())
+    dealer_val = _bj_hand_value(dealer_hand)
+
+    total_delta = 0
+    result_lines = []
+    for i, hand in enumerate(game["hands"]):
+        hand_bet = game["bet"] * (2 if game["doubled"][i] else 1)
+        player_val = _bj_hand_value(hand)
+        if player_val > 21:
+            result_lines.append(f"Hand {i+1}: 💥 Bust  −{hand_bet:,}")
+            total_delta -= hand_bet
+        elif dealer_val > 21 or player_val > dealer_val:
+            result_lines.append(f"Hand {i+1}: 🏆 Win  +{hand_bet:,}")
+            total_delta += hand_bet
+        elif player_val == dealer_val:
+            result_lines.append(f"Hand {i+1}: 🤝 Push")
+        else:
+            result_lines.append(f"Hand {i+1}: 😞 Lose  −{hand_bet:,}")
+            total_delta -= hand_bet
+
+    if len(game["hands"]) == 1:
+        result_lines = [result_lines[0].replace("Hand 1: ", "")]
+
+    new_bal = await db.update_balance(config.DB_PATH, user_id, total_delta)
+    result_text = "\n".join(result_lines)
+    if len(game["hands"]) > 1:
+        sign = "+" if total_delta > 0 else ""
+        result_text += f"\n\nNet: {sign}{total_delta:,} WRK$"
+
+    await query.edit_message_text(
+        f"{_bj_render(game['hands'], dealer_hand, hide_dealer=False)}\n\n"
+        f"{result_text}\n💰 {new_bal:,} WRK$",
+        parse_mode="Markdown"
+    )
 
 
 @topic_gated
@@ -787,7 +863,9 @@ async def cmd_blackjack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     _bj_games[user.id] = {
         "bet": bet,
         "deck": deck,
-        "player": player,
+        "hands": [player],
+        "current_hand": 0,
+        "doubled": [False],
         "dealer": dealer,
         "chat_id": msg.chat.id,
     }
@@ -797,16 +875,17 @@ async def cmd_blackjack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         winnings = int(bet * 1.5)
         new_bal = await db.update_balance(config.DB_PATH, user.id, winnings)
         await msg.reply_text(
-            f"{_bj_render(player, dealer, hide_dealer=False)}\n\n"
+            f"{_bj_render([player], dealer, hide_dealer=False)}\n\n"
             f"🎉 Blackjack! +{winnings:,} WRK$\n💰 {new_bal:,} WRK$",
             parse_mode="Markdown"
         )
         return
 
+    keyboard = _bj_active_keyboard(_bj_games[user.id], user.id, wallet["balance"])
     sent = await msg.reply_text(
-        _bj_render(player, dealer),
+        _bj_render([player], dealer),
         parse_mode="Markdown",
-        reply_markup=_bj_keyboard(user.id)
+        reply_markup=keyboard
     )
     _bj_games[user.id]["message_id"] = sent.message_id
 
@@ -828,50 +907,67 @@ async def blackjack_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     wallet = await db.get_wallet(config.DB_PATH, user_id)
-    bet = game["bet"]
+    ci = game["current_hand"]
+    hand = game["hands"][ci]
 
     if action == "hit":
-        game["player"].append(game["deck"].pop())
-        val = _bj_hand_value(game["player"])
-        if val > 21:
-            del _bj_games[user_id]
-            new_bal = await db.update_balance(config.DB_PATH, user_id, -bet)
-            await query.edit_message_text(
-                f"{_bj_render(game['player'], game['dealer'], hide_dealer=False)}\n\n"
-                f"💥 Bust! Lost {bet:,} WRK$\n💰 {new_bal:,} WRK$",
-                parse_mode="Markdown"
-            )
+        hand.append(game["deck"].pop())
+        if _bj_hand_value(hand) > 21:
+            if ci < len(game["hands"]) - 1:
+                game["current_hand"] += 1
+                kb = _bj_active_keyboard(game, user_id, wallet["balance"])
+                await query.edit_message_text(
+                    f"{_bj_render(game['hands'], game['dealer'], game['current_hand'])}\n\n💥 Hand {ci+1} bust!",
+                    parse_mode="Markdown", reply_markup=kb
+                )
+            else:
+                await _bj_resolve(query, game, user_id, wallet)
         else:
+            kb = _bj_active_keyboard(game, user_id, wallet["balance"])
             await query.edit_message_text(
-                _bj_render(game["player"], game["dealer"]),
-                parse_mode="Markdown",
-                reply_markup=_bj_keyboard(user_id)
+                _bj_render(game["hands"], game["dealer"], ci),
+                parse_mode="Markdown", reply_markup=kb
             )
 
     elif action == "stand":
-        dealer_hand = game["dealer"]
-        deck = game["deck"]
-        while _bj_hand_value(dealer_hand) < 17:
-            dealer_hand.append(deck.pop())
-
-        player_val = _bj_hand_value(game["player"])
-        dealer_val = _bj_hand_value(dealer_hand)
-        del _bj_games[user_id]
-
-        if dealer_val > 21 or player_val > dealer_val:
-            new_bal = await db.update_balance(config.DB_PATH, user_id, bet)
-            result = f"🏆 You win! +{bet:,} WRK$"
-        elif player_val == dealer_val:
-            result = f"🤝 Push — bet returned."
-            new_bal = wallet["balance"]
+        if ci < len(game["hands"]) - 1:
+            game["current_hand"] += 1
+            kb = _bj_active_keyboard(game, user_id, wallet["balance"])
+            await query.edit_message_text(
+                _bj_render(game["hands"], game["dealer"], game["current_hand"]),
+                parse_mode="Markdown", reply_markup=kb
+            )
         else:
-            new_bal = await db.update_balance(config.DB_PATH, user_id, -bet)
-            result = f"😞 Dealer wins. -{bet:,} WRK$"
+            await _bj_resolve(query, game, user_id, wallet)
 
+    elif action == "double":
+        if len(hand) != 2 or wallet["balance"] < game["bet"]:
+            await query.answer("Can't double now.", show_alert=True)
+            return
+        game["doubled"][ci] = True
+        hand.append(game["deck"].pop())
+        if ci < len(game["hands"]) - 1:
+            game["current_hand"] += 1
+            kb = _bj_active_keyboard(game, user_id, wallet["balance"])
+            await query.edit_message_text(
+                _bj_render(game["hands"], game["dealer"], game["current_hand"]),
+                parse_mode="Markdown", reply_markup=kb
+            )
+        else:
+            await _bj_resolve(query, game, user_id, wallet)
+
+    elif action == "split":
+        if len(hand) != 2 or len(game["hands"]) > 1 or wallet["balance"] < game["bet"]:
+            await query.answer("Can't split now.", show_alert=True)
+            return
+        card1, card2 = hand
+        game["hands"] = [[card1, game["deck"].pop()], [card2, game["deck"].pop()]]
+        game["doubled"] = [False, False]
+        game["current_hand"] = 0
+        kb = _bj_active_keyboard(game, user_id, wallet["balance"])
         await query.edit_message_text(
-            f"{_bj_render(game['player'], dealer_hand, hide_dealer=False)}\n\n"
-            f"{result}\n💰 {new_bal:,} WRK$",
-            parse_mode="Markdown"
+            _bj_render(game["hands"], game["dealer"], 0),
+            parse_mode="Markdown", reply_markup=kb
         )
 
 
