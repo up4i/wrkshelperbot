@@ -1,4 +1,5 @@
 import logging
+import random
 from telegram import ChatPermissions
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
@@ -30,3 +31,32 @@ async def sweep_punishments(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.warning("Sweep error for %s/%s: %s", chat_id, user_id, e)
         finally:
             await db.delete_punishment_by_id(config.DB_PATH, pid)
+
+
+async def daily_price_update(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Runs at midnight: apply random drift + demand pressure, then reset pressure."""
+    prices = await db.get_all_gift_prices(config.DB_PATH)
+
+    for p in prices:
+        base = p["base_price"]
+        current = p["current_price"]
+        floor_price = int(base * 0.40)
+        ceil_price = int(base * 5.0)
+
+        drift_pct = random.uniform(-0.20, 0.20)
+
+        demand = p["demand_pressure"]
+        if demand > 0:
+            demand_pct = min(demand * 0.03, 0.30)
+        elif demand < 0:
+            demand_pct = max(demand * 0.02, -0.30)
+        else:
+            demand_pct = 0.0
+
+        new_price = int(current * (1 + drift_pct + demand_pct))
+        new_price = max(floor_price, min(ceil_price, new_price))
+
+        await db.update_gift_price(config.DB_PATH, p["collection"], p["background"], new_price)
+
+    await db.reset_demand_pressure(config.DB_PATH)
+    log.info("daily_price_update: updated %d price rows", len(prices))
