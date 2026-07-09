@@ -94,6 +94,27 @@ _PAGES = {
         "`/info` — detailed user info (reply)\n"
         "`/help` — this menu"
     ),
+    "economy": (
+        "💰 *Economy — WRK$*\n\n"
+        "💼 *Wallet*\n"
+        "`/balance` — check your WRK$ balance and streak\n"
+        "`/daily` — claim 500–1500 WRK$ (24h cooldown, streak bonuses)\n"
+        "`/leaderboard` — top 10 WRK$ holders globally\n\n"
+        "🥷 *Crime*\n"
+        "`/rob @user` — attempt to rob someone (1h cooldown)\n"
+        "└ 50% success · steal 3–10% of their balance\n"
+        "└ On fail: fine, bail, or clean getaway\n"
+        "└ Victim needs ≥500 WRK$ to be robbable\n\n"
+        "🎰 *Gambling*\n"
+        "`/slots <bet>` — spin the slots (min 10 WRK$)\n"
+        "`/coinflip <bet> [heads|tails]` — 50/50 double or nothing\n"
+        "`/dice <bet>` — roll vs the bot\n"
+        "`/blackjack <bet>` — card game vs the house\n"
+        "`/crash <bet>` — start a multiplayer crash game\n"
+        "`/cashout` — lock in your multiplier during a crash game\n\n"
+        "📅 *Daily Streak Bonuses*\n"
+        "Day 7 → 2x · Day 14 → 3x · Day 30+ → 4x"
+    ),
 }
 
 _PAGE_BACK = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ Back", callback_data="help:main")]])
@@ -111,16 +132,49 @@ def _main_kb() -> InlineKeyboardMarkup:
             InlineKeyboardButton("🤖 Autoreplies",  callback_data="help:autoreply"),
         ],
         [
+            InlineKeyboardButton("💰 Economy",      callback_data="help:economy"),
             InlineKeyboardButton("⚙️ Setup & Info", callback_data="help:setup"),
+        ],
+        [
             InlineKeyboardButton("❌ Close",         callback_data="help:close"),
         ],
     ])
 
 
 async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    await update.effective_message.reply_text(
-        _MAIN_TEXT, parse_mode="Markdown", reply_markup=_main_kb()
-    )
+    msg = update.effective_message
+    if msg.chat.type in ("group", "supergroup"):
+        try:
+            await ctx.bot.send_message(
+                update.effective_user.id, _MAIN_TEXT,
+                parse_mode="Markdown", reply_markup=_main_kb()
+            )
+            await msg.reply_text("📬 Check your DMs!")
+        except TelegramError:
+            await msg.reply_text(
+                "❌ Couldn't DM you. Start a conversation with me first, then try again."
+            )
+    else:
+        await msg.reply_text(_MAIN_TEXT, parse_mode="Markdown", reply_markup=_main_kb())
+
+
+async def cmd_econhelp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    content = _PAGES["economy"]
+    if msg.chat.type in ("group", "supergroup"):
+        try:
+            await ctx.bot.send_message(
+                update.effective_user.id, content,
+                parse_mode="Markdown",
+                reply_markup=_PAGE_BACK
+            )
+            await msg.reply_text("📬 Check your DMs!")
+        except TelegramError:
+            await msg.reply_text(
+                "❌ Couldn't DM you. Start a conversation with me first, then try again."
+            )
+    else:
+        await msg.reply_text(content, parse_mode="Markdown", reply_markup=_PAGE_BACK)
 
 
 async def help_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
