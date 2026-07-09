@@ -93,7 +93,7 @@ Usage: `/rob @username`
 
 ### Constraints
 - 1 hour cooldown per robber (regardless of outcome)
-- Cannot rob someone with less than 100 WRK$
+- Cannot rob someone with less than 500 WRK$
 - Cannot rob yourself
 
 ---
@@ -135,13 +135,11 @@ Three reels, each with 7 symbols. Payouts:
 **Starting a game:**
 1. First user runs `/crash <bet>` — bot posts announcement:
    ```
-   🚀 @user has started Crash! Place your bet to join.
+   🚀 @user has started Crash! Type /crash <bet> to join.
    Crash starts in 10...
-   [Join Crash]
    ```
 2. Countdown ticks down (edited message, every second)
-3. Other users click **Join Crash** — bot DMs them: "Reply with your bet amount." Their response registers them.
-4. Alternatively, any user in the chat can type `/crash <bet>` during the countdown to join directly.
+3. Any other user types `/crash <bet>` during the countdown to join with their chosen bet.
 
 **During the game:**
 - Bot edits the message every 1.5 seconds with the live multiplier:
@@ -209,5 +207,5 @@ New users receive **1000 WRK$** when they first interact with any economy comman
 - Insufficient balance: `❌ You don't have enough WRK$. Your balance: X WRK$`
 - Invalid bet (non-number, below minimum): `❌ Bet must be at least 10 WRK$`
 - Crash already running: `❌ A crash game is already in progress in this chat`
-- Rob target too poor: `❌ @user doesn't have enough WRK$ to rob (minimum 100)`
+- Rob target too poor: `❌ @user doesn't have enough WRK$ to rob (minimum 500)`
 - Blackjack already active: `❌ You already have an active blackjack game`
