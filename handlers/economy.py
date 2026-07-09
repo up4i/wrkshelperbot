@@ -109,6 +109,14 @@ def _fmt(wallet: dict) -> str:
     return f"💰 {wallet['balance']:,} WRK$"
 
 
+def _resolve_bet(arg: str, balance: int) -> int | None:
+    if arg.lower() == "all":
+        return balance
+    if arg.isdigit():
+        return int(arg)
+    return None
+
+
 async def _ensure_wallet(user: object, db_path: str) -> dict:
     await db.upsert_wallet(db_path, user.id, user.username, user.full_name)
     return await db.get_wallet(db_path, user.id)
@@ -397,10 +405,10 @@ async def cmd_slots(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     wallet = await _ensure_wallet(user, config.DB_PATH)
 
-    if not ctx.args or not ctx.args[0].isdigit():
-        await msg.reply_text("Usage: `/slots <bet>`", parse_mode="Markdown")
+    bet = _resolve_bet(ctx.args[0], wallet["balance"]) if ctx.args else None
+    if bet is None:
+        await msg.reply_text("Usage: `/slots <bet|all>`", parse_mode="Markdown")
         return
-    bet = int(ctx.args[0])
     if bet < 10:
         await msg.reply_text("❌ Minimum bet is 10 WRK$.")
         return
@@ -431,10 +439,10 @@ async def cmd_coinflip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     wallet = await _ensure_wallet(user, config.DB_PATH)
 
-    if not ctx.args or not ctx.args[0].isdigit():
-        await msg.reply_text("Usage: `/coinflip <bet> [heads|tails]`", parse_mode="Markdown")
+    bet = _resolve_bet(ctx.args[0], wallet["balance"]) if ctx.args else None
+    if bet is None:
+        await msg.reply_text("Usage: `/coinflip <bet|all> [heads|tails]`", parse_mode="Markdown")
         return
-    bet = int(ctx.args[0])
     if bet < 10:
         await msg.reply_text("❌ Minimum bet is 10 WRK$.")
         return
@@ -474,10 +482,10 @@ async def cmd_dice(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     wallet = await _ensure_wallet(user, config.DB_PATH)
 
-    if not ctx.args or not ctx.args[0].isdigit():
-        await msg.reply_text("Usage: `/dice <bet>`", parse_mode="Markdown")
+    bet = _resolve_bet(ctx.args[0], wallet["balance"]) if ctx.args else None
+    if bet is None:
+        await msg.reply_text("Usage: `/dice <bet|all>`", parse_mode="Markdown")
         return
-    bet = int(ctx.args[0])
     if bet < 10:
         await msg.reply_text("❌ Minimum bet is 10 WRK$.")
         return
@@ -529,10 +537,10 @@ async def cmd_blackjack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if user.id in _bj_games:
         await msg.reply_text("❌ You already have an active blackjack game. Finish it first.")
         return
-    if not ctx.args or not ctx.args[0].isdigit():
-        await msg.reply_text("Usage: `/blackjack <bet>`", parse_mode="Markdown")
+    bet = _resolve_bet(ctx.args[0], wallet["balance"]) if ctx.args else None
+    if bet is None:
+        await msg.reply_text("Usage: `/blackjack <bet|all>`", parse_mode="Markdown")
         return
-    bet = int(ctx.args[0])
     if bet < 10:
         await msg.reply_text("❌ Minimum bet is 10 WRK$.")
         return
@@ -643,10 +651,10 @@ async def cmd_crash(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     chat_id = msg.chat.id
     wallet = await _ensure_wallet(user, config.DB_PATH)
 
-    if not ctx.args or not ctx.args[0].isdigit():
-        await msg.reply_text("Usage: `/crash <bet>`", parse_mode="Markdown")
+    bet = _resolve_bet(ctx.args[0], wallet["balance"]) if ctx.args else None
+    if bet is None:
+        await msg.reply_text("Usage: `/crash <bet|all>`", parse_mode="Markdown")
         return
-    bet = int(ctx.args[0])
     if bet < 10:
         await msg.reply_text("❌ Minimum bet is 10 WRK$.")
         return
