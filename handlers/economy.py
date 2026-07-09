@@ -204,10 +204,25 @@ async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif streak < 30:
         next_milestone = f"\n📅 {30 - streak} day(s) until 4x daily bonus"
 
+    # 25% chance at a random low-tier gift drop
+    gift_line = ""
+    if await db.is_gifts_seeded(config.DB_PATH) and random.random() < 0.25:
+        dropped = await db.get_random_low_tier_bank_gift(config.DB_PATH)
+        if dropped:
+            await db.transfer_gift(config.DB_PATH, dropped["id"], user.id)
+            from handlers.gifts import _collection_display_name, _bg_emoji, _bg_label
+            col_name = _collection_display_name(dropped["collection"])
+            gift_line = (
+                f"\n\n🎁 *Gift Drop!*\n"
+                f"{dropped['model_emoji']} {col_name} #{dropped['model_number']} "
+                f"{_bg_emoji(dropped['background'])} {_bg_label(dropped['background'])}"
+            )
+
     await update.effective_message.reply_text(
         f"✅ Daily claimed! +{earned:,} WRK${bonus_note}\n"
         f"🔥 Streak: {streak} day(s)\n"
-        f"💰 {new_balance:,} WRK${next_milestone}"
+        f"💰 {new_balance:,} WRK${next_milestone}{gift_line}",
+        parse_mode="Markdown"
     )
 
 
