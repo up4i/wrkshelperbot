@@ -542,6 +542,83 @@
   .cooldown-label { font-size: 13px; color: var(--muted); }
   .cooldown-timer { font-size: 36px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--primary); }
 
+  /* ── Blackjack ── */
+  .bj-table {
+    background: rgba(13, 80, 40, 0.22);
+    border: 1px solid rgba(22, 163, 74, 0.2);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .bj-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 8px;
+  }
+  .bj-hand-row { display: flex; gap: 6px; align-items: flex-end; flex-wrap: wrap; }
+  .bj-hand-wrap {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    margin-bottom: 4px;
+  }
+  .bj-hand-wrap.bj-active {
+    background: rgba(139,92,246,.12);
+    border: 1px solid rgba(139,92,246,.3);
+  }
+  .bj-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--gold);
+    min-width: 32px;
+    line-height: 1;
+  }
+  .bj-val.bust { color: var(--red); }
+  .bj-val.bj21 { color: var(--green); }
+  .bj-info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .bj-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .bj-btn { width: 100%; padding: 13px; font-size: 14px; }
+  /* Playing cards */
+  .play-card {
+    width: 44px;
+    height: 62px;
+    background: #fff;
+    border-radius: 7px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 3px 5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.5);
+    flex-shrink: 0;
+    position: relative;
+  }
+  .play-card .cr { font-size: 13px; font-weight: 800; line-height: 1; color: #111; }
+  .play-card .cs { font-size: 14px; line-height: 1; text-align: right; color: #111; }
+  .play-card.red .cr, .play-card.red .cs { color: #dc2626; }
+  .play-card.facedown {
+    background: repeating-linear-gradient(
+      45deg, #1e3a8a, #1e3a8a 5px, #2563eb 5px, #2563eb 10px
+    );
+    border: 2px solid #3b82f6;
+  }
+  .bj-bet-section { display: flex; flex-direction: column; gap: 12px; }
+
   /* floating +X animation */
   .float-earn {
     position: fixed;
@@ -619,10 +696,10 @@
           <div class="gname">Coinflip</div>
           <div class="gdesc">50/50 double or nothing</div>
         </div>
-        <div class="game-card soon">
+        <div class="game-card" onclick="openBlackjack()">
           <div class="gicon">🃏</div>
           <div class="gname">Blackjack</div>
-          <div class="gdesc">Coming soon</div>
+          <div class="gdesc">Hit, stand, or bust</div>
         </div>
         <div class="game-card soon">
           <div class="gicon">🚀</div>
@@ -747,6 +824,15 @@
     </div>
     <div class="balance-display">Balance: <span class="b" id="cfBal">—</span> WRK$</div>
     <div class="error-msg" id="cfErr"></div>
+  </div>
+</div>
+
+<!-- BLACKJACK MODAL -->
+<div class="modal-bg" id="bjModal" onclick="closeBjModal(event)">
+  <div class="modal" style="position:relative;max-height:88vh;overflow-y:auto">
+    <button class="modal-close" onclick="document.getElementById('bjModal').classList.remove('open')">✕</button>
+    <div class="modal-title">🃏 Blackjack</div>
+    <div id="bjContent"><div class="loading">Loading…</div></div>
   </div>
 </div>
 
@@ -1349,6 +1435,166 @@ function handleShiftComplete(result) {
     </div>`;
 
   setTimeout(() => refreshWorkStatus(), 2000);
+}
+
+// ── Blackjack ─────────────────────────────────────────────────────────────────
+let bjBusy = false;
+
+function closeBjModal(evt) {
+  if (evt && evt.target.id !== 'bjModal') return;
+  document.getElementById('bjModal').classList.remove('open');
+}
+
+async function openBlackjack() {
+  if (!state.userId) return alert('Set your user ID first.');
+  document.getElementById('bjModal').classList.add('open');
+  document.getElementById('bjContent').innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const s = await api(`/api/blackjack/status/${state.userId}`);
+    if (s.active) {
+      renderBjPlaying(s);
+    } else {
+      renderBjBetting();
+    }
+  } catch { renderBjBetting(); }
+}
+
+function renderBjBetting() {
+  bjBusy = false;
+  document.getElementById('bjContent').innerHTML = `
+    <div class="bj-bet-section">
+      <div class="bj-section-label">Your bet</div>
+      <div class="bet-row">
+        <input class="input bet-input" id="bjBetInput" type="number" min="10" placeholder="Min 10 WRK$">
+        <button class="btn" onclick="dealBlackjack()">Deal 🃏</button>
+      </div>
+      <div class="bet-presets" id="bjPresets"></div>
+    </div>
+    <div class="balance-display">Balance: <span class="b" id="bjBetBal">${state.balance !== null ? fmt(state.balance) : '—'}</span> WRK$</div>
+    <div class="error-msg" id="bjErr"></div>
+  `;
+  buildPresets('bjPresets', 'bjBetInput');
+}
+
+async function dealBlackjack() {
+  if (bjBusy) return;
+  const bet = parseInt(document.getElementById('bjBetInput')?.value);
+  const errEl = document.getElementById('bjErr');
+  if (!bet || bet < 10) { if (errEl) errEl.textContent = 'Minimum bet is 10 WRK$'; return; }
+  bjBusy = true;
+  if (errEl) errEl.textContent = '';
+  try {
+    const data = await api('/api/blackjack/start', { method: 'POST', json: { user_id: +state.userId, bet } });
+    if (data.status === 'playing') renderBjPlaying(data);
+    else renderBjFinished(data);
+  } catch(e) {
+    bjBusy = false;
+    document.getElementById('bjContent').innerHTML += `<div class="error-msg" style="margin-top:8px">${esc(e.message)}</div>`;
+    const errEl2 = document.getElementById('bjErr');
+    if (errEl2) errEl2.textContent = e.message;
+  }
+}
+
+async function bjAction(action) {
+  if (bjBusy) return;
+  bjBusy = true;
+  try {
+    const data = await api('/api/blackjack/action', { method: 'POST', json: { user_id: +state.userId, action } });
+    if (data.status === 'playing') renderBjPlaying(data);
+    else renderBjFinished(data);
+  } catch(e) {
+    bjBusy = false;
+    alert(e.message);
+  }
+}
+
+function bjCard(card, faceDown = false) {
+  if (faceDown) return `<div class="play-card facedown"></div>`;
+  const red = card.suit === '♥' || card.suit === '♦';
+  return `<div class="play-card${red ? ' red' : ''}"><div class="cr">${card.rank}</div><div class="cs">${card.suit}</div></div>`;
+}
+
+function bjHandHtml(cards, value, active = false) {
+  const vc = value > 21 ? 'bust' : value === 21 ? 'bj21' : '';
+  return `<div class="bj-hand-wrap${active ? ' bj-active' : ''}">
+    <div class="bj-hand-row">${cards.map(c => bjCard(c)).join('')}</div>
+    <div class="bj-val ${vc}">${value > 21 ? '💥' : ''}${value}</div>
+  </div>`;
+}
+
+function renderBjPlaying(g) {
+  bjBusy = false;
+  const dealerHtml = g.dealer_face.map(c => bjCard(c)).join('') + bjCard(null, true);
+  const playerHtml = g.hands.map((h, i) => bjHandHtml(h, g.player_values[i], i === g.current_hand)).join('');
+  const splitLabel = g.hands.length > 1 ? ` — Hand ${g.current_hand + 1} of 2` : '';
+
+  document.getElementById('bjContent').innerHTML = `
+    <div class="bj-table">
+      <div>
+        <div class="bj-section-label">Dealer — ${g.dealer_value_shown}+?</div>
+        <div class="bj-hand-row">${dealerHtml}</div>
+      </div>
+      <div class="divider"></div>
+      <div>
+        <div class="bj-section-label">You${splitLabel}</div>
+        ${playerHtml}
+      </div>
+    </div>
+    <div class="bj-info-row">
+      <span>Bet: ${fmt(g.bet)} WRK$${g.doubled[g.current_hand] ? ' (2×)' : ''}</span>
+      <span>Balance: ${fmt(g.balance)} WRK$</span>
+    </div>
+    <div class="bj-actions">
+      <button class="btn bj-btn" onclick="bjAction('hit')">👊 Hit</button>
+      <button class="btn bj-btn" onclick="bjAction('stand')">✋ Stand</button>
+      ${g.can_double ? `<button class="btn bj-btn outline" onclick="bjAction('double')">2️⃣ Double</button>` : ''}
+      ${g.can_split ? `<button class="btn bj-btn outline" onclick="bjAction('split')">✂️ Split</button>` : ''}
+    </div>
+  `;
+}
+
+function renderBjFinished(data) {
+  bjBusy = false;
+  if (data.new_balance !== undefined) {
+    state.balance = data.new_balance;
+    refreshHeaderBal();
+  }
+
+  const isBlackjack = data.status === 'blackjack';
+  const dealerCards = (data.dealer_hand || []).map(c => bjCard(c)).join('');
+  const playerHtml = data.hands.map((h, i) => {
+    const r = data.results[i];
+    return bjHandHtml(h, r.player_value, false);
+  }).join('');
+
+  const OUTCOMES = { win: '🏆 Win', bust: '💥 Bust', lose: '😞 Lose', push: '🤝 Push', blackjack: '🎉 Blackjack!' };
+  const resultLines = data.results.map((r, i) => {
+    const label = data.hands.length > 1 ? `Hand ${i+1}: ` : '';
+    const sign = r.delta > 0 ? '+' : '';
+    const amt = r.delta !== 0 ? ` ${sign}${fmt(r.delta)} WRK$` : '';
+    return `${label}${OUTCOMES[r.outcome] || r.outcome}${amt}`;
+  }).join('<br>');
+
+  const netLine = data.hands.length > 1
+    ? `<br><b>Net: ${data.total_delta >= 0 ? '+' : ''}${fmt(data.total_delta)} WRK$</b>` : '';
+  const resClass = data.total_delta > 0 ? 'win-box' : data.total_delta < 0 ? 'lose-box' : '';
+
+  document.getElementById('bjContent').innerHTML = `
+    <div class="bj-table">
+      <div>
+        <div class="bj-section-label">Dealer — ${data.dealer_value ?? ''}</div>
+        <div class="bj-hand-row">${dealerCards}</div>
+      </div>
+      <div class="divider"></div>
+      <div>
+        <div class="bj-section-label">You</div>
+        ${playerHtml}
+      </div>
+    </div>
+    <div class="result-box show ${resClass}" style="font-size:14px;line-height:1.7">${resultLines}${netLine}</div>
+    <div class="balance-display">Balance: <span class="b">${fmt(data.new_balance)}</span> WRK$</div>
+    <button class="btn" style="width:100%" onclick="renderBjBetting()">Play Again</button>
+  `;
 }
 
 boot();

@@ -400,6 +400,231 @@ def work_end(req: WorkEndRequest):
         return _collect_shift(db, req.user_id, session["taps"], session["earned"])
 
 
+# ── Blackjack ─────────────────────────────────────────────────────────────────
+
+_bj_games: dict[int, dict] = {}
+
+_BJ_SUITS = ['♠', '♥', '♦', '♣']
+_BJ_RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+
+
+def _bj_new_deck() -> list:
+    deck = [(r, s) for s in _BJ_SUITS for r in _BJ_RANKS]
+    random.shuffle(deck)
+    return deck
+
+
+def _bj_card_val(rank: str) -> int:
+    if rank in ('J', 'Q', 'K'):
+        return 10
+    if rank == 'A':
+        return 11
+    return int(rank)
+
+
+def _bj_hand_val(hand: list) -> int:
+    total = sum(_bj_card_val(r) for r, _ in hand)
+    aces = sum(1 for r, _ in hand if r == 'A')
+    while total > 21 and aces:
+        total -= 10
+        aces -= 1
+    return total
+
+
+def _bj_fmt(hand: list) -> list:
+    return [{"rank": r, "suit": s} for r, s in hand]
+
+
+def _bj_playing_state(game: dict, balance: int) -> dict:
+    ci = game["current_hand"]
+    hand = game["hands"][ci]
+    is_first = len(hand) == 2
+    can_double = is_first and balance >= game["bet"]
+    can_split = (
+        is_first
+        and len(game["hands"]) == 1
+        and _bj_card_val(hand[0][0]) == _bj_card_val(hand[1][0])
+        and balance >= game["bet"]
+    )
+    return {
+        "status": "playing",
+        "bet": game["bet"],
+        "hands": [_bj_fmt(h) for h in game["hands"]],
+        "dealer_face": _bj_fmt([game["dealer"][0]]),
+        "player_values": [_bj_hand_val(h) for h in game["hands"]],
+        "dealer_value_shown": _bj_hand_val([game["dealer"][0]]),
+        "current_hand": ci,
+        "can_double": can_double,
+        "can_split": can_split,
+        "doubled": game["doubled"],
+        "balance": balance,
+    }
+
+
+def _bj_resolve_game(db, user_id: int, game: dict) -> dict:
+    dealer_hand = game["dealer"]
+    deck = game["deck"]
+    if any(_bj_hand_val(h) <= 21 for h in game["hands"]):
+        while _bj_hand_val(dealer_hand) < 17:
+            dealer_hand.append(deck.pop())
+    dealer_val = _bj_hand_val(dealer_hand)
+
+    total_delta = 0
+    results = []
+    for i, hand in enumerate(game["hands"]):
+        hand_bet = game["bet"] * (2 if game["doubled"][i] else 1)
+        pv = _bj_hand_val(hand)
+        if pv > 21:
+            outcome, delta = "bust", -hand_bet
+        elif dealer_val > 21 or pv > dealer_val:
+            outcome, delta = "win", hand_bet
+        elif pv == dealer_val:
+            outcome, delta = "push", 0
+        else:
+            outcome, delta = "lose", -hand_bet
+        results.append({"outcome": outcome, "delta": delta, "player_value": pv, "hand_bet": hand_bet})
+        total_delta += delta
+
+    if total_delta != 0:
+        db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (total_delta, user_id))
+    row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (user_id,)).fetchone()
+    db.commit()
+    new_balance = row["balance"] if row else 0
+    del _bj_games[user_id]
+
+    return {
+        "status": "finished",
+        "bet": game["bet"],
+        "hands": [_bj_fmt(h) for h in game["hands"]],
+        "dealer_hand": _bj_fmt(dealer_hand),
+        "player_values": [_bj_hand_val(h) for h in game["hands"]],
+        "dealer_value": dealer_val,
+        "doubled": game["doubled"],
+        "results": results,
+        "total_delta": total_delta,
+        "new_balance": new_balance,
+    }
+
+
+class BlackjackStartRequest(BaseModel):
+    user_id: int
+    bet: int
+
+
+class BlackjackActionRequest(BaseModel):
+    user_id: int
+    action: str
+
+
+@app.get("/api/blackjack/status/{user_id}")
+def blackjack_status(user_id: int):
+    game = _bj_games.get(user_id)
+    if not game:
+        return {"active": False}
+    with db_conn() as db:
+        row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (user_id,)).fetchone()
+        balance = row["balance"] if row else 0
+    return {"active": True, **_bj_playing_state(game, balance)}
+
+
+@app.post("/api/blackjack/start")
+def blackjack_start(req: BlackjackStartRequest):
+    if req.user_id in _bj_games:
+        raise HTTPException(400, "Game already in progress — finish it first")
+    with db_conn() as db:
+        row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "User not found — use the bot first")
+        if req.bet < 10:
+            raise HTTPException(400, "Minimum bet is 10 WRK$")
+        if row["balance"] < req.bet:
+            raise HTTPException(400, f"Insufficient balance ({row['balance']:,} WRK$)")
+        balance = row["balance"]
+
+    deck = _bj_new_deck()
+    player = [deck.pop(), deck.pop()]
+    dealer = [deck.pop(), deck.pop()]
+
+    if _bj_hand_val(player) == 21:
+        winnings = int(req.bet * 1.5)
+        with db_conn() as db:
+            db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (winnings, req.user_id))
+            row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+            db.commit()
+        return {
+            "status": "blackjack",
+            "bet": req.bet,
+            "hands": [_bj_fmt(player)],
+            "dealer_hand": _bj_fmt(dealer),
+            "player_values": [21],
+            "dealer_value": _bj_hand_val(dealer),
+            "results": [{"outcome": "blackjack", "delta": winnings, "player_value": 21, "hand_bet": req.bet}],
+            "total_delta": winnings,
+            "new_balance": row["balance"],
+        }
+
+    _bj_games[req.user_id] = {
+        "bet": req.bet,
+        "deck": deck,
+        "hands": [player],
+        "current_hand": 0,
+        "doubled": [False],
+        "dealer": dealer,
+    }
+    return _bj_playing_state(_bj_games[req.user_id], balance)
+
+
+@app.post("/api/blackjack/action")
+def blackjack_action(req: BlackjackActionRequest):
+    game = _bj_games.get(req.user_id)
+    if not game:
+        raise HTTPException(404, "No active game")
+    if req.action not in ("hit", "stand", "double", "split"):
+        raise HTTPException(400, "action must be hit | stand | double | split")
+
+    with db_conn() as db:
+        row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+        balance = row["balance"] if row else 0
+        ci = game["current_hand"]
+        hand = game["hands"][ci]
+
+        if req.action == "hit":
+            hand.append(game["deck"].pop())
+            if _bj_hand_val(hand) > 21:
+                if ci < len(game["hands"]) - 1:
+                    game["current_hand"] += 1
+                    return _bj_playing_state(game, balance)
+                return _bj_resolve_game(db, req.user_id, game)
+            return _bj_playing_state(game, balance)
+
+        if req.action == "stand":
+            if ci < len(game["hands"]) - 1:
+                game["current_hand"] += 1
+                return _bj_playing_state(game, balance)
+            return _bj_resolve_game(db, req.user_id, game)
+
+        if req.action == "double":
+            if len(hand) != 2 or balance < game["bet"]:
+                raise HTTPException(400, "Can't double now")
+            game["doubled"][ci] = True
+            hand.append(game["deck"].pop())
+            if ci < len(game["hands"]) - 1:
+                game["current_hand"] += 1
+                return _bj_playing_state(game, balance)
+            return _bj_resolve_game(db, req.user_id, game)
+
+        if req.action == "split":
+            if len(hand) != 2 or len(game["hands"]) > 1 or balance < game["bet"]:
+                raise HTTPException(400, "Can't split now")
+            c1, c2 = hand
+            game["hands"] = [[c1, game["deck"].pop()], [c2, game["deck"].pop()]]
+            game["doubled"] = [False, False]
+            game["current_hand"] = 0
+            return _bj_playing_state(game, balance)
+
+    return _bj_playing_state(game, balance)  # unreachable but satisfies linter
+
+
 # ── Serve SPA ─────────────────────────────────────────────────────────────────
 
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
