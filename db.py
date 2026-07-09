@@ -53,6 +53,14 @@ CREATE TABLE IF NOT EXISTS blocklist (
     pattern TEXT COLLATE NOCASE,
     UNIQUE(chat_id, pattern)
 );
+CREATE TABLE IF NOT EXISTS economy (
+    user_id     INTEGER PRIMARY KEY,
+    username    TEXT,
+    full_name   TEXT,
+    balance     INTEGER NOT NULL DEFAULT 1000,
+    streak      INTEGER NOT NULL DEFAULT 0,
+    last_daily  INTEGER NOT NULL DEFAULT 0
+);
 """
 
 async def _migrate(db) -> None:
@@ -312,3 +320,59 @@ async def get_inactives(db_path: str, chat_id: int, since_ts: int) -> list[dict]
             (chat_id, since_ts),
         ) as cur:
             return [dict(r) async for r in cur]
+
+
+# --- economy ---
+
+async def upsert_wallet(db_path: str, user_id: int, username: str | None, full_name: str | None) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            """INSERT INTO economy (user_id, username, full_name, balance, streak, last_daily)
+               VALUES (?, ?, ?, 1000, 0, 0)
+               ON CONFLICT(user_id) DO UPDATE SET
+                   username = excluded.username,
+                   full_name = excluded.full_name""",
+            (user_id, username, full_name),
+        )
+        await db.commit()
+
+
+async def get_wallet(db_path: str, user_id: int) -> dict | None:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT user_id, username, full_name, balance, streak, last_daily FROM economy WHERE user_id = ?",
+            (user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def update_balance(db_path: str, user_id: int, delta: int) -> int:
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "UPDATE economy SET balance = balance + ? WHERE user_id = ? RETURNING balance",
+            (delta, user_id),
+        ) as cur:
+            row = await cur.fetchone()
+            await db.commit()
+            return row[0] if row else 0
+
+
+async def get_leaderboard(db_path: str, limit: int = 10) -> list[dict]:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT user_id, full_name, username, balance FROM economy ORDER BY balance DESC LIMIT ?",
+            (limit,),
+        ) as cur:
+            return [dict(r) async for r in cur]
+
+
+async def set_daily(db_path: str, user_id: int, streak: int, timestamp: int) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "UPDATE economy SET streak = ?, last_daily = ? WHERE user_id = ?",
+            (streak, timestamp, user_id),
+        )
+        await db.commit()
