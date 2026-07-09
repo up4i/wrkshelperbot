@@ -348,15 +348,15 @@ async def get_wallet(db_path: str, user_id: int) -> dict | None:
             return dict(row) if row else None
 
 
-async def update_balance(db_path: str, user_id: int, delta: int) -> int:
+async def update_balance(db_path: str, user_id: int, delta: int) -> int | None:
     async with aiosqlite.connect(db_path) as db:
         async with db.execute(
-            "UPDATE economy SET balance = balance + ? WHERE user_id = ? RETURNING balance",
+            "UPDATE economy SET balance = MAX(0, balance + ?) WHERE user_id = ? RETURNING balance",
             (delta, user_id),
         ) as cur:
             row = await cur.fetchone()
-            await db.commit()
-            return row[0] if row else 0
+        await db.commit()
+        return row[0] if row else None
 
 
 async def get_leaderboard(db_path: str, limit: int = 10) -> list[dict]:
@@ -369,10 +369,12 @@ async def get_leaderboard(db_path: str, limit: int = 10) -> list[dict]:
             return [dict(r) async for r in cur]
 
 
-async def set_daily(db_path: str, user_id: int, streak: int, timestamp: int) -> None:
+async def claim_daily(db_path: str, user_id: int, amount: int, streak: int, timestamp: int) -> int:
     async with aiosqlite.connect(db_path) as db:
-        await db.execute(
-            "UPDATE economy SET streak = ?, last_daily = ? WHERE user_id = ?",
-            (streak, timestamp, user_id),
-        )
+        async with db.execute(
+            "UPDATE economy SET balance = balance + ?, streak = ?, last_daily = ? WHERE user_id = ? RETURNING balance",
+            (amount, streak, timestamp, user_id),
+        ) as cur:
+            row = await cur.fetchone()
         await db.commit()
+        return row[0] if row else 0
