@@ -48,7 +48,7 @@ from handlers.gifts import (
     cmd_inventory, cmd_gift,
     cmd_shop, cmd_buy, cmd_sell,
     cmd_offer, cmd_offers,
-    gifts_callback, gift_offer_callback,
+    gifts_callback, gift_offer_callback, shop_callback,
 )
 
 os.makedirs(os.path.dirname(config.LOG_FILE), exist_ok=True)
@@ -159,6 +159,7 @@ def build_app() -> Application:
     app.add_handler(CallbackQueryHandler(blackjack_callback, pattern=r"^bj:"))
     app.add_handler(CallbackQueryHandler(gifts_callback,      pattern=r"^gifts:"))
     app.add_handler(CallbackQueryHandler(gift_offer_callback, pattern=r"^gift_offer:"))
+    app.add_handler(CallbackQueryHandler(shop_callback,       pattern=r"^shop:"))
     app.add_handler(MessageHandler(filters.ChatType.GROUPS & filters.ALL, on_any_message))
     app.add_handler(
         MessageHandler(filters.ChatType.GROUPS & filters.StatusUpdate.ALL, on_service_message),

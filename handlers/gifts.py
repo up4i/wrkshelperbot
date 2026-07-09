@@ -226,37 +226,140 @@ async def cmd_shop(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     collection, _ = _parse_args(ctx.args) if ctx.args else (None, [])
 
     if collection:
-        bank_gifts = await db.get_bank_gifts(config.DB_PATH, collection)
-        if not bank_gifts:
-            col_name = _collection_display_name(collection)
-            await msg.reply_text(f"❌ No {col_name} gifts available from the bank right now.")
-            return
-
-        lines = [f"🏪 <b>{escape(_collection_display_name(collection))} — Bank Stock</b>\n"]
-        seen = set()
-        for g in bank_gifts:
-            key = (g["model_number"], g["background"])
-            if key in seen:
-                continue
-            seen.add(key)
-            price_row = await db.get_gift_price(config.DB_PATH, g["collection"], g["background"])
-            price = price_row["current_price"] if price_row else 0
-            lines.append(
-                f"{_model_emoji_html(g)} #{g['model_number']} {escape(g['model_name'])} "
-                f"{_bg_emoji(g['background'])} {escape(_bg_label(g['background']))} "
-                f"— {price:,} WRK$"
-            )
-        await msg.reply_text("\n".join(lines), parse_mode="HTML")
+        await _send_shop_models(msg, collection, page=0)
     else:
+        await _send_shop_collections(msg, page=0)
+
+
+_SHOP_COLS_PER_PAGE = 10
+_SHOP_MODELS_PER_PAGE = 15
+
+
+async def _send_shop_collections(msg, page: int):
+    bank_gifts = await db.get_bank_gifts(config.DB_PATH)
+    if not bank_gifts:
+        await msg.reply_text("🏪 Bank has no gifts in stock.")
+        return
+    collections = sorted({g["collection"] for g in bank_gifts})
+    total = len(collections)
+    total_pages = (total + _SHOP_COLS_PER_PAGE - 1) // _SHOP_COLS_PER_PAGE
+    page = max(0, min(page, total_pages - 1))
+    chunk = collections[page * _SHOP_COLS_PER_PAGE:(page + 1) * _SHOP_COLS_PER_PAGE]
+
+    # Two-column grid of collection buttons
+    rows = []
+    for i in range(0, len(chunk), 2):
+        row = []
+        for col_key in chunk[i:i + 2]:
+            row.append(InlineKeyboardButton(
+                _collection_display_name(col_key),
+                callback_data=f"shop:mdl:{col_key}:0"
+            ))
+        rows.append(row)
+
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("◀ Prev", callback_data=f"shop:col:{page - 1}"))
+    if page < total_pages - 1:
+        nav.append(InlineKeyboardButton("Next ▶", callback_data=f"shop:col:{page + 1}"))
+    if nav:
+        rows.append(nav)
+
+    await msg.reply_text(
+        f"🏪 <b>Bank Stock</b> — page {page + 1}/{total_pages} · {total} collections",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(rows)
+    )
+
+
+async def _send_shop_models(msg_or_query, collection: str, page: int, edit: bool = False):
+    bank_gifts = await db.get_bank_gifts(config.DB_PATH, collection)
+    col_name = _collection_display_name(collection)
+    if not bank_gifts:
+        text = f"❌ No {escape(col_name)} gifts available from the bank right now."
+        if edit:
+            await msg_or_query.edit_message_text(text, parse_mode="HTML")
+        else:
+            await msg_or_query.reply_text(text, parse_mode="HTML")
+        return
+
+    prices = {r["background"]: r["current_price"]
+              for r in await db.get_all_gift_prices_for_collection(config.DB_PATH, collection)}
+    seen: dict[int, dict] = {}
+    for g in bank_gifts:
+        n = g["model_number"]
+        bg_price = prices.get(g["background"], 0)
+        if n not in seen or bg_price < seen[n]["price"]:
+            seen[n] = {"gift": g, "price": bg_price}
+
+    models = sorted(seen.items())  # [(model_number, entry), ...]
+    total = len(models)
+    total_pages = (total + _SHOP_MODELS_PER_PAGE - 1) // _SHOP_MODELS_PER_PAGE
+    page = max(0, min(page, total_pages - 1))
+    chunk = models[page * _SHOP_MODELS_PER_PAGE:(page + 1) * _SHOP_MODELS_PER_PAGE]
+
+    lines = [f"🏪 <b>{escape(col_name)}</b> — page {page + 1}/{total_pages} · {total} models\n"]
+    for n, entry in chunk:
+        g, price = entry["gift"], entry["price"]
+        lines.append(f"{_model_emoji_html(g)} <b>#{n}</b> {escape(g['model_name'])} — from {price:,} WRK$")
+    lines.append(f"\n<i>Use /buy {collection} &lt;#&gt; &lt;bg&gt; to purchase</i>")
+
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton("◀ Prev", callback_data=f"shop:mdl:{collection}:{page - 1}"))
+    nav.append(InlineKeyboardButton("⬅️ Collections", callback_data="shop:col:0"))
+    if page < total_pages - 1:
+        nav.append(InlineKeyboardButton("Next ▶", callback_data=f"shop:mdl:{collection}:{page + 1}"))
+    kb = InlineKeyboardMarkup([nav])
+
+    text = "\n".join(lines)
+    if edit:
+        await msg_or_query.edit_message_text(text, parse_mode="HTML", reply_markup=kb)
+    else:
+        await msg_or_query.reply_text(text, parse_mode="HTML", reply_markup=kb)
+
+
+async def shop_callback(update, ctx):
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split(":")
+    # shop:col:<page>  or  shop:mdl:<collection>:<page>
+    if parts[1] == "col":
+        page = int(parts[2])
         bank_gifts = await db.get_bank_gifts(config.DB_PATH)
         if not bank_gifts:
-            await msg.reply_text("🏪 Bank has no gifts in stock.")
+            await query.edit_message_text("🏪 Bank has no gifts in stock.")
             return
-        collections_in_stock = sorted({g["collection"] for g in bank_gifts})
-        lines = ["🏪 <b>Bank Stock — Collections Available</b>\n"]
-        lines += [f"• <code>{c}</code> — {escape(_collection_display_name(c))}" for c in collections_in_stock]
-        lines.append("\nUse <code>/shop &lt;collection&gt;</code> to see models and prices.")
-        await msg.reply_text("\n".join(lines), parse_mode="HTML")
+        collections = sorted({g["collection"] for g in bank_gifts})
+        total = len(collections)
+        total_pages = (total + _SHOP_COLS_PER_PAGE - 1) // _SHOP_COLS_PER_PAGE
+        page = max(0, min(page, total_pages - 1))
+        chunk = collections[page * _SHOP_COLS_PER_PAGE:(page + 1) * _SHOP_COLS_PER_PAGE]
+        rows = []
+        for i in range(0, len(chunk), 2):
+            row = []
+            for col_key in chunk[i:i + 2]:
+                row.append(InlineKeyboardButton(
+                    _collection_display_name(col_key),
+                    callback_data=f"shop:mdl:{col_key}:0"
+                ))
+            rows.append(row)
+        nav = []
+        if page > 0:
+            nav.append(InlineKeyboardButton("◀ Prev", callback_data=f"shop:col:{page - 1}"))
+        if page < total_pages - 1:
+            nav.append(InlineKeyboardButton("Next ▶", callback_data=f"shop:col:{page + 1}"))
+        if nav:
+            rows.append(nav)
+        await query.edit_message_text(
+            f"🏪 <b>Bank Stock</b> — page {page + 1}/{total_pages} · {total} collections",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(rows)
+        )
+    elif parts[1] == "mdl":
+        collection = parts[2]
+        page = int(parts[3])
+        await _send_shop_models(query, collection, page, edit=True)
 
 
 # ── /buy ──────────────────────────────────────────────────────────────────────

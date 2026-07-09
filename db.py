@@ -579,6 +579,15 @@ async def get_all_gift_prices(db_path: str) -> list[dict]:
             return [dict(r) async for r in cur]
 
 
+async def get_all_gift_prices_for_collection(db_path: str, collection: str) -> list[dict]:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM gift_prices WHERE collection=?", (collection,)
+        ) as cur:
+            return [dict(r) async for r in cur]
+
+
 async def update_gift_price(db_path: str, collection: str, background: str, new_price: int) -> None:
     now = int(time.time())
     async with aiosqlite.connect(db_path) as db:
