@@ -584,7 +584,10 @@ async def cmd_demote(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             is_anonymous=False,
         )
     except TelegramError as e:
-        await msg.reply_text(f"Failed to demote: {e}")
+        if "chat_admin_required" in str(e).lower():
+            await msg.reply_text("❌ Can't demote: Telegram only allows bots to demote admins they promoted themselves.")
+        else:
+            await msg.reply_text(f"Failed to demote: {e}")
         return
 
     await msg.reply_text(f"⬇️ {target_name} demoted.")
