@@ -27,8 +27,8 @@ _PAGES = {
         "`/unban` — unban (reply)\n"
         "`/kick` — kick (reply)\n"
         "`/dkick` — kick + delete the message\n"
-        "`/promote` — make replied user an admin\n"
-        "`/demote` — remove replied user's admin rights\n"
+        "`/promote` — make user an admin (reply or `@username`)\n"
+        "`/demote` — remove admin rights (reply or `@username`)\n"
         "`/purge [N]` — delete from replied message, or last N messages\n"
         "`/report [reason]` — report a message to admins _(any user)_\n"
         "`/dlog` — delete replied message and forward to log channel\n\n"
@@ -53,7 +53,8 @@ _PAGES = {
         "`/antiraid on|off`\n"
         "`/setantiraid <joins> <secs> [mute\\_secs]`\n\n"
         "😇 *Halo* — exempt a user from all protection\n"
-        "`/givehalo` · `/removehalo` — reply to a user"
+        "`/givehalo` · `/removehalo` — reply to a user\n"
+        "`/halos` — list all halo users"
     ),
     "group": (
         "👥 *Group*\n\n"
