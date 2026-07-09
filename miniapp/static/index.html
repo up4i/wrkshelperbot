@@ -1315,14 +1315,14 @@ async function syncBatch() {
   } catch(e) {
     workState.localTaps += batchTaps;
     workState.localEarned += batchEarned;
+  } finally {
+    workState.syncing = false;
   }
-  workState.syncing = false;
 }
 
 async function collectShift() {
-  if (workState.localTaps > 0) {
-    await syncBatch();
-  }
+  while (workState.syncing) await sleep(50);
+  if (workState.localTaps > 0) await syncBatch();
   try {
     const result = await api('/api/work/end', { method:'POST', json:{ user_id:+state.userId } });
     handleShiftComplete(result);
@@ -1334,7 +1334,6 @@ async function collectShift() {
 function handleShiftComplete(result) {
   workState.localTaps = 0;
   workState.localEarned = 0;
-  workState.syncing = false;
   state.balance = result.new_balance;
   refreshHeaderBal();
 
