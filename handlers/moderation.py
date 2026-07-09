@@ -454,11 +454,14 @@ async def cmd_report(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if log_channel_id:
         try:
-            await ctx.bot.send_message(log_channel_id, header, parse_mode="Markdown")
+            admins = await ctx.bot.get_chat_administrators(chat_id)
+            tags = " ".join(f"@{m.user.username}" for m in admins if m.user.username and not m.user.is_bot)
+            ping = f"\n{tags}" if tags else ""
+            await ctx.bot.send_message(log_channel_id, header + ping, parse_mode="Markdown")
             await ctx.bot.forward_message(log_channel_id, chat_id, target.message_id)
         except TelegramError:
             pass
-        await msg.reply_text("✅ Report sent to the log channel.")
+        await msg.reply_text("✅ Reported to the admins.")
     else:
         await msg.reply_text("⚠️ No log channel set. Ask an admin to run /setlog.")
 
