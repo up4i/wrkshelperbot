@@ -193,6 +193,47 @@ async def cmd_leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 _rob_cooldowns: dict[int, float] = {}  # user_id -> timestamp
 
+_ROB_SUCCESS = [
+    ("🔫", "{robber} robbed {target} at gunpoint and walked away with {amount} WRK$!"),
+    ("🌱", "{robber} was randomly guessing seed phrases and cracked {target}'s wallet for {amount} WRK$!"),
+    ("📞", "{robber} was on a call and sneakily drained {target}'s wallet for {amount} WRK$!"),
+    ("🎭", "{robber} pulled a classic social engineering play on {target} and got {amount} WRK$!"),
+    ("🧢", "{robber} rug pulled {target} for {amount} WRK$. It was just a 'test token', bro."),
+    ("🕵️", "{robber} deployed a honeypot contract and {target} fell for it. -{amount} WRK$!"),
+    ("💌", "{robber} sent {target} a phishing link and drained {amount} WRK$ from their wallet!"),
+    ("🔧", "{robber} exploited a zero-day in {target}'s opsec and extracted {amount} WRK$!"),
+    ("🚗", "{robber} pulled up on {target}, took the bag, and peeled out with {amount} WRK$!"),
+    ("🎯", "{robber} front-ran {target}'s transaction and sniped {amount} WRK$ in the mempool!"),
+    ("🛸", "{robber} airdropped a malicious token into {target}'s wallet and drained {amount} WRK$!"),
+    ("🏦", "{robber} bribed {target}'s validator and quietly skimmed {amount} WRK$!"),
+    ("🧠", "{robber} talked {target} into a 'collab' and bounced with {amount} WRK$!"),
+    ("💣", "{robber} flash-loaned their way into {target}'s liquidity pool and escaped with {amount} WRK$!"),
+]
+
+_ROB_FINE = [
+    ("🚔", "{robber} tried to rob {target} but got spooked and dropped {amount} WRK$ running away!"),
+    ("👮", "{robber} got caught mid-heist on {target} and bribed the cop for {amount} WRK$!"),
+    ("🐕", "{robber} set off {target}'s wallet alarm and tripped over their own getaway dog. Lost {amount} WRK$."),
+    ("🧂", "{robber} fumbled the bag trying to rob {target} and scattered {amount} WRK$ on the floor."),
+    ("🏃", "{robber} tried robbing {target} but {target}'s security was wild — lost {amount} WRK$ in the sprint!"),
+    ("🪤", "{robber} walked into {target}'s honeypot trying to rob them. Ate a {amount} WRK$ fine."),
+]
+
+_ROB_BAIL = [
+    ("🚨", "{robber} got arrested trying to rob {target}! Had to post {amount} WRK$ bail."),
+    ("⛓️", "{robber} got cuffed outside {target}'s wallet. Lawyer fees: {amount} WRK$."),
+    ("🏛️", "{robber} went to trial for robbing {target} and lost. Court fined them {amount} WRK$!"),
+    ("📡", "{robber}'s heist on {target} was traced on-chain. Investigators froze {amount} WRK$."),
+    ("🕵️", "{robber} got doxxed attempting to rob {target}. Restitution order: {amount} WRK$."),
+]
+
+_ROB_GETAWAY = [
+    ("😮‍💨", "{robber} botched the rob on {target} but vanished into the crowd. No trace, no loss."),
+    ("🌫️", "{robber} failed to crack {target}'s wallet but ghosted before anyone noticed."),
+    ("🐱", "{robber} slipped away like a shadow after failing to hit {target}. Clean getaway."),
+    ("🧊", "{robber} fumbled the job on {target} but kept their cool and disappeared. No loss."),
+]
+
 async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     robber = update.effective_user
@@ -232,33 +273,31 @@ async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     success = random.random() < 0.50
     result = _rob_outcome(success, robber_wallet["balance"], target_wallet["balance"])
 
+    robber_name = display_name(robber)
+
     if result["outcome"] == "success":
         amount = result["amount"]
         await db.update_balance(config.DB_PATH, target_id, -amount)
         new_bal = await db.update_balance(config.DB_PATH, robber.id, amount)
-        await msg.reply_text(
-            f"🥷 Success! You robbed {target_name} for {amount:,} WRK$.\n"
-            f"💰 Your balance: {new_bal:,} WRK$"
-        )
+        emoji, template = random.choice(_ROB_SUCCESS)
+        line = template.format(robber=robber_name, target=target_name, amount=f"{amount:,}")
+        await msg.reply_text(f"{emoji} {line}\n💰 Your balance: {new_bal:,} WRK$")
     elif result["outcome"] == "fine":
         amount = result["amount"]
         new_bal = await db.update_balance(config.DB_PATH, robber.id, -amount)
-        await msg.reply_text(
-            f"🚔 You got chased off! Lost {amount:,} WRK$ running away.\n"
-            f"💰 Your balance: {new_bal:,} WRK$"
-        )
+        emoji, template = random.choice(_ROB_FINE)
+        line = template.format(robber=robber_name, target=target_name, amount=f"{amount:,}")
+        await msg.reply_text(f"{emoji} {line}\n💰 Your balance: {new_bal:,} WRK$")
     elif result["outcome"] == "bail":
         amount = result["amount"]
         new_bal = await db.update_balance(config.DB_PATH, robber.id, -amount)
-        await msg.reply_text(
-            f"🚨 Busted! You were arrested and had to bail out. Lost {amount:,} WRK$.\n"
-            f"💰 Your balance: {new_bal:,} WRK$"
-        )
+        emoji, template = random.choice(_ROB_BAIL)
+        line = template.format(robber=robber_name, target=target_name, amount=f"{amount:,}")
+        await msg.reply_text(f"{emoji} {line}\n💰 Your balance: {new_bal:,} WRK$")
     else:  # getaway
-        await msg.reply_text(
-            f"😮‍💨 You failed the rob but made a clean getaway. No loss.\n"
-            f"💰 Your balance: {robber_wallet['balance']:,} WRK$"
-        )
+        emoji, template = random.choice(_ROB_GETAWAY)
+        line = template.format(robber=robber_name, target=target_name, amount="0")
+        await msg.reply_text(f"{emoji} {line}\n💰 Your balance: {robber_wallet['balance']:,} WRK$")
 
 
 # ── /slots ────────────────────────────────────────────────────────────────────
