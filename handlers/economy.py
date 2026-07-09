@@ -365,3 +365,136 @@ async def cmd_dice(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(
             f"🎲 You rolled {player_roll} | Bot rolled {bot_roll}\n\nBot wins. -{bet:,} WRK$\n💰 {new_bal:,} WRK$"
         )
+
+
+# ── /blackjack ────────────────────────────────────────────────────────────────
+
+def _bj_render(player_hand, dealer_hand, hide_dealer=True) -> str:
+    def fmt_hand(hand):
+        return " ".join(f"{r}{s}" for r, s in hand)
+    dealer_display = f"{dealer_hand[0][0]}{dealer_hand[0][1]} ??" if hide_dealer else fmt_hand(dealer_hand)
+    return (
+        f"🃏 *Blackjack*\n\n"
+        f"Your hand: {fmt_hand(player_hand)} = **{_bj_hand_value(player_hand)}**\n"
+        f"Dealer: {dealer_display}"
+    )
+
+
+def _bj_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("👊 Hit", callback_data=f"bj:hit:{user_id}"),
+        InlineKeyboardButton("✋ Stand", callback_data=f"bj:stand:{user_id}"),
+    ]])
+
+
+async def cmd_blackjack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    wallet = await _ensure_wallet(user, config.DB_PATH)
+
+    if user.id in _bj_games:
+        await msg.reply_text("❌ You already have an active blackjack game. Finish it first.")
+        return
+    if not ctx.args or not ctx.args[0].isdigit():
+        await msg.reply_text("Usage: `/blackjack <bet>`", parse_mode="Markdown")
+        return
+    bet = int(ctx.args[0])
+    if bet < 10:
+        await msg.reply_text("❌ Minimum bet is 10 WRK$.")
+        return
+    if wallet["balance"] < bet:
+        await msg.reply_text(f"❌ Not enough WRK$. Your balance: {wallet['balance']:,}")
+        return
+
+    deck = _new_deck()
+    player = [deck.pop(), deck.pop()]
+    dealer = [deck.pop(), deck.pop()]
+
+    _bj_games[user.id] = {
+        "bet": bet,
+        "deck": deck,
+        "player": player,
+        "dealer": dealer,
+        "chat_id": msg.chat.id,
+    }
+
+    if _bj_is_blackjack(player):
+        del _bj_games[user.id]
+        winnings = int(bet * 1.5)
+        new_bal = await db.update_balance(config.DB_PATH, user.id, winnings)
+        await msg.reply_text(
+            f"{_bj_render(player, dealer, hide_dealer=False)}\n\n"
+            f"🎉 Blackjack! +{winnings:,} WRK$\n💰 {new_bal:,} WRK$",
+            parse_mode="Markdown"
+        )
+        return
+
+    sent = await msg.reply_text(
+        _bj_render(player, dealer),
+        parse_mode="Markdown",
+        reply_markup=_bj_keyboard(user.id)
+    )
+    _bj_games[user.id]["message_id"] = sent.message_id
+
+
+async def blackjack_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    _, action, uid_str = query.data.split(":")
+    user_id = int(uid_str)
+
+    if query.from_user.id != user_id:
+        await query.answer("This isn't your game.", show_alert=True)
+        return
+
+    game = _bj_games.get(user_id)
+    if not game:
+        await query.edit_message_text("Game expired.")
+        return
+
+    wallet = await db.get_wallet(config.DB_PATH, user_id)
+    bet = game["bet"]
+
+    if action == "hit":
+        game["player"].append(game["deck"].pop())
+        val = _bj_hand_value(game["player"])
+        if val > 21:
+            del _bj_games[user_id]
+            new_bal = await db.update_balance(config.DB_PATH, user_id, -bet)
+            await query.edit_message_text(
+                f"{_bj_render(game['player'], game['dealer'], hide_dealer=False)}\n\n"
+                f"💥 Bust! Lost {bet:,} WRK$\n💰 {new_bal:,} WRK$",
+                parse_mode="Markdown"
+            )
+        else:
+            await query.edit_message_text(
+                _bj_render(game["player"], game["dealer"]),
+                parse_mode="Markdown",
+                reply_markup=_bj_keyboard(user_id)
+            )
+
+    elif action == "stand":
+        dealer_hand = game["dealer"]
+        deck = game["deck"]
+        while _bj_hand_value(dealer_hand) < 17:
+            dealer_hand.append(deck.pop())
+
+        player_val = _bj_hand_value(game["player"])
+        dealer_val = _bj_hand_value(dealer_hand)
+        del _bj_games[user_id]
+
+        if dealer_val > 21 or player_val > dealer_val:
+            new_bal = await db.update_balance(config.DB_PATH, user_id, bet)
+            result = f"🏆 You win! +{bet:,} WRK$"
+        elif player_val == dealer_val:
+            result = f"🤝 Push — bet returned."
+            new_bal = wallet["balance"]
+        else:
+            new_bal = await db.update_balance(config.DB_PATH, user_id, -bet)
+            result = f"😞 Dealer wins. -{bet:,} WRK$"
+
+        await query.edit_message_text(
+            f"{_bj_render(game['player'], dealer_hand, hide_dealer=False)}\n\n"
+            f"{result}\n💰 {new_bal:,} WRK$",
+            parse_mode="Markdown"
+        )
