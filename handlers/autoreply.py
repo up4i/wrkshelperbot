@@ -40,11 +40,11 @@ async def on_message_autoreply(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     autoreplies = await db.get_autoreplies(config.DB_PATH, msg.chat.id)
     for ar in autoreplies:
         if _matches(ar["trigger"], text):
-            await _send(ctx.bot, msg.chat.id, ar)
+            await _send(ctx.bot, msg.chat.id, ar, reply_to=msg.message_id)
             break  # first match only
 
 
-async def _send(bot, chat_id: int, ar: dict):
+async def _send(bot, chat_id: int, ar: dict, reply_to: int | None = None):
     rtype = ar["response_type"]
     content = ar["response_content"]
     caption = ar.get("response_caption") or None
@@ -53,19 +53,19 @@ async def _send(bot, chat_id: int, ar: dict):
         if rtype == "text":
             clean, markup = _parse_buttons(content)
             try:
-                await bot.send_message(chat_id, clean, parse_mode="Markdown", reply_markup=markup)
+                await bot.send_message(chat_id, clean, parse_mode="Markdown", reply_markup=markup, reply_to_message_id=reply_to)
             except TelegramError:
-                await bot.send_message(chat_id, clean, reply_markup=markup)
+                await bot.send_message(chat_id, clean, reply_markup=markup, reply_to_message_id=reply_to)
         elif rtype == "photo":
-            await bot.send_photo(chat_id, content, caption=caption)
+            await bot.send_photo(chat_id, content, caption=caption, reply_to_message_id=reply_to)
         elif rtype == "animation":
-            await bot.send_animation(chat_id, content, caption=caption)
+            await bot.send_animation(chat_id, content, caption=caption, reply_to_message_id=reply_to)
         elif rtype == "video":
-            await bot.send_video(chat_id, content, caption=caption)
+            await bot.send_video(chat_id, content, caption=caption, reply_to_message_id=reply_to)
         elif rtype == "sticker":
-            await bot.send_sticker(chat_id, content)
+            await bot.send_sticker(chat_id, content, reply_to_message_id=reply_to)
         elif rtype == "document":
-            await bot.send_document(chat_id, content, caption=caption)
+            await bot.send_document(chat_id, content, caption=caption, reply_to_message_id=reply_to)
     except TelegramError as e:
         log.warning("autoreply failed for trigger %r: %s", ar["trigger"], e)
 
