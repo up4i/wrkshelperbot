@@ -354,7 +354,7 @@ async def work_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         session = await db.sync_work_session(config.DB_PATH, user_id, taps_delta=1, earned_delta=earned_this_tap)
         await query.answer(f"+{earned_this_tap:,} WRK$ 💰")
 
-        if session["taps"] % 5 == 0 or session["taps"] >= _SHIFT_MAX_TAPS:
+        if session["taps"] % 5 == 0 and session["taps"] < _SHIFT_MAX_TAPS:
             kb = InlineKeyboardMarkup([[
                 InlineKeyboardButton("⚡ Work", callback_data=f"work:tap:{user_id}"),
                 InlineKeyboardButton("🏁 End Shift", callback_data=f"work:end:{user_id}"),
@@ -391,16 +391,7 @@ async def _end_shift(query, user_id: int, session: dict, auto: bool):
         await query.edit_message_text("You ended your shift without earning anything. Tap ⚡ next time!")
         return
 
-    new_bal, new_tap_count = await db.claim_work(config.DB_PATH, user_id, total, int(time.time()))
-
-    if taps > 1:
-        async with __import__('aiosqlite').connect(config.DB_PATH) as _db:
-            await _db.execute(
-                "UPDATE economy SET work_count = work_count + ? WHERE user_id = ?",
-                (taps - 1, user_id)
-            )
-            await _db.commit()
-        new_tap_count = new_tap_count + (taps - 1)
+    new_bal, new_tap_count = await db.claim_work(config.DB_PATH, user_id, total, int(time.time()), taps=taps)
 
     old_title = _JOBS[final["job_tier_index"]][1]
     new_title = _get_job(new_tap_count)[1]

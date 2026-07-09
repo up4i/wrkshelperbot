@@ -439,13 +439,13 @@ async def get_leaderboard(db_path: str, limit: int = 10) -> list[dict]:
             return [dict(r) async for r in cur]
 
 
-async def claim_work(db_path: str, user_id: int, amount: int, timestamp: int) -> tuple[int, int]:
+async def claim_work(db_path: str, user_id: int, amount: int, timestamp: int, taps: int = 1) -> tuple[int, int]:
     """Returns (new_balance, new_work_count)."""
     async with aiosqlite.connect(db_path) as db:
         async with db.execute(
-            "UPDATE economy SET balance = balance + ?, last_work = ?, work_count = work_count + 1 "
+            "UPDATE economy SET balance = balance + ?, last_work = ?, work_count = work_count + ? "
             "WHERE user_id = ? RETURNING balance, work_count",
-            (amount, timestamp, user_id),
+            (amount, timestamp, taps, user_id),
         ) as cur:
             row = await cur.fetchone()
         await db.commit()
