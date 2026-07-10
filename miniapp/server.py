@@ -665,6 +665,489 @@ def play_coinflip(req: CoinflipRequest):
         return {"result": result, "won": won, "delta": delta, "new_balance": new_bal}
 
 
+# ── Roulette ──────────────────────────────────────────────────────────────────
+
+class RouletteRequest(BaseModel):
+    user_id: int
+    bet: int
+    color: str
+
+
+@app.post("/api/play/roulette")
+def play_roulette(req: RouletteRequest):
+    if req.color not in ("red", "black", "green"):
+        raise HTTPException(400, "color must be red, black, or green")
+    with db_conn() as db:
+        bal = _deduct_and_check(db, req.user_id, req.bet)
+        slot = random.randint(0, 37)
+        if slot <= 1:
+            winning_color = "green"
+            payout_mult = 14
+        elif slot <= 19:
+            winning_color = "red"
+            payout_mult = 2
+        else:
+            winning_color = "black"
+            payout_mult = 2
+        won = req.color == winning_color
+        delta = req.bet * (payout_mult - 1) if won else -req.bet
+        new_bal = bal + delta
+        db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+        db.commit()
+        return {
+            "slot": slot,
+            "winning_color": winning_color,
+            "won": won,
+            "payout_mult": payout_mult if won else 0,
+            "delta": delta,
+            "new_balance": new_bal,
+        }
+
+
+# ── High-Low ──────────────────────────────────────────────────────────────────
+
+class HighLowStartRequest(BaseModel):
+    user_id: int
+    bet: int
+
+
+class HighLowGuessRequest(BaseModel):
+    user_id: int
+    direction: str  # "higher" or "lower"
+
+
+class HighLowCashoutRequest(BaseModel):
+    user_id: int
+
+
+def _card_label(rank: int) -> str:
+    return {1: "A", 11: "J", 12: "Q", 13: "K"}.get(rank, str(rank))
+
+
+@app.post("/api/play/highlow/start")
+def highlow_start(req: HighLowStartRequest):
+    with db_conn() as db:
+        existing = db.execute(
+            "SELECT user_id FROM highlow_sessions WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if existing:
+            raise HTTPException(400, "You already have an active High-Low session")
+        bal = _deduct_and_check(db, req.user_id, req.bet)
+        new_bal = bal - req.bet
+        db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+        card = random.randint(1, 13)
+        now = int(time.time())
+        db.execute(
+            "INSERT INTO highlow_sessions (user_id, bet, current_card, multiplier, started_at) "
+            "VALUES (?, ?, ?, 1.0, ?)",
+            (req.user_id, req.bet, card, now),
+        )
+        db.commit()
+        return {
+            "card": card,
+            "card_label": _card_label(card),
+            "multiplier": 1.0,
+            "new_balance": new_bal,
+        }
+
+
+@app.post("/api/play/highlow/guess")
+def highlow_guess(req: HighLowGuessRequest):
+    if req.direction not in ("higher", "lower"):
+        raise HTTPException(400, "direction must be higher or lower")
+    with db_conn() as db:
+        sess = db.execute(
+            "SELECT * FROM highlow_sessions WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if not sess:
+            raise HTTPException(404, "No active High-Low session — start one first")
+        sess = dict(sess)
+        next_card = random.randint(1, 13)
+        correct = next_card > sess["current_card"] if req.direction == "higher" else next_card < sess["current_card"]
+
+        if correct:
+            new_mult = round(sess["multiplier"] * 1.5, 4)
+            db.execute(
+                "UPDATE highlow_sessions SET current_card = ?, multiplier = ? WHERE user_id = ?",
+                (next_card, new_mult, req.user_id),
+            )
+            db.commit()
+            return {
+                "result": "correct",
+                "next_card": next_card,
+                "next_card_label": _card_label(next_card),
+                "multiplier": new_mult,
+                "potential_win": int(sess["bet"] * new_mult),
+            }
+        else:
+            db.execute("DELETE FROM highlow_sessions WHERE user_id = ?", (req.user_id,))
+            db.commit()
+            new_bal = db.execute(
+                "SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)
+            ).fetchone()["balance"]
+            return {
+                "result": "wrong",
+                "next_card": next_card,
+                "next_card_label": _card_label(next_card),
+                "lost": sess["bet"],
+                "new_balance": new_bal,
+            }
+
+
+@app.post("/api/play/highlow/cashout")
+def highlow_cashout(req: HighLowCashoutRequest):
+    with db_conn() as db:
+        sess = db.execute(
+            "SELECT * FROM highlow_sessions WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if not sess:
+            raise HTTPException(404, "No active High-Low session")
+        sess = dict(sess)
+        winnings = int(sess["bet"] * sess["multiplier"])
+        db.execute("DELETE FROM highlow_sessions WHERE user_id = ?", (req.user_id,))
+        row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+        new_bal = row["balance"] + winnings
+        db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+        db.commit()
+        return {"winnings": winnings, "multiplier": sess["multiplier"], "new_balance": new_bal}
+
+
+@app.get("/api/play/highlow/status/{user_id}")
+def highlow_status(user_id: int):
+    with db_conn() as db:
+        sess = db.execute(
+            "SELECT * FROM highlow_sessions WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if not sess:
+            return {"active": False}
+        sess = dict(sess)
+        return {
+            "active": True,
+            "card": sess["current_card"],
+            "card_label": _card_label(sess["current_card"]),
+            "multiplier": sess["multiplier"],
+            "bet": sess["bet"],
+            "potential_win": int(sess["bet"] * sess["multiplier"]),
+        }
+
+
+# ── Street Craps ──────────────────────────────────────────────────────────────
+
+class CrapsStartRequest(BaseModel):
+    user_id: int
+    bet: int
+
+
+class CrapsRollRequest(BaseModel):
+    user_id: int
+
+
+@app.post("/api/play/craps/start")
+def craps_start(req: CrapsStartRequest):
+    with db_conn() as db:
+        existing = db.execute(
+            "SELECT user_id FROM craps_sessions WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if existing:
+            raise HTTPException(400, "You already have an active craps session")
+        bal = _deduct_and_check(db, req.user_id, req.bet)
+        new_bal = bal - req.bet
+        db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+        now = int(time.time())
+        db.execute(
+            "INSERT INTO craps_sessions (user_id, bet, point, started_at) VALUES (?, ?, NULL, ?)",
+            (req.user_id, req.bet, now),
+        )
+        db.commit()
+        return {"session": {"user_id": req.user_id, "bet": req.bet, "point": None}, "new_balance": new_bal}
+
+
+@app.post("/api/play/craps/roll")
+def craps_roll(req: CrapsRollRequest):
+    with db_conn() as db:
+        sess = db.execute(
+            "SELECT * FROM craps_sessions WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if not sess:
+            raise HTTPException(404, "No active craps session — start one first")
+        sess = dict(sess)
+        d1 = random.randint(1, 6)
+        d2 = random.randint(1, 6)
+        total = d1 + d2
+
+        if sess["point"] is None:
+            if total in (7, 11):
+                winnings = sess["bet"] * 2
+                db.execute("DELETE FROM craps_sessions WHERE user_id = ?", (req.user_id,))
+                row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+                new_bal = row["balance"] + winnings
+                db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+                db.commit()
+                return {"d1": d1, "d2": d2, "total": total, "result": "win", "winnings": winnings, "new_balance": new_bal}
+            elif total in (2, 3, 12):
+                db.execute("DELETE FROM craps_sessions WHERE user_id = ?", (req.user_id,))
+                row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+                db.commit()
+                return {"d1": d1, "d2": d2, "total": total, "result": "lose", "lost": sess["bet"], "new_balance": row["balance"]}
+            else:
+                db.execute("UPDATE craps_sessions SET point = ? WHERE user_id = ?", (total, req.user_id))
+                db.commit()
+                return {"d1": d1, "d2": d2, "total": total, "result": "point", "point": total}
+        else:
+            if total == sess["point"]:
+                winnings = sess["bet"] * 2
+                db.execute("DELETE FROM craps_sessions WHERE user_id = ?", (req.user_id,))
+                row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+                new_bal = row["balance"] + winnings
+                db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+                db.commit()
+                return {"d1": d1, "d2": d2, "total": total, "result": "win", "winnings": winnings, "new_balance": new_bal}
+            elif total == 7:
+                db.execute("DELETE FROM craps_sessions WHERE user_id = ?", (req.user_id,))
+                row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+                db.commit()
+                return {"d1": d1, "d2": d2, "total": total, "result": "lose", "lost": sess["bet"], "new_balance": row["balance"]}
+            else:
+                return {"d1": d1, "d2": d2, "total": total, "result": "rolling", "point": sess["point"]}
+
+
+@app.get("/api/play/craps/status/{user_id}")
+def craps_status(user_id: int):
+    with db_conn() as db:
+        sess = db.execute("SELECT * FROM craps_sessions WHERE user_id = ?", (user_id,)).fetchone()
+        if not sess:
+            return {"active": False}
+        return {"active": True, **dict(sess)}
+
+
+# ── Hack ──────────────────────────────────────────────────────────────────────
+
+from handlers.economy import _WORDLIST, _hack_display
+
+class HackStartRequest(BaseModel):
+    user_id: int
+
+
+class HackGuessRequest(BaseModel):
+    user_id: int
+    word: str
+
+
+_HACK_COOLDOWN = 3600
+
+
+@app.get("/api/hack/status/{user_id}")
+def hack_status(user_id: int):
+    with db_conn() as db:
+        row = db.execute("SELECT last_hack FROM economy WHERE user_id = ?", (user_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "User not found")
+        now = int(time.time())
+        cooldown_remaining = max(0, _HACK_COOLDOWN - (now - (row["last_hack"] or 0)))
+        sess = db.execute("SELECT * FROM hack_sessions WHERE user_id = ?", (user_id,)).fetchone()
+        if sess:
+            sess = dict(sess)
+            revealed = set(int(x) for x in sess["revealed_indices"].split(",") if x)
+            display = _hack_display(sess["word"], revealed)
+            return {
+                "active": True,
+                "display": display,
+                "clue": sess["clue"],
+                "attempts": sess["attempts"],
+                "reward": sess["reward"],
+                "word_length": len(sess["word"]),
+                "cooldown_remaining": 0,
+            }
+        return {"active": False, "cooldown_remaining": cooldown_remaining}
+
+
+@app.post("/api/hack/start")
+def hack_start(req: HackStartRequest):
+    with db_conn() as db:
+        row = db.execute("SELECT last_hack FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "User not found — use the bot first")
+        now = int(time.time())
+        cooldown_remaining = max(0, _HACK_COOLDOWN - (now - (row["last_hack"] or 0)))
+        if cooldown_remaining > 0:
+            raise HTTPException(400, f"Hack on cooldown for {cooldown_remaining}s")
+        existing = db.execute("SELECT user_id FROM hack_sessions WHERE user_id = ?", (req.user_id,)).fetchone()
+        if existing:
+            raise HTTPException(400, "You already have an active hack session")
+        word, clue = random.choice(_WORDLIST)
+        reward = random.randint(5000, 15000)
+        db.execute(
+            "INSERT INTO hack_sessions (user_id, word, clue, reward, attempts, revealed_indices, started_at) "
+            "VALUES (?, ?, ?, ?, 5, '0', ?)",
+            (req.user_id, word, clue, reward, now),
+        )
+        db.commit()
+        display = _hack_display(word, {0})
+        return {"display": display, "clue": clue, "attempts": 5, "reward": reward, "word_length": len(word)}
+
+
+@app.post("/api/hack/guess")
+def hack_guess(req: HackGuessRequest):
+    guess = req.word.lower().strip()
+    with db_conn() as db:
+        sess = db.execute("SELECT * FROM hack_sessions WHERE user_id = ?", (req.user_id,)).fetchone()
+        if not sess:
+            raise HTTPException(404, "No active hack session")
+        sess = dict(sess)
+        word = sess["word"]
+        revealed = set(int(x) for x in sess["revealed_indices"].split(",") if x)
+
+        if guess == word:
+            db.execute("DELETE FROM hack_sessions WHERE user_id = ?", (req.user_id,))
+            db.execute("UPDATE economy SET last_hack = ? WHERE user_id = ?", (int(time.time()), req.user_id))
+            row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+            new_bal = row["balance"] + sess["reward"]
+            db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+            db.commit()
+            return {"result": "win", "word": word, "reward": sess["reward"], "new_balance": new_bal}
+
+        attempts_left = sess["attempts"] - 1
+        if attempts_left <= 0:
+            db.execute("DELETE FROM hack_sessions WHERE user_id = ?", (req.user_id,))
+            db.execute("UPDATE economy SET last_hack = ? WHERE user_id = ?", (int(time.time()), req.user_id))
+            db.commit()
+            return {"result": "lose", "word": word, "attempts_left": 0}
+
+        unrevealed = [i for i in range(len(word)) if i not in revealed]
+        if unrevealed:
+            revealed.add(random.choice(unrevealed))
+        new_revealed_str = ",".join(str(i) for i in sorted(revealed))
+        db.execute(
+            "UPDATE hack_sessions SET attempts = ?, revealed_indices = ? WHERE user_id = ?",
+            (attempts_left, new_revealed_str, req.user_id),
+        )
+        db.commit()
+        display = _hack_display(word, revealed)
+        return {"result": "wrong", "display": display, "attempts_left": attempts_left}
+
+
+# ── Rob ───────────────────────────────────────────────────────────────────────
+
+from handlers.economy import _rob_outcome, _ROB_SUCCESS, _ROB_FINE, _ROB_BAIL, _ROB_GETAWAY
+
+_ROB_COOLDOWN = 900  # 15 minutes
+
+
+class RobAttemptRequest(BaseModel):
+    user_id: int
+    target_id: int
+
+
+def _send_telegram_dm(user_id: int, text: str) -> None:
+    token = config.BOT_TOKEN
+    payload = json.dumps({"chat_id": user_id, "text": text}).encode()
+    req = urllib.request.Request(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        urllib.request.urlopen(req, timeout=5)
+    except Exception:
+        pass
+
+
+@app.get("/api/rob/targets")
+def rob_targets(user_id: int, limit: int = 30):
+    with db_conn() as db:
+        rows = db.execute(
+            """SELECT e.user_id,
+                      COALESCE(a.full_name, e.full_name, 'User ' || e.user_id) AS name,
+                      e.balance
+               FROM economy e
+               LEFT JOIN (
+                   SELECT user_id, full_name FROM user_activity
+                   WHERE (user_id, last_seen) IN (
+                       SELECT user_id, MAX(last_seen) FROM user_activity GROUP BY user_id
+                   )
+               ) a ON a.user_id = e.user_id
+               WHERE e.user_id != ? AND e.balance >= 500
+               ORDER BY e.balance DESC LIMIT ?""",
+            (user_id, limit),
+        ).fetchall()
+    return [{"user_id": r["user_id"], "name": r["name"], "balance": r["balance"]} for r in rows]
+
+
+@app.post("/api/rob/attempt")
+def rob_attempt(req: RobAttemptRequest):
+    if req.user_id == req.target_id:
+        raise HTTPException(400, "You can't rob yourself")
+    with db_conn() as db:
+        robber_row = db.execute(
+            "SELECT balance, last_rob FROM economy WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if not robber_row:
+            raise HTTPException(404, "Robber not found")
+        now = int(time.time())
+        cooldown_remaining = max(0, _ROB_COOLDOWN - (now - (robber_row["last_rob"] or 0)))
+        if cooldown_remaining > 0:
+            raise HTTPException(400, f"Rob on cooldown for {cooldown_remaining}s")
+
+        target_row = db.execute(
+            """SELECT e.user_id, e.balance,
+                      COALESCE(a.full_name, e.full_name, 'User ' || e.user_id) AS name
+               FROM economy e
+               LEFT JOIN (
+                   SELECT user_id, full_name FROM user_activity
+                   WHERE (user_id, last_seen) IN (
+                       SELECT user_id, MAX(last_seen) FROM user_activity GROUP BY user_id
+                   )
+               ) a ON a.user_id = e.user_id
+               WHERE e.user_id = ?""",
+            (req.target_id,),
+        ).fetchone()
+        if not target_row or target_row["balance"] < 500:
+            raise HTTPException(400, "Target doesn't have enough WRK$ (minimum 500)")
+
+        db.execute("UPDATE economy SET last_rob = ? WHERE user_id = ?", (now, req.user_id))
+
+        success = random.random() < 0.50
+        result = _rob_outcome(success, robber_row["balance"], target_row["balance"])
+        target_name = target_row["name"]
+
+        if result["outcome"] == "success":
+            amount = result["amount"]
+            db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (amount, req.target_id))
+            db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (amount, req.user_id))
+            emoji, template = random.choice(_ROB_SUCCESS)
+            flavor = template.format(robber="You", target=target_name, amount=f"{amount:,}")
+            _send_telegram_dm(req.target_id, f"{emoji} Your wallet was robbed! Someone stole {amount:,} WRK$ from you.")
+        elif result["outcome"] == "fine":
+            amount = result["amount"]
+            db.execute("UPDATE economy SET balance = MAX(0, balance - ?) WHERE user_id = ?", (amount, req.user_id))
+            emoji, template = random.choice(_ROB_FINE)
+            flavor = template.format(robber="You", target=target_name, amount=f"{amount:,}")
+        elif result["outcome"] == "bail":
+            amount = result["amount"]
+            db.execute("UPDATE economy SET balance = MAX(0, balance - ?) WHERE user_id = ?", (amount, req.user_id))
+            emoji, template = random.choice(_ROB_BAIL)
+            flavor = template.format(robber="You", target=target_name, amount=f"{amount:,}")
+        else:
+            amount = 0
+            emoji, template = random.choice(_ROB_GETAWAY)
+            flavor = template.format(robber="You", target=target_name, amount="0")
+
+        new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()["balance"]
+        db.commit()
+        return {"outcome": result["outcome"], "emoji": emoji, "flavor": flavor, "amount": amount, "new_balance": new_bal}
+
+
+@app.get("/api/rob/cooldown/{user_id}")
+def rob_cooldown_status(user_id: int):
+    with db_conn() as db:
+        row = db.execute("SELECT last_rob FROM economy WHERE user_id = ?", (user_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "User not found")
+        now = int(time.time())
+        remaining = max(0, _ROB_COOLDOWN - (now - (row["last_rob"] or 0)))
+        return {"cooldown_remaining": remaining}
+
+
 # ── Work / Jobs endpoints ─────────────────────────────────────────────────────
 
 @app.get("/api/work/status/{user_id}")
