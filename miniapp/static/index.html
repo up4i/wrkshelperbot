@@ -641,6 +641,95 @@
   }
   .collection-select option { background: var(--surface); }
 
+  /* ── Gift detail modal ── */
+  .gift-detail-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 28px 28px 0 0;
+    width: 100%;
+    max-width: 480px;
+    animation: slideUp .25s ease;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .gift-detail-hero {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px 32px;
+    gap: 0;
+  }
+  .gift-detail-glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 60%, rgba(255,255,255,0.28) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  .gift-detail-emoji {
+    position: relative;
+    z-index: 1;
+    font-size: 72px;
+    line-height: 1;
+    filter: drop-shadow(0 0 24px rgba(255,255,255,.5));
+    animation: gift-float 3s ease-in-out infinite;
+  }
+  @keyframes gift-float {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-8px); }
+  }
+  .gift-detail-emoji img {
+    width: 80px; height: 80px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 24px rgba(255,255,255,.5));
+    animation: gift-float 3s ease-in-out infinite;
+  }
+  .gift-detail-body {
+    padding: 20px 20px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .gift-detail-title {
+    font-size: 22px;
+    font-weight: 800;
+    text-align: center;
+    letter-spacing: -.3px;
+  }
+  .gift-detail-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 14px;
+  }
+  .gift-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+  }
+  .gift-detail-row .lbl { color: var(--muted); }
+  .gift-detail-row .val { font-weight: 600; color: var(--text); }
+  .gift-detail-row .val.gold { color: var(--gold); }
+  .market-num-badge {
+    position: absolute;
+    top: 8px; left: 8px;
+    background: rgba(0,0,0,.55);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 8px;
+    padding: 2px 7px;
+    font-size: 10px;
+    font-weight: 800;
+    color: rgba(255,255,255,.9);
+    z-index: 2;
+    backdrop-filter: blur(4px);
+  }
+
   /* ── Crash ── */
   .crash-history {
     display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; padding: 4px 0 8px;
@@ -924,7 +1013,7 @@
         <div class="tab-btn" onclick="setMarketTier('high',this)">High</div>
       </div>
       <!-- Search -->
-      <input class="market-search" id="marketSearch" placeholder="Search gifts or collections…" oninput="onMarketSearch(this.value)">
+      <input class="market-search" id="marketSearch" placeholder="Search by name, collection, or #number…" oninput="onMarketSearch(this.value)">
       <!-- Collection filter -->
       <select class="collection-select" id="marketCollection" onchange="onMarketCollection(this.value)">
         <option value="">All collections</option>
@@ -1024,6 +1113,22 @@
     <button class="modal-close" onclick="document.getElementById('bjModal').classList.remove('open')">✕</button>
     <div class="modal-title">🃏 Blackjack</div>
     <div id="bjContent"><div class="loading">Loading…</div></div>
+  </div>
+</div>
+
+<!-- GIFT DETAIL MODAL -->
+<div class="modal-bg" id="giftDetailModal" onclick="if(event.target.id==='giftDetailModal')closeGiftDetail()">
+  <div class="gift-detail-modal" style="position:relative">
+    <button class="modal-close" onclick="closeGiftDetail()">✕</button>
+    <div class="gift-detail-hero" id="giftDetailHero">
+      <div class="gift-detail-glow"></div>
+      <div class="gift-detail-emoji" id="giftDetailEmoji"></div>
+    </div>
+    <div class="gift-detail-body">
+      <div class="gift-detail-title" id="giftDetailTitle"></div>
+      <div class="gift-detail-rows" id="giftDetailRows"></div>
+      <button class="btn green-btn" id="giftDetailBuyBtn" style="width:100%;padding:14px;font-size:16px;font-weight:800">Buy Now</button>
+    </div>
   </div>
 </div>
 
@@ -1646,6 +1751,8 @@ function handleShiftComplete(result) {
 }
 
 // ── Market ────────────────────────────────────────────────────────────────────
+let _marketItems = [];
+
 const BG_HEX = {
   black: '#161717', onyx: '#33373a', grape: '#7e52a4',
   emerald: '#4ba774', midnight: '#3c475f', orange: '#c47b42',
@@ -1721,14 +1828,19 @@ async function loadMarket(reset = false) {
       grid.innerHTML = '<div class="empty">No gifts match your filters</div>';
       return;
     }
-    const cards = items.map(g => {
+    if (marketOffset === 0) _marketItems = [];
+    const startIdx = _marketItems.length;
+    _marketItems.push(...items);
+    const cards = items.map((g, i) => {
+      const idx = startIdx + i;
       const bg = BG_HEX[g.background] || '#161717';
       const emojiHtml = g.custom_emoji_id
         ? `<img class="market-emoji-img" src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<div class=\\'market-emoji\\'>🎁</div>'">`
         : `<div class="market-emoji">🎁</div>`;
       return `
-        <div class="market-card" style="background:${bg}" onclick="confirmBuy('${g.collection}',${g.model_number},'${g.background}','${esc(g.model_name)}',${g.current_price},${g.stock})">
+        <div class="market-card" style="background:${bg}" onclick="openGiftCard(${idx})">
           <div class="market-glow"></div>
+          <div class="market-num-badge">#${g.min_gift_number}</div>
           ${emojiHtml}
           <div class="market-col">${esc(fmtCollection(g.collection))}</div>
           <div class="market-name">${esc(g.model_name)}</div>
@@ -1797,6 +1909,75 @@ async function executeBuy(collection, modelNumber, background, btn) {
     btn.disabled = false;
     btn.textContent = 'Confirm';
     document.getElementById('marketConfirmBar').insertAdjacentHTML('beforeend', `<div class="error-msg">${esc(e.message)}</div>`);
+  }
+}
+
+// ── Gift Detail Modal ─────────────────────────────────────────────────────────
+let _gdCurrent = null;
+
+function openGiftCard(idx) {
+  const g = _marketItems[idx];
+  if (!g) return;
+  _gdCurrent = g;
+
+  const bg = BG_HEX[g.background] || '#161717';
+  const hero = document.getElementById('giftDetailHero');
+  hero.style.background = bg;
+
+  const emojiEl = document.getElementById('giftDetailEmoji');
+  if (g.custom_emoji_id) {
+    emojiEl.innerHTML = `<img src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='🎁'" style="width:80px;height:80px;object-fit:contain;filter:drop-shadow(0 0 24px rgba(255,255,255,.5));animation:gift-float 3s ease-in-out infinite">`;
+  } else {
+    emojiEl.textContent = '🎁';
+  }
+
+  document.getElementById('giftDetailTitle').textContent = `${g.model_name} #${g.min_gift_number}`;
+
+  document.getElementById('giftDetailRows').innerHTML = `
+    <div class="gift-detail-row"><span class="lbl">Model</span><span class="val">${esc(fmtCollection(g.collection))}</span></div>
+    <div class="gift-detail-row"><span class="lbl">Background</span><span class="val">${esc(BG_LABEL[g.background] || g.background)}</span></div>
+    <div class="gift-detail-row"><span class="lbl">In Stock</span><span class="val">${g.stock}</span></div>
+    <div class="gift-detail-row"><span class="lbl">Owner</span><span class="val">Bank</span></div>
+    <div class="gift-detail-row"><span class="lbl">Market Floor Price</span><span class="val gold">${fmt(g.current_price)} WRK$</span></div>
+  `;
+
+  const buyBtn = document.getElementById('giftDetailBuyBtn');
+  buyBtn.disabled = false;
+  buyBtn.textContent = 'Buy Now';
+  buyBtn.onclick = () => executeGiftDetailBuy(buyBtn);
+
+  document.getElementById('giftDetailModal').classList.add('open');
+}
+
+function closeGiftDetail() {
+  document.getElementById('giftDetailModal').classList.remove('open');
+  _gdCurrent = null;
+}
+
+async function executeGiftDetailBuy(btn) {
+  if (!state.userId) { alert('Set your user ID first.'); return; }
+  const g = _gdCurrent;
+  if (!g) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const data = await api('/api/market/buy', {
+      method: 'POST',
+      json: { user_id: +state.userId, collection: g.collection, model_number: g.model_number, background: g.background },
+    });
+    closeGiftDetail();
+    state.balance = data.new_balance;
+    refreshHeaderBal();
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:calc(var(--nav-h)+80px);left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:10px 20px;border-radius:20px;font-weight:700;font-size:13px;z-index:300;animation:float-earn .9s ease-out 1.5s forwards';
+    toast.textContent = `✅ Got gift #${data.gift_number}!`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2600);
+    loadMarket(true);
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Buy Now';
+    alert(e.message);
   }
 }
 

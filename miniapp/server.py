@@ -517,8 +517,12 @@ def market_listings(tier: str = "low", limit: int = 40, offset: int = 0,
     where = ["gi.owner_id IS NULL", "gm.tier = ?"]
     params: list = [tier]
     if search:
-        where.append("(gm.model_name LIKE ? OR gm.collection LIKE ?)")
-        params += [f"%{search}%", f"%{search}%"]
+        if search.isdigit():
+            where.append("(gm.model_name LIKE ? OR gm.collection LIKE ? OR gi.gift_number = ?)")
+            params += [f"%{search}%", f"%{search}%", int(search)]
+        else:
+            where.append("(gm.model_name LIKE ? OR gm.collection LIKE ?)")
+            params += [f"%{search}%", f"%{search}%"]
     if background:
         where.append("gi.background = ?")
         params.append(background)
@@ -529,7 +533,8 @@ def market_listings(tier: str = "low", limit: int = 40, offset: int = 0,
     with db_conn() as db:
         rows = db.execute(
             f"""SELECT gm.collection, gm.model_number, gm.model_name, gm.tier,
-                       gm.custom_emoji_id, gi.background, COUNT(gi.id) AS stock, gp.current_price
+                       gm.custom_emoji_id, gi.background, COUNT(gi.id) AS stock, gp.current_price,
+                       MIN(gi.gift_number) AS min_gift_number
                 FROM gift_instances gi
                 JOIN gift_models gm ON gm.id = gi.model_id
                 JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
