@@ -628,7 +628,7 @@ def blackjack_action(req: BlackjackActionRequest):
 
 # ── Crash ─────────────────────────────────────────────────────────────────────
 
-_CRASH_BETTING_SECS = 7.0
+_CRASH_BETTING_SECS = 30.0
 _CRASH_TICK_MS = 100
 _CRASH_GROWTH = 0.015  # 1.5% per tick → ~2× at 5s, ~4.4× at 10s
 
