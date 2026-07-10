@@ -1788,7 +1788,8 @@ function toggleReorderMode() {
   if (!grid || !btn) return;
 
   if (_sortableInstance) {
-    // Exit reorder mode
+    // Exit reorder mode — disable first to clear any stuck drag state
+    _sortableInstance.option('disabled', true);
     _sortableInstance.destroy();
     _sortableInstance = null;
     btn.textContent = '⠿ Reorder';
@@ -1818,6 +1819,8 @@ function toggleReorderMode() {
     ghostClass: 'gift-card-ghost',
     delay: 300,
     delayOnTouchOnly: true,
+    forceFallback: true,
+    fallbackTolerance: 3,
     onEnd() {
       clearTimeout(_reorderDebounce);
       _reorderDebounce = setTimeout(_saveGiftOrder, 800);
