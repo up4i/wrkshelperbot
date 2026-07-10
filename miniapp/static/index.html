@@ -1816,6 +1816,8 @@ function toggleReorderMode() {
   _sortableInstance = new Sortable(grid, {
     animation: 150,
     ghostClass: 'gift-card-ghost',
+    delay: 300,
+    delayOnTouchOnly: true,
     onEnd() {
       clearTimeout(_reorderDebounce);
       _reorderDebounce = setTimeout(_saveGiftOrder, 800);
@@ -2520,7 +2522,9 @@ function openCoinflip() {
   document.getElementById('cfTails').classList.remove('selected');
   document.getElementById('cfResult').className = 'result-box';
   document.getElementById('cfErr').textContent = '';
-  document.getElementById('cfCoin').textContent = '🪙';
+  document.getElementById('cfFront').textContent = '🌝';
+  document.getElementById('cfBack').textContent = '🌚';
+  document.getElementById('cfCoin').classList.remove('flipping');
   document.getElementById('cfBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
   buildPresets('cfPresets', 'cfBet');
   document.getElementById('cfModal').classList.add('open');
