@@ -1678,7 +1678,7 @@ async function loadOwnProfile() {
   try {
     const d = await api(`/api/profile/${state.userId}`);
     el.innerHTML = buildProfileHtml(d, true);
-    _setupGiftsObserver();
+    _setupGiftsObserver(el.querySelector('#giftsGrid'));
   } catch(e) {
     el.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
   }
@@ -1696,7 +1696,7 @@ async function loadProfile() {
     const d = await api(url);
     content.innerHTML = buildProfileHtml(d, false);
     content.style.display = 'flex';
-    _setupGiftsObserver();
+    _setupGiftsObserver(content.querySelector('#giftsGrid'));
   } catch(e) {
     errEl.textContent = e.message;
   }
@@ -1842,35 +1842,38 @@ async function _saveGiftOrder() {
   }
 }
 
-function _setupGiftsObserver() {
+function _setupGiftsObserver(gridEl) {
   if (_giftsObserver) { _giftsObserver.disconnect(); _giftsObserver = null; }
   if (!_giftsHasMore) return;
-  const sentinel = document.getElementById('giftSentinel');
+  // Use passed-in grid, or fall back to finding sentinel's parent
+  const sentinel = gridEl
+    ? gridEl.querySelector('#giftSentinel')
+    : document.getElementById('giftSentinel');
   if (!sentinel) return;
+  const capturedGrid = gridEl || sentinel.parentElement;
   const profileId = _giftsProfileId;
+  const isOwn = window._profileIsOwn || false;
+  const pinnedId = window._profilePinnedId || null;
   let localOffset = _giftsOffset;
   _giftsObserver = new IntersectionObserver(async entries => {
     if (!entries[0].isIntersecting || !_giftsHasMore) return;
     _giftsHasMore = false; // prevent double-fire while loading
     try {
       const d = await api(`/api/profile/${profileId}?gifts_offset=${localOffset}&gifts_limit=20`);
-      const grid = document.getElementById('giftsGrid');
-      if (!grid) return;
-      const old = document.getElementById('giftSentinel');
+      if (!capturedGrid.isConnected) return;
+      const old = capturedGrid.querySelector('#giftSentinel');
       if (old) old.remove();
-      const isOwn = window._profileIsOwn || false;
-      const pinnedId = window._profilePinnedId || null;
       d.gifts.forEach(g => {
         if (window._profileGifts) window._profileGifts[g.id] = g;
-        grid.insertAdjacentHTML('beforeend', _buildGiftCardHtml(g, isOwn, pinnedId));
+        capturedGrid.insertAdjacentHTML('beforeend', _buildGiftCardHtml(g, isOwn, pinnedId));
       });
       localOffset += d.gifts.length;
       _giftsOffset = localOffset;
       _giftsHasMore = d.has_more || false;
       if (_giftsHasMore) {
-        grid.insertAdjacentHTML('beforeend',
+        capturedGrid.insertAdjacentHTML('beforeend',
           `<div id="giftSentinel" style="grid-column:1/-1;text-align:center;padding:12px;color:var(--muted);font-size:13px">Loading…</div>`);
-        _setupGiftsObserver();
+        _setupGiftsObserver(capturedGrid);
       } else {
         _giftsObserver.disconnect();
         _giftsObserver = null;
