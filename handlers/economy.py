@@ -4,7 +4,7 @@ import time
 import logging
 from html import escape
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
@@ -558,7 +558,7 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     name = p.get("full_name") or (f"@{p['username']}" if p.get("username") else f"User {p['user_id']}")
     username = p.get("username")
-    name_html = f'<a href="https://t.me/{username.lstrip("@")}">{escape(name)}</a>' if username else escape(name)
+    name_html = f'<a href="https://t.me/{username.lstrip("@")}">{escape(name)}</a>' if username else f'<b>{escape(name)}</b>'
 
     # pinned gift line
     pinned_line = ""
@@ -566,10 +566,10 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if pg:
         bg_emoji = _BG_EMOJI.get(pg.get("background", ""), "")
         if pg.get("custom_emoji_id"):
-            gift_icon = f'<tg-emoji emoji-id="{pg["custom_emoji_id"]}">{pg.get("model_emoji","🎁")}</tg-emoji>'
+            gift_icon = f'<tg-emoji emoji-id="{pg["custom_emoji_id"]}">{pg.get("model_emoji", "🎁")}</tg-emoji>'
         else:
             gift_icon = pg.get("model_emoji", "🎁")
-        pinned_line = f'\n📌 {gift_icon}{bg_emoji} <b>{escape(pg["model_name"])}</b> #{pg["gift_number"]}'
+        pinned_line = f'\n{gift_icon}{bg_emoji} {escape(pg["model_name"])} #{pg["gift_number"]}'
 
     # job title
     work_count = p.get("work_count") or 0
@@ -580,16 +580,17 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     mult_str = f"{p['best_mult']:.2f}×" if p["best_mult"] else "—"
 
     text = (
-        f'👤 <b>{name_html}</b>\n'
+        f'<b>{name_html}</b>'
         f'{pinned_line}\n'
-        f'<code>{p["user_id"]}</code> · {escape(job_title)}\n\n'
+        f'{escape(job_title)}\n\n'
         f'💰 <b>{p["balance"]:,} WRK$</b> — rank #{p["balance_rank"]}\n'
         f'🔥 <b>{p["streak"]} day streak</b> — rank #{p["streak_rank"]}\n'
         f'🎁 <b>{p["gift_count"]} gifts</b> — rank #{p["gift_rank"]}\n\n'
         f'🎰 Gambling: +{p["total_won"]:,} won · -{p["total_lost"]:,} lost · net {net_str}\n'
         f'🚀 Best crash mult: {mult_str}'
     )
-    await msg.reply_text(text, parse_mode="HTML")
+    await msg.reply_text(text, parse_mode="HTML",
+                         link_preview_options=LinkPreviewOptions(is_disabled=True))
 
 
 # ── /workreminder ─────────────────────────────────────────────────────────────
