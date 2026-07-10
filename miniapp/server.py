@@ -241,6 +241,11 @@ class PinGiftRequest(BaseModel):
     gift_id: int | None = None
 
 
+class ReorderRequest(BaseModel):
+    user_id: int
+    gift_ids: list[int]
+
+
 @app.post("/api/profile/pin")
 def pin_gift(req: PinGiftRequest):
     with db_conn() as db:
@@ -255,6 +260,26 @@ def pin_gift(req: PinGiftRequest):
             "UPDATE economy SET pinned_gift_id = ? WHERE user_id = ?",
             (req.gift_id, req.user_id),
         )
+        db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/profile/reorder")
+def profile_reorder(req: ReorderRequest):
+    with db_conn() as db:
+        # Verify all gift_ids belong to this user
+        placeholders = ",".join("?" * len(req.gift_ids))
+        owned = db.execute(
+            f"SELECT id FROM gift_instances WHERE id IN ({placeholders}) AND owner_id = ?",
+            (*req.gift_ids, req.user_id)
+        ).fetchall()
+        if len(owned) != len(req.gift_ids):
+            raise HTTPException(403, "One or more gifts don't belong to this user")
+        for idx, gift_id in enumerate(req.gift_ids):
+            db.execute(
+                "UPDATE gift_instances SET sort_index = ? WHERE id = ? AND owner_id = ?",
+                (idx, gift_id, req.user_id)
+            )
         db.commit()
     return {"ok": True}
 
