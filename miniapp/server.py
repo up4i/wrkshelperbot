@@ -1,4 +1,5 @@
 import asyncio
+import gzip
 import hashlib
 import hmac
 import json
@@ -203,6 +204,8 @@ def profile_by_username(username: str):
 
 _EMOJI_CACHE = STATIC_DIR / "emoji_cache"
 _EMOJI_CACHE.mkdir(exist_ok=True)
+_EMOJI_ANIM_CACHE = STATIC_DIR / "emoji_anim_cache"
+_EMOJI_ANIM_CACHE.mkdir(exist_ok=True)
 
 
 @app.get("/emoji/{emoji_id}")
@@ -252,6 +255,55 @@ def get_emoji_image(emoji_id: str):
         raise
     except Exception:
         raise HTTPException(502, "Could not fetch emoji from Telegram")
+
+
+@app.get("/emoji-anim/{emoji_id}")
+def get_emoji_animation(emoji_id: str):
+    if not emoji_id.isdigit():
+        raise HTTPException(400, "Invalid emoji ID")
+
+    cached = _EMOJI_ANIM_CACHE / f"{emoji_id}.json"
+    if cached.exists():
+        return FileResponse(str(cached), media_type="application/json",
+                            headers={"Cache-Control": "public, max-age=31536000"})
+
+    token = config.BOT_TOKEN
+    try:
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{token}/getCustomEmojiStickers",
+            data=json.dumps({"custom_emoji_ids": [emoji_id]}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as r:
+            data = json.loads(r.read())
+        sticker = data["result"][0]
+
+        if not sticker.get("is_animated"):
+            raise HTTPException(404, "Sticker is not animated")
+
+        file_id = sticker["file_id"]
+
+        with urllib.request.urlopen(
+            f"https://api.telegram.org/bot{token}/getFile?file_id={file_id}", timeout=8
+        ) as r:
+            file_data = json.loads(r.read())
+        file_path = file_data["result"]["file_path"]
+
+        with urllib.request.urlopen(
+            f"https://api.telegram.org/file/bot{token}/{file_path}", timeout=10
+        ) as r:
+            tgs_bytes = r.read()
+
+        lottie_json = gzip.decompress(tgs_bytes)
+        cached.write_bytes(lottie_json)
+
+        return Response(content=lottie_json, media_type="application/json",
+                        headers={"Cache-Control": "public, max-age=31536000"})
+
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(502, "Could not fetch animation from Telegram")
 
 
 # ── Telegram auth ─────────────────────────────────────────────────────────────
