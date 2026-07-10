@@ -208,7 +208,6 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         "pinned_gift": pinned_gift,
         "pinned_gift_id": row["pinned_gift_id"],
         "has_more": len(gifts) == gifts_limit and (gifts_offset + gifts_limit) < gift_count,
-        "gifts_offset": gifts_offset,
     }
 
 
@@ -219,7 +218,7 @@ def profile_by_id(user_id: int, gifts_offset: int = 0, gifts_limit: int = 20):
 
 
 @app.get("/api/profile/username/{username}")
-def profile_by_username(username: str):
+def profile_by_username(username: str, gifts_offset: int = 0, gifts_limit: int = 20):
     username = username.lstrip("@")
     with db_conn() as db:
         row = db.execute(
@@ -232,7 +231,7 @@ def profile_by_username(username: str):
             ).fetchone()
         if not row:
             raise HTTPException(404, "Username not found")
-        return _load_profile(db, row["user_id"])
+        return _load_profile(db, row["user_id"], gifts_offset, gifts_limit)
 
 
 # ── Pin gift ─────────────────────────────────────────────────────────────────
