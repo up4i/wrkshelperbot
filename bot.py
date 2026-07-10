@@ -43,7 +43,7 @@ from handlers.economy import (
     cmd_give, cmd_givewrk, cmd_setwrk,
     cmd_hack, cmd_guess,
     cmd_work, cmd_workreminder, cmd_jobs, work_callback,
-    cmd_profile,
+    cmd_profile, lb_callback,
 )
 from handlers.gifts import (
     cmd_seedgifts,
@@ -161,6 +161,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("sell",       cmd_sell))
     app.add_handler(CommandHandler("offer",      cmd_offer))
     app.add_handler(CommandHandler("offers",     cmd_offers))
+    app.add_handler(CallbackQueryHandler(lb_callback,      pattern=r"^lb:"))
     app.add_handler(CallbackQueryHandler(setup_callback,  pattern=r"^setup:"))
     app.add_handler(CallbackQueryHandler(dsetup_callback, pattern=r"^dsetup:"))
     app.add_handler(CallbackQueryHandler(help_callback,   pattern=r"^help:"))

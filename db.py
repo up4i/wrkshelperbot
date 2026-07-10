@@ -563,7 +563,7 @@ async def get_profile(db_path: str, user_id: int) -> dict | None:
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            """SELECT e.user_id, e.balance, e.streak, e.pinned_gift_id,
+            """SELECT e.user_id, e.balance, e.streak, e.work_count, e.pinned_gift_id,
                       COALESCE(a.username, e.username) AS username,
                       COALESCE(a.full_name, e.full_name) AS full_name
                FROM economy e

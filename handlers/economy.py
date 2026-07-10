@@ -462,64 +462,86 @@ _LB_TITLES = {
     "mult":      "🚀 Best Crash Multiplier",
 }
 
+_LB_BUTTONS = [
+    [("💰 Balance", "balance"), ("🔥 Streak", "streak"), ("🎁 Gifts", "gifts")],
+    [("🎰 Gamble Won", "gamble"), ("💸 Losses", "loss")],
+    [("🎰 Slots", "slots"), ("🪙 Coinflip", "coinflip"), ("🃏 Blackjack", "blackjack")],
+    [("📈 Crash", "crash"), ("🚀 Best Mult", "mult")],
+]
+
+def _lb_keyboard(active_tab: str) -> InlineKeyboardMarkup:
+    rows = []
+    for row in _LB_BUTTONS:
+        rows.append([
+            InlineKeyboardButton(
+                f"› {label}" if tab == active_tab else label,
+                callback_data=f"lb:{tab}"
+            )
+            for label, tab in row
+        ])
+    return InlineKeyboardMarkup(rows)
+
 def _lb_display_name(row: dict) -> str:
     name = row.get("full_name") or row.get("username") or f"User {row['user_id']}"
     username = row.get("username")
     if username:
-        return f"[{name}](https://t.me/{username.lstrip('@')})"
-    return name
+        return f'<a href="https://t.me/{username.lstrip("@")}">{escape(name)}</a>'
+    return escape(name)
 
-@topic_gated
-async def cmd_leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    arg = (ctx.args[0].lower() if ctx.args else "balance")
-    tab = _LB_ALIASES.get(arg)
-    if tab is None:
-        tabs = "balance · streak · gifts · gamble · loss · slots · coinflip · blackjack · crash · mult"
-        await update.effective_message.reply_text(
-            f"❓ Unknown tab `{arg}`\n\nAvailable: {tabs}", parse_mode="Markdown"
-        )
-        return
-
+async def _build_lb_text(tab: str) -> str:
     rows = await db.get_stats_leaderboard(config.DB_PATH, tab, limit=10)
-    if not rows:
-        await update.effective_message.reply_text("No data yet for that leaderboard.")
-        return
-
     medals = ['🥇', '🥈', '🥉']
     title = _LB_TITLES[tab]
-    lines = [f"*{title} Leaderboard*\n"]
+    if not rows:
+        return f"<b>{title} Leaderboard</b>\n\nNo data yet."
+    lines = [f"<b>{title} Leaderboard</b>\n"]
     for i, row in enumerate(rows):
         prefix = medals[i] if i < 3 else f"{i + 1}."
         display = _lb_display_name(row)
         val = row["value"]
-        unit = row["unit"]
-        if tab == "mult":
-            val_str = f"{val:.2f}×"
-        else:
-            val_str = f"{int(val):,} {unit}"
+        val_str = f"{val:.2f}×" if tab == "mult" else f"{int(val):,} {row['unit']}"
         lines.append(f"{prefix} {display} — {val_str}")
-    await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
+    return "\n".join(lines)
+
+@topic_gated
+async def cmd_leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    arg = (ctx.args[0].lower() if ctx.args else "balance")
+    tab = _LB_ALIASES.get(arg, "balance")
+    text = await _build_lb_text(tab)
+    await update.effective_message.reply_text(
+        text, parse_mode="HTML", reply_markup=_lb_keyboard(tab)
+    )
+
+async def lb_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    tab = query.data.split(":", 1)[1]
+    if tab not in _LB_TITLES:
+        return
+    text = await _build_lb_text(tab)
+    await query.edit_message_text(text, parse_mode="HTML", reply_markup=_lb_keyboard(tab))
 
 
 # ── /profile ──────────────────────────────────────────────────────────────────
 
+_BG_EMOJI = {
+    "black": "⬛", "onyx": "🩶", "grape": "🟣",
+    "emerald": "💚", "midnight": "🔵", "orange": "🟠",
+}
+
 async def _resolve_profile_target(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int | None:
-    """Returns user_id from reply, @username arg, or self."""
     msg = update.effective_message
-    # reply to someone
     if msg.reply_to_message:
         return msg.reply_to_message.from_user.id
-    # @username or user_id arg
     if ctx.args:
         arg = ctx.args[0].lstrip("@")
         if arg.isdigit():
             return int(arg)
         row = await db.get_user_by_username(config.DB_PATH, update.effective_chat.id, arg)
         if not row:
-            await msg.reply_text(f"❓ Couldn't find user `@{arg}` — they need to have chatted here first.", parse_mode="Markdown")
+            await msg.reply_text(f"❓ Couldn't find @{arg} — they need to have chatted here first.")
             return None
         return row["user_id"]
-    # self
     return update.effective_user.id
 
 @topic_gated
@@ -536,24 +558,38 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     name = p.get("full_name") or (f"@{p['username']}" if p.get("username") else f"User {p['user_id']}")
     username = p.get("username")
-    name_link = f"[{name}](https://t.me/{username.lstrip('@')})" if username else name
+    name_html = f'<a href="https://t.me/{username.lstrip("@")}">{escape(name)}</a>' if username else escape(name)
 
-    pinned = f"  📌 {p['pinned_gift']['model_emoji']} {p['pinned_gift']['model_name']} #{p['pinned_gift']['gift_number']}" if p.get("pinned_gift") else ""
+    # pinned gift line
+    pinned_line = ""
+    pg = p.get("pinned_gift")
+    if pg:
+        bg_emoji = _BG_EMOJI.get(pg.get("background", ""), "")
+        if pg.get("custom_emoji_id"):
+            gift_icon = f'<tg-emoji emoji-id="{pg["custom_emoji_id"]}">{pg.get("model_emoji","🎁")}</tg-emoji>'
+        else:
+            gift_icon = pg.get("model_emoji", "🎁")
+        pinned_line = f'\n📌 {gift_icon}{bg_emoji} <b>{escape(pg["model_name"])}</b> #{pg["gift_number"]}'
+
+    # job title
+    work_count = p.get("work_count") or 0
+    job_title = _get_job(work_count)[1]
 
     net = p["total_won"] - p["total_lost"]
     net_str = f"+{net:,}" if net >= 0 else f"{net:,}"
     mult_str = f"{p['best_mult']:.2f}×" if p["best_mult"] else "—"
 
     text = (
-        f"👤 *{name_link}*{pinned}\n"
-        f"ID: `{p['user_id']}`\n\n"
-        f"💰 *{p['balance']:,} WRK$* — rank #{p['balance_rank']}\n"
-        f"🔥 *{p['streak']} day streak* — rank #{p['streak_rank']}\n"
-        f"🎁 *{p['gift_count']} gifts* — rank #{p['gift_rank']}\n\n"
-        f"🎰 Gambling: +{p['total_won']:,} won · -{p['total_lost']:,} lost · net {net_str}\n"
-        f"🚀 Best crash mult: {mult_str}"
+        f'👤 <b>{name_html}</b>\n'
+        f'{pinned_line}\n'
+        f'<code>{p["user_id"]}</code> · {escape(job_title)}\n\n'
+        f'💰 <b>{p["balance"]:,} WRK$</b> — rank #{p["balance_rank"]}\n'
+        f'🔥 <b>{p["streak"]} day streak</b> — rank #{p["streak_rank"]}\n'
+        f'🎁 <b>{p["gift_count"]} gifts</b> — rank #{p["gift_rank"]}\n\n'
+        f'🎰 Gambling: +{p["total_won"]:,} won · -{p["total_lost"]:,} lost · net {net_str}\n'
+        f'🚀 Best crash mult: {mult_str}'
     )
-    await msg.reply_text(text, parse_mode="Markdown")
+    await msg.reply_text(text, parse_mode="HTML")
 
 
 # ── /workreminder ─────────────────────────────────────────────────────────────
