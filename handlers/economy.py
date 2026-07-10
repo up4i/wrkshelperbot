@@ -569,7 +569,8 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             gift_icon = f'<tg-emoji emoji-id="{pg["custom_emoji_id"]}">{pg.get("model_emoji", "🎁")}</tg-emoji>'
         else:
             gift_icon = pg.get("model_emoji", "🎁")
-        pinned_line = f'\n{gift_icon}{bg_emoji} {escape(pg["model_name"])} #{pg["gift_number"]}'
+        gift_display = pg["collection"].replace("_", " ").title()
+        pinned_line = f'\n{gift_icon}{bg_emoji} {escape(gift_display)} #{pg["gift_number"]}'
 
     # job title
     work_count = p.get("work_count") or 0

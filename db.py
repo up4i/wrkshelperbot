@@ -602,7 +602,7 @@ async def get_profile(db_path: str, user_id: int) -> dict | None:
         if d.get("pinned_gift_id"):
             async with db.execute(
                 "SELECT gi.id, gi.gift_number, gi.background, "
-                "gm.model_name, gm.model_emoji, gm.custom_emoji_id "
+                "gm.collection, gm.model_name, gm.model_emoji, gm.custom_emoji_id "
                 "FROM gift_instances gi JOIN gift_models gm ON gm.id = gi.model_id "
                 "WHERE gi.id = ? AND gi.owner_id = ?", (d["pinned_gift_id"], user_id)
             ) as cur:
