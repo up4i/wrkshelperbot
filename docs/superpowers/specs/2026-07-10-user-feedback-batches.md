@@ -24,6 +24,9 @@ Quick bugs and one-liners — no spec/plan needed, implement directly.
 - **Leaderboard profile embed**: remove the profile preview/embed that appears on the leaderboard
 - **Coinflip same side**: both sides of the coin flip animation show the same face — make heads/tails visually distinct
 - **Bet button spacing**: in the new games (roulette, craps, hack, rob, high-low), the preset bet buttons are too close to the confirm/bet button — add spacing
+- **Infinite scroll on other user's profile loads wrong gifts**: when viewing another user's profile and scrolling to load more gifts, the scroll loads the wrong user's gifts (likely own user's gifts). `_giftsProfileId` / `window._profileIsOwn` may not be resetting correctly when navigating between profiles while staying on the profile tab
+- **Gift reorder — drag whole card**: currently dragging requires hitting the small ⠿ handle in the corner; make the entire gift card the drag target in reorder mode (remove the handle overlay, use the whole card)
+- **Gift reorder — multi-move stability**: moving more than one gift in a session bugs out; Sortable state likely not resetting cleanly between moves
 
 ---
 
