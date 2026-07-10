@@ -80,6 +80,36 @@ def test_bj_is_blackjack_false_21_not_natural():
     assert _bj_is_blackjack([('7', '♠'), ('7', '♥'), ('7', '♣')]) is False
 
 
+# ── Blackjack split logic ─────────────────────────────────────────────────────
+
+def _can_split(hand, balance, bet):
+    """Mirrors the can_split condition in miniapp/server.py _bj_playing_state()."""
+    is_first = len(hand) == 2
+    return is_first and hand[0][0] == hand[1][0] and balance >= bet
+
+
+def test_split_same_rank_pairs():
+    assert _can_split([('7', '♠'), ('7', '♥')], 1000, 100) is True
+    assert _can_split([('A', '♠'), ('A', '♥')], 1000, 100) is True
+    assert _can_split([('J', '♠'), ('J', '♦')], 1000, 100) is True
+    assert _can_split([('10', '♠'), ('10', '♦')], 1000, 100) is True
+
+
+def test_split_different_rank_not_allowed():
+    assert _can_split([('10', '♠'), ('J', '♥')], 1000, 100) is False
+    assert _can_split([('K', '♠'), ('7', '♥')], 1000, 100) is False
+    assert _can_split([('A', '♠'), ('K', '♥')], 1000, 100) is False
+
+
+def test_split_requires_enough_balance():
+    assert _can_split([('7', '♠'), ('7', '♥')], 50, 100) is False
+
+
+def test_split_only_on_first_two_cards():
+    # Three-card hand — can_split should be False
+    assert _can_split([('7', '♠'), ('7', '♥'), ('3', '♣')], 1000, 100) is False
+
+
 # --- Crash ---
 
 def test_generate_crash_point_range():

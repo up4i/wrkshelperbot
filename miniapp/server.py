@@ -1514,7 +1514,7 @@ def _bj_playing_state(game: dict, balance: int) -> dict:
     can_split = (
         is_first
         and len(game["hands"]) == 1
-        and _bj_card_val(hand[0][0]) == _bj_card_val(hand[1][0])
+        and hand[0][0] == hand[1][0]
         and balance >= game["bet"]
     )
     return {
