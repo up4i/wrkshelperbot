@@ -1789,6 +1789,10 @@ function toggleReorderMode() {
 
   if (_sortableInstance) {
     // Exit reorder mode — disable first to clear any stuck drag state
+    if (_sortableCancelHandler) {
+      document.removeEventListener('touchcancel', _sortableCancelHandler);
+      _sortableCancelHandler = null;
+    }
     _sortableInstance.option('disabled', true);
     _sortableInstance.destroy();
     _sortableInstance = null;
@@ -1819,13 +1823,22 @@ function toggleReorderMode() {
     ghostClass: 'gift-card-ghost',
     delay: 300,
     delayOnTouchOnly: true,
-    forceFallback: true,
-    fallbackTolerance: 3,
     onEnd() {
       clearTimeout(_reorderDebounce);
       _reorderDebounce = setTimeout(_saveGiftOrder, 800);
     }
   });
+
+  // If the OS cancels the touch mid-delay (notification, app switch, etc.),
+  // Sortable's passive:false touchmove listener stays attached and blocks UI.
+  // Reset state immediately on touchcancel to unblock interaction.
+  _sortableCancelHandler = () => {
+    if (_sortableInstance) {
+      _sortableInstance.option('disabled', true);
+      _sortableInstance.option('disabled', false);
+    }
+  };
+  document.addEventListener('touchcancel', _sortableCancelHandler);
 }
 
 async function _saveGiftOrder() {
@@ -1935,6 +1948,7 @@ let _giftsHasMore = false;
 let _giftsObserver = null;
 let _sortableInstance = null;
 let _reorderDebounce = null;
+let _sortableCancelHandler = null;
 
 let rouletteColor = null;
 
