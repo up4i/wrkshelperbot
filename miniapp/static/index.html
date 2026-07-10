@@ -467,12 +467,15 @@
     background: linear-gradient(135deg, #f59e0b, #d97706);
     box-shadow: 0 4px 20px rgba(245,158,11,.4);
     transform-style: preserve-3d;
+    position: relative;
     transition: transform .1s;
   }
+  .coin-face { position:absolute; width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:48px; backface-visibility:hidden; -webkit-backface-visibility:hidden; }
+  .coin-back { transform: rotateY(180deg); }
   .coin.flipping { animation: coin-flip .8s ease; }
   @keyframes coin-flip {
-    0%   { transform: rotateY(0deg); }
-    100% { transform: rotateY(1440deg); }
+    from { transform: rotateY(0deg); }
+    to { transform: rotateY(720deg); }
   }
 
   /* ── Result flash ── */
@@ -532,7 +535,7 @@
 
   .bet-row { display: flex; gap: 8px; align-items: center; }
   .bet-input { width: 100px; text-align: center; }
-  .bet-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .bet-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
   .preset-btn {
     background: var(--card2);
     border: 1px solid var(--border);
@@ -1396,7 +1399,7 @@
   <div class="modal" style="position:relative">
     <button class="modal-close" onclick="closeModal('cfModal')">✕</button>
     <div class="modal-title">🪙 Coinflip</div>
-    <div class="coin-wrap"><div class="coin" id="cfCoin">🪙</div></div>
+    <div class="coin-wrap"><div class="coin" id="cfCoin"><div class="coin-face coin-front" id="cfFront">🌝</div><div class="coin-face coin-back" id="cfBack">🌚</div></div></div>
     <div class="result-box" id="cfResult"></div>
     <div class="cf-choice">
       <div class="cf-btn" id="cfHeads" onclick="setCfChoice('heads')">🌝 Heads</div>
@@ -1609,7 +1612,7 @@ async function loadLeaderboard(tab) {
       const initials = r.name.replace(/^@/,'').slice(0,2).toUpperCase();
       const val = meta.fmt(r.value);
       const sub = meta.sub(r);
-      return `<div class="lb-row ${cls}" onclick="viewUser(${r.user_id})">
+      return `<div class="lb-row ${cls}">
         <div class="lb-rank">${medal}</div>
         <img class="lb-avatar" src="/api/avatar/${r.user_id}" alt="${initials}" onerror="avatarError(this,'${initials}')">
         <div class="lb-info">
@@ -2537,13 +2540,20 @@ async function flipCoin() {
   document.getElementById('cfResult').className = 'result-box';
 
   const coinEl = document.getElementById('cfCoin');
+  const frontEl = document.getElementById('cfFront');
+  const backEl = document.getElementById('cfBack');
+  frontEl.textContent = state.cfChoice === 'heads' ? '🌝' : '🌚';
+  backEl.textContent = state.cfChoice === 'heads' ? '🌚' : '🌝';
+
   coinEl.classList.add('flipping');
 
   try {
     const data = await api('/api/play/coinflip', { method:'POST', json:{ user_id:+state.userId, bet, choice:state.cfChoice } });
     await sleep(800);
     coinEl.classList.remove('flipping');
-    coinEl.textContent = data.result === 'heads' ? '🌝' : '🌚';
+    const headsEmoji = '🌝', tailsEmoji = '🌚';
+    frontEl.textContent = data.result === 'heads' ? headsEmoji : tailsEmoji;
+    backEl.textContent = data.result === 'heads' ? tailsEmoji : headsEmoji;
 
     const resEl = document.getElementById('cfResult');
     const delta = data.delta > 0 ? `+${fmt(data.delta)}` : fmt(data.delta);
@@ -2599,7 +2609,7 @@ async function api(url, opts = {}) {
   return res.json();
 }
 
-function fmt(n) { return Number(n).toLocaleString(); }
+function fmt(n) { return Number(n).toLocaleString('en-US'); }
 function fmtK(n) { if (n >= 1_000_000) return (n/1_000_000).toFixed(1)+'M'; if (n >= 1000) return (n/1000).toFixed(1)+'K'; return fmt(n); }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
