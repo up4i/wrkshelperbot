@@ -47,32 +47,62 @@ def _display_name(row) -> str:
 
 @app.get("/api/leaderboard")
 def leaderboard(tab: str = "balance", limit: int = 20):
+    _name_subquery = """
+        LEFT JOIN (
+            SELECT user_id,
+                   COALESCE(full_name, '') AS full_name,
+                   username
+            FROM user_activity
+            WHERE (user_id, last_seen) IN (
+                SELECT user_id, MAX(last_seen) FROM user_activity GROUP BY user_id
+            )
+        ) a ON a.user_id = e.user_id
+    """
+
+    def _merged_name(r) -> str:
+        username = r["a_username"] or r["e_username"]
+        full_name = r["a_full_name"] or r["e_full_name"]
+        if username:
+            return f"@{username}"
+        return full_name or f"User {r['user_id']}"
+
     with db_conn() as db:
         if tab == "balance":
             rows = db.execute(
-                "SELECT user_id, username, full_name, balance, streak "
-                "FROM economy ORDER BY balance DESC LIMIT ?", (limit,)
+                f"""SELECT e.user_id,
+                           e.username AS e_username, e.full_name AS e_full_name,
+                           a.username AS a_username, a.full_name AS a_full_name,
+                           e.balance, e.streak
+                    FROM economy e {_name_subquery}
+                    ORDER BY e.balance DESC LIMIT ?""", (limit,)
             ).fetchall()
-            return [{"rank": i + 1, "user_id": r["user_id"], "name": _display_name(r),
+            return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
                      "value": r["balance"], "streak": r["streak"]} for i, r in enumerate(rows)]
 
         if tab == "streak":
             rows = db.execute(
-                "SELECT user_id, username, full_name, balance, streak "
-                "FROM economy ORDER BY streak DESC LIMIT ?", (limit,)
+                f"""SELECT e.user_id,
+                           e.username AS e_username, e.full_name AS e_full_name,
+                           a.username AS a_username, a.full_name AS a_full_name,
+                           e.balance, e.streak
+                    FROM economy e {_name_subquery}
+                    ORDER BY e.streak DESC LIMIT ?""", (limit,)
             ).fetchall()
-            return [{"rank": i + 1, "user_id": r["user_id"], "name": _display_name(r),
+            return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
                      "value": r["streak"], "balance": r["balance"]} for i, r in enumerate(rows)]
 
         if tab == "gifts":
             rows = db.execute(
-                "SELECT e.user_id, e.username, e.full_name, e.balance, "
-                "COUNT(gi.id) AS gift_count "
-                "FROM economy e "
-                "LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id "
-                "GROUP BY e.user_id ORDER BY gift_count DESC LIMIT ?", (limit,)
+                f"""SELECT e.user_id,
+                           e.username AS e_username, e.full_name AS e_full_name,
+                           a.username AS a_username, a.full_name AS a_full_name,
+                           e.balance, COUNT(gi.id) AS gift_count
+                    FROM economy e
+                    LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id
+                    {_name_subquery}
+                    GROUP BY e.user_id ORDER BY gift_count DESC LIMIT ?""", (limit,)
             ).fetchall()
-            return [{"rank": i + 1, "user_id": r["user_id"], "name": _display_name(r),
+            return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
                      "value": r["gift_count"], "balance": r["balance"]} for i, r in enumerate(rows)]
 
         raise HTTPException(400, "tab must be balance | streak | gifts")

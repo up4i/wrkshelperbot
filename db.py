@@ -393,8 +393,8 @@ async def upsert_wallet(db_path: str, user_id: int, username: str | None, full_n
             """INSERT INTO economy (user_id, username, full_name, balance, streak, last_daily)
                VALUES (?, ?, ?, 1000, 0, 0)
                ON CONFLICT(user_id) DO UPDATE SET
-                   username = excluded.username,
-                   full_name = excluded.full_name""",
+                   username  = COALESCE(excluded.username,  economy.username),
+                   full_name = COALESCE(excluded.full_name, economy.full_name)""",
             (user_id, username, full_name),
         )
         await db.commit()
@@ -433,7 +433,9 @@ async def get_leaderboard(db_path: str, limit: int = 10) -> list[dict]:
                LEFT JOIN (
                    SELECT user_id, full_name, username
                    FROM user_activity
-                   GROUP BY user_id
+                   WHERE (user_id, last_seen) IN (
+                       SELECT user_id, MAX(last_seen) FROM user_activity GROUP BY user_id
+                   )
                ) a ON a.user_id = e.user_id
                ORDER BY e.balance DESC LIMIT ?""",
             (limit,),
