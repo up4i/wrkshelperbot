@@ -681,6 +681,7 @@
     width: 40px; height: 40px;
     object-fit: contain;
     display: block; margin: 0 auto 4px;
+    border-radius: 6px;
   }
   .market-search {
     width: 100%;
@@ -1718,8 +1719,11 @@ function buildProfileHtml(d, isOwn) {
         const isPinned = d.pinned_gift_id === g.id;
         const ownCls = isOwn ? ' own-gift' : '';
         const pinnedCls = isPinned ? ' pinned-gift' : '';
+        const bgColor = g.background
+          ? (g.background.startsWith('#') ? g.background : `#${g.background}`)
+          : 'var(--card2)';
         return `
-        <div class="gift-card${ownCls}${pinnedCls}" style="cursor:pointer" onclick="openProfileGiftModal(${g.id})">
+        <div class="gift-card${ownCls}${pinnedCls}" style="cursor:pointer;background:${bgColor}" onclick="openProfileGiftModal(${g.id})">
           ${gemHtml}
           <div class="gname">${esc(g.model_name)}</div>
           <div class="gtier ${tierColor[g.tier]||''}">${g.tier} #${g.gift_number||g.id}</div>
