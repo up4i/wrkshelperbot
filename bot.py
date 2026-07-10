@@ -50,6 +50,7 @@ from handlers.gifts import (
     cmd_inventory, cmd_gift,
     cmd_shop, cmd_buy, cmd_sell,
     cmd_offer, cmd_offers,
+    cmd_pin, pin_callback,
     gifts_callback, gift_offer_callback, shop_callback,
 )
 
@@ -156,12 +157,14 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("inventory",  cmd_inventory))
     app.add_handler(CommandHandler("inv",        cmd_inventory))
     app.add_handler(CommandHandler("gift",       cmd_gift))
+    app.add_handler(CommandHandler("pin",        cmd_pin))
     app.add_handler(CommandHandler("shop",       cmd_shop))
     app.add_handler(CommandHandler("buy",        cmd_buy))
     app.add_handler(CommandHandler("sell",       cmd_sell))
     app.add_handler(CommandHandler("offer",      cmd_offer))
     app.add_handler(CommandHandler("offers",     cmd_offers))
     app.add_handler(CallbackQueryHandler(lb_callback,      pattern=r"^lb:"))
+    app.add_handler(CallbackQueryHandler(pin_callback,     pattern=r"^pin:"))
     app.add_handler(CallbackQueryHandler(setup_callback,  pattern=r"^setup:"))
     app.add_handler(CallbackQueryHandler(dsetup_callback, pattern=r"^dsetup:"))
     app.add_handler(CallbackQueryHandler(help_callback,   pattern=r"^help:"))

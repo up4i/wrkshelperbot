@@ -812,6 +812,23 @@ async def get_gift_instance(db_path: str, instance_id: int) -> dict | None:
             return dict(row) if row else None
 
 
+async def set_pinned_gift(db_path: str, user_id: int, gift_id: int | None) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "UPDATE economy SET pinned_gift_id = ? WHERE user_id = ?", (gift_id, user_id)
+        )
+        await db.commit()
+
+
+async def get_pinned_gift_id(db_path: str, user_id: int) -> int | None:
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "SELECT pinned_gift_id FROM economy WHERE user_id = ?", (user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
+
+
 async def get_gift_instance_by_number(db_path: str, collection: str, gift_number: int) -> dict | None:
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row

@@ -174,6 +174,107 @@ async def gifts_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(card, parse_mode="HTML", reply_markup=back_kb)
 
 
+# ── /pin ─────────────────────────────────────────────────────────────────────
+
+_PIN_PER_PAGE = 10
+
+def _pin_keyboard(gifts: list[dict], page: int, user_id: int, pinned_id: int | None) -> InlineKeyboardMarkup:
+    start = page * _PIN_PER_PAGE
+    page_gifts = gifts[start:start + _PIN_PER_PAGE]
+    rows = []
+    # Two gifts per row
+    for i in range(0, len(page_gifts), 2):
+        row = []
+        for g in page_gifts[i:i + 2]:
+            col = _collection_display_name(g["collection"])
+            gn = g.get("gift_number") or g["model_number"]
+            is_pinned = g["id"] == pinned_id
+            label = f"{'📌' if is_pinned else g['model_emoji']} {col} #{gn}"
+            row.append(InlineKeyboardButton(label, callback_data=f"pin:set:{user_id}:{g['id']}"))
+        rows.append(row)
+    nav = []
+    total_pages = max(1, (len(gifts) + _PIN_PER_PAGE - 1) // _PIN_PER_PAGE)
+    if page > 0:
+        nav.append(InlineKeyboardButton("◀ Prev", callback_data=f"pin:page:{user_id}:{page - 1}"))
+    if page < total_pages - 1:
+        nav.append(InlineKeyboardButton("Next ▶", callback_data=f"pin:page:{user_id}:{page + 1}"))
+    if nav:
+        rows.append(nav)
+    if pinned_id:
+        rows.append([InlineKeyboardButton("❌ Unpin current gift", callback_data=f"pin:set:{user_id}:0")])
+    return InlineKeyboardMarkup(rows)
+
+def _pin_header(gifts: list[dict], pinned_id: int | None) -> str:
+    if pinned_id:
+        pg = next((g for g in gifts if g["id"] == pinned_id), None)
+        if pg:
+            col = _collection_display_name(pg["collection"])
+            gn = pg.get("gift_number") or pg["model_number"]
+            pinned_line = f"📌 Currently pinned: <b>{escape(col)} #{gn}</b>\n\n"
+        else:
+            pinned_line = ""
+    else:
+        pinned_line = "No gift pinned yet.\n\n"
+    return f"🎁 <b>Pin a Gift</b>\n{pinned_line}Tap a gift to pin it to your profile:"
+
+async def cmd_pin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    user = update.effective_user
+    gifts = await db.get_user_gifts(config.DB_PATH, user.id)
+    if not gifts:
+        await msg.reply_text("🎁 You don't have any gifts yet. Try /daily or /shop!")
+        return
+    pinned_id = await db.get_pinned_gift_id(config.DB_PATH, user.id)
+    kb = _pin_keyboard(gifts, page=0, user_id=user.id, pinned_id=pinned_id)
+    await msg.reply_text(_pin_header(gifts, pinned_id), parse_mode="HTML", reply_markup=kb)
+
+async def pin_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    parts = query.data.split(":")
+    action = parts[1]
+    user_id = int(parts[2])
+
+    if query.from_user.id != user_id:
+        await query.answer("This isn't your pin menu.", show_alert=True)
+        return
+
+    gifts = await db.get_user_gifts(config.DB_PATH, user_id)
+
+    if action == "page":
+        page = int(parts[3])
+        pinned_id = await db.get_pinned_gift_id(config.DB_PATH, user_id)
+        await query.answer()
+        kb = _pin_keyboard(gifts, page=page, user_id=user_id, pinned_id=pinned_id)
+        await query.edit_message_text(_pin_header(gifts, pinned_id), parse_mode="HTML", reply_markup=kb)
+
+    elif action == "set":
+        gift_id = int(parts[3])
+        current_pinned = await db.get_pinned_gift_id(config.DB_PATH, user_id)
+
+        # gift_id == 0 means unpin
+        if gift_id == 0:
+            await db.set_pinned_gift(config.DB_PATH, user_id, None)
+            await query.answer("📌 Gift unpinned.", show_alert=False)
+            new_pinned = None
+        elif gift_id == current_pinned:
+            await db.set_pinned_gift(config.DB_PATH, user_id, None)
+            await query.answer("📌 Unpinned.", show_alert=False)
+            new_pinned = None
+        else:
+            g = next((g for g in gifts if g["id"] == gift_id), None)
+            if not g:
+                await query.answer("Gift not found.", show_alert=True)
+                return
+            await db.set_pinned_gift(config.DB_PATH, user_id, gift_id)
+            col = _collection_display_name(g["collection"])
+            gn = g.get("gift_number") or g["model_number"]
+            await query.answer(f"📌 Pinned {col} #{gn}!", show_alert=False)
+            new_pinned = gift_id
+
+        kb = _pin_keyboard(gifts, page=0, user_id=user_id, pinned_id=new_pinned)
+        await query.edit_message_text(_pin_header(gifts, new_pinned), parse_mode="HTML", reply_markup=kb)
+
+
 # ── /gift <collection> <number> ───────────────────────────────────────────────
 
 async def cmd_gift(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
