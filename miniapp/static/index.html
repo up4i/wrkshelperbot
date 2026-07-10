@@ -6,6 +6,7 @@
 <title>wrk.money</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
 <style>
   :root {
     --bg: #07071a;
@@ -1148,7 +1149,7 @@
     <div class="slots-legend" id="slotsLegend">
       <div class="legend-row">
         <span class="legend-combo">7️⃣7️⃣7️⃣</span>
-        <span class="legend-label">Jackpot</span>
+        <span class="legend-label">Jackpot (7s only)</span>
         <span class="legend-mult" style="color:var(--gold)">50×</span>
       </div>
       <div class="legend-row">
@@ -1591,6 +1592,20 @@ function toggleSlotsLegend() {
   document.getElementById('slotsLegend').classList.toggle('open');
 }
 
+function fireConfetti() {
+  confetti({ particleCount: 120, spread: 80, origin: { y: 0.55 } });
+}
+
+function fireFireworks() {
+  const colors = ['#f59e0b', '#8b5cf6', '#10b981', '#ef4444', '#fff'];
+  const end = Date.now() + 2800;
+  (function frame() {
+    confetti({ particleCount: 6, angle: 60,  spread: 60, origin: { x: 0, y: 0.7 }, colors });
+    confetti({ particleCount: 6, angle: 120, spread: 60, origin: { x: 1, y: 0.7 }, colors });
+    if (Date.now() < end) requestAnimationFrame(frame);
+  })();
+}
+
 async function spinSlots() {
   if (slotsSpinning) return;
   const bet = parseInt(document.getElementById('slotBet').value);
@@ -1621,6 +1636,9 @@ async function spinSlots() {
       if (isJackpot) el.classList.add('jackpot');
       else if (isWin) el.classList.add('win');
     });
+
+    if (isJackpot) fireFireworks();
+    else if (data.result === 'three_match') fireConfetti();
 
     const resEl = document.getElementById('slotsResult');
     const labels = { jackpot: `🎰 JACKPOT! ${data.multiplier}×`, three_match: `🎉 Three of a kind! ${data.multiplier}×`, two_match: `✨ Two match! ${data.multiplier}×`, no_match: '💀 No match' };
