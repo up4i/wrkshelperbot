@@ -1028,6 +1028,31 @@
           <div class="gname">Crash</div>
           <div class="gdesc">Cash out before it crashes</div>
         </div>
+        <div class="game-card" onclick="openRoulette()">
+          <div class="gicon">🎡</div>
+          <div class="gname">Roulette</div>
+          <div class="gdesc">Red, Black, or Green — up to 14×</div>
+        </div>
+        <div class="game-card" onclick="openHighLow()">
+          <div class="gicon">🃏</div>
+          <div class="gname">High-Low</div>
+          <div class="gdesc">Chain multipliers by reading the cards</div>
+        </div>
+        <div class="game-card" onclick="openCraps()">
+          <div class="gicon">🎲</div>
+          <div class="gname">Street Craps</div>
+          <div class="gdesc">Roll your point, beat the seven</div>
+        </div>
+        <div class="game-card" onclick="openHack()">
+          <div class="gicon">🖥️</div>
+          <div class="gname">Hack</div>
+          <div class="gdesc">Crack the word, drain the wallet</div>
+        </div>
+        <div class="game-card" onclick="openRob()">
+          <div class="gicon">🔫</div>
+          <div class="gname">Rob</div>
+          <div class="gdesc">Pick a target and take the bag</div>
+        </div>
       </div>
     </div>
 
@@ -1164,6 +1189,134 @@
       <span class="icon">👤</span>Profile
     </button>
   </nav>
+</div>
+
+<!-- ROULETTE MODAL -->
+<div class="modal-bg" id="rouletteModal" onclick="closeModal('rouletteModal',event)">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('rouletteModal')">✕</button>
+    <div class="modal-title">🎡 Roulette</div>
+    <div class="result-box" id="rouletteResult"></div>
+    <div class="cf-choice" id="rouletteColors">
+      <div class="cf-btn" id="rouletteRed" onclick="setRouletteColor('red')" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.5)">🔴 Red ×2</div>
+      <div class="cf-btn" id="rouletteBlack" onclick="setRouletteColor('black')" style="background:rgba(30,30,40,.5);border-color:rgba(100,100,120,.5)">⚫ Black ×2</div>
+      <div class="cf-btn" id="rouletteGreen" onclick="setRouletteColor('green')" style="background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.5)">🟢 Green ×14</div>
+    </div>
+    <div class="card-title" style="margin-top:4px">Bet amount</div>
+    <div class="bet-presets" id="roulettePresets"></div>
+    <div class="bet-row">
+      <input class="input bet-input" id="rouletteBet" type="number" value="100" min="10">
+      <button class="btn" id="rouletteSpinBtn" onclick="spinRoulette()">SPIN</button>
+    </div>
+    <div class="balance-display">Balance: <span class="b" id="rouletteBal">—</span> WRK$</div>
+    <div class="error-msg" id="rouletteErr"></div>
+  </div>
+</div>
+
+<!-- HIGH-LOW MODAL -->
+<div class="modal-bg" id="hlModal" onclick="closeModal('hlModal',event)">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('hlModal')">✕</button>
+    <div class="modal-title">🃏 High-Low</div>
+    <div id="hlStatus" style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:8px"></div>
+    <div id="hlBetWrap">
+      <div class="card-title">Bet amount</div>
+      <div class="bet-presets" id="hlPresets"></div>
+      <div class="bet-row">
+        <input class="input bet-input" id="hlBet" type="number" value="100" min="10">
+        <button class="btn" id="hlStartBtn" onclick="startHighLow()">DEAL</button>
+      </div>
+    </div>
+    <div id="hlGameWrap" style="display:none;flex-direction:column;gap:12px;align-items:center">
+      <div style="font-size:64px;font-weight:900;letter-spacing:-2px" id="hlCard">—</div>
+      <div style="font-size:13px;color:var(--muted)">Current card</div>
+      <div style="font-size:18px;font-weight:700;color:var(--gold)">
+        Multiplier: <span id="hlMult">1.00</span>× · Potential: <span id="hlPotential">—</span> WRK$
+      </div>
+      <div class="cf-choice" style="gap:12px">
+        <button class="btn" id="hlHigherBtn" onclick="guessHighLow('higher')" style="flex:1;background:var(--green)">▲ Higher</button>
+        <button class="btn" id="hlLowerBtn" onclick="guessHighLow('lower')" style="flex:1;background:var(--red)">▼ Lower</button>
+      </div>
+      <button class="btn outline" id="hlCashoutBtn" onclick="cashoutHighLow()" style="width:100%">💰 Cash Out</button>
+    </div>
+    <div class="result-box" id="hlResult"></div>
+    <div class="balance-display">Balance: <span class="b" id="hlBal">—</span> WRK$</div>
+    <div class="error-msg" id="hlErr"></div>
+  </div>
+</div>
+
+<!-- CRAPS MODAL -->
+<div class="modal-bg" id="crapsModal" onclick="closeModal('crapsModal',event)">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('crapsModal')">✕</button>
+    <div class="modal-title">🎲 Street Craps</div>
+    <div id="crapsStatus" style="text-align:center;font-size:15px;font-weight:600;margin-bottom:4px"></div>
+    <div id="crapsBetWrap">
+      <div class="card-title">Bet amount</div>
+      <div class="bet-presets" id="crapsPresets"></div>
+      <div class="bet-row">
+        <input class="input bet-input" id="crapsBet" type="number" value="100" min="10">
+        <button class="btn" id="crapsStartBtn" onclick="startCraps()">ROLL</button>
+      </div>
+    </div>
+    <div id="crapsGameWrap" style="display:none;flex-direction:column;gap:16px;align-items:center">
+      <div style="display:flex;gap:24px;font-size:52px">
+        <span id="crapsDie1">⬜</span><span id="crapsDie2">⬜</span>
+      </div>
+      <div style="font-size:16px;font-weight:600" id="crapsTotal"></div>
+      <button class="btn" id="crapsRollBtn" onclick="rollCraps()" style="width:100%">🎲 Roll</button>
+    </div>
+    <div class="result-box" id="crapsResult"></div>
+    <div class="balance-display">Balance: <span class="b" id="crapsBal">—</span> WRK$</div>
+    <div class="error-msg" id="crapsErr"></div>
+  </div>
+</div>
+
+<!-- HACK MODAL -->
+<div class="modal-bg" id="hackModal" onclick="closeModal('hackModal',event)">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('hackModal')">✕</button>
+    <div class="modal-title">🖥️ Hack</div>
+    <div id="hackCooldown" style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:8px"></div>
+    <div id="hackStartWrap" style="text-align:center">
+      <div style="color:var(--muted);font-size:13px;margin-bottom:12px">Crack a crypto wallet seed phrase</div>
+      <button class="btn" id="hackStartBtn" onclick="startHack()" style="width:100%">🖥️ Start Hack</button>
+    </div>
+    <div id="hackGameWrap" style="display:none;flex-direction:column;gap:12px">
+      <div style="background:var(--card);border-radius:8px;padding:12px;font-size:13px;color:var(--muted)" id="hackClue"></div>
+      <div style="text-align:center;font-size:28px;letter-spacing:6px;font-family:monospace;font-weight:700" id="hackDisplay"></div>
+      <div style="text-align:center;font-size:13px;color:var(--muted)">Attempts left: <span id="hackAttempts" style="color:var(--text);font-weight:600">5</span></div>
+      <div style="text-align:center;font-size:13px;color:var(--gold)">Reward: <span id="hackReward">—</span> WRK$</div>
+      <div class="bet-row">
+        <input class="input" id="hackGuessInput" type="text" placeholder="Enter your guess…" style="flex:1">
+        <button class="btn" id="hackGuessBtn" onclick="submitHackGuess()" style="min-width:80px">GUESS</button>
+      </div>
+    </div>
+    <div class="result-box" id="hackResult"></div>
+    <div class="error-msg" id="hackErr"></div>
+  </div>
+</div>
+
+<!-- ROB MODAL -->
+<div class="modal-bg" id="robModal" onclick="closeModal('robModal',event)">
+  <div class="modal" style="position:relative;max-height:90vh;overflow-y:auto">
+    <button class="modal-close" onclick="closeModal('robModal')">✕</button>
+    <div class="modal-title">🔫 Rob</div>
+    <div id="robCooldown" style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:8px"></div>
+    <div id="robTargetWrap">
+      <div style="color:var(--muted);font-size:13px;margin-bottom:8px">Select a target:</div>
+      <div id="robTargetList" style="display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto"></div>
+    </div>
+    <div id="robConfirmWrap" style="display:none;flex-direction:column;gap:12px">
+      <div style="text-align:center;font-size:15px" id="robConfirmText"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn outline" onclick="cancelRob()" style="flex:1">Cancel</button>
+        <button class="btn" id="robAttemptBtn" onclick="attemptRob()" style="flex:1;background:var(--red)">Rob 'em</button>
+      </div>
+    </div>
+    <div class="result-box" id="robResult"></div>
+    <div class="error-msg" id="robErr"></div>
+  </div>
 </div>
 
 <!-- SLOTS MODAL -->
@@ -1615,6 +1768,397 @@ function toggleFastMode() {
   slotsFast = !slotsFast;
   localStorage.setItem('slotsFast', slotsFast ? '1' : '0');
   document.getElementById('fastBtn').classList.toggle('active', slotsFast);
+}
+
+// ── Roulette ──────────────────────────────────────────────────────────────────
+let rouletteColor = null;
+
+function openRoulette() {
+  if (!state.userId) return alert('Open in Telegram to play.');
+  rouletteColor = null;
+  ['rouletteRed','rouletteBlack','rouletteGreen'].forEach(id => document.getElementById(id).classList.remove('selected'));
+  document.getElementById('rouletteResult').className = 'result-box';
+  document.getElementById('rouletteErr').textContent = '';
+  document.getElementById('rouletteBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
+  buildPresets('roulettePresets', 'rouletteBet');
+  document.getElementById('rouletteModal').classList.add('open');
+}
+
+function setRouletteColor(c) {
+  rouletteColor = c;
+  ['rouletteRed','rouletteBlack','rouletteGreen'].forEach(id => document.getElementById(id).classList.remove('selected'));
+  document.getElementById('roulette' + c.charAt(0).toUpperCase() + c.slice(1)).classList.add('selected');
+}
+
+async function spinRoulette() {
+  if (!rouletteColor) return alert('Pick a color first.');
+  const bet = parseInt(document.getElementById('rouletteBet').value);
+  const errEl = document.getElementById('rouletteErr');
+  errEl.textContent = '';
+  document.getElementById('rouletteSpinBtn').disabled = true;
+  document.getElementById('rouletteResult').className = 'result-box';
+  try {
+    const data = await api('/api/play/roulette', { method:'POST', json:{ user_id:+state.userId, bet, color:rouletteColor } });
+    const resEl = document.getElementById('rouletteResult');
+    const colorEmoji = { red:'🔴', black:'⚫', green:'🟢' }[data.winning_color];
+    const delta = data.delta > 0 ? `+${fmt(data.delta)}` : fmt(data.delta);
+    resEl.textContent = data.won
+      ? `${colorEmoji} ${data.winning_color.toUpperCase()}! You win! ${delta} WRK$`
+      : `${colorEmoji} ${data.winning_color.toUpperCase()}. You lose. ${delta} WRK$`;
+    resEl.className = `result-box show ${data.won ? 'win-box' : 'lose-box'}`;
+    state.balance = data.new_balance;
+    document.getElementById('rouletteBal').textContent = fmt(state.balance);
+    refreshHeaderBal();
+  } catch (e) {
+    errEl.textContent = e.message || 'Error';
+  } finally {
+    document.getElementById('rouletteSpinBtn').disabled = false;
+  }
+}
+
+// ── High-Low ──────────────────────────────────────────────────────────────────
+async function openHighLow() {
+  if (!state.userId) return alert('Open in Telegram to play.');
+  document.getElementById('hlResult').className = 'result-box';
+  document.getElementById('hlErr').textContent = '';
+  document.getElementById('hlBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
+  buildPresets('hlPresets', 'hlBet');
+  document.getElementById('hlModal').classList.add('open');
+  try {
+    const status = await api(`/api/play/highlow/status/${state.userId}`);
+    if (status.active) {
+      _hlEnterGame(status.card_label, status.multiplier, status.potential_win);
+    } else {
+      _hlShowBet();
+    }
+  } catch { _hlShowBet(); }
+}
+
+function _hlShowBet() {
+  document.getElementById('hlBetWrap').style.display = '';
+  document.getElementById('hlGameWrap').style.display = 'none';
+  document.getElementById('hlStatus').textContent = '';
+  document.getElementById('hlCashoutBtn').disabled = true;
+}
+
+function _hlEnterGame(cardLabel, mult, potential) {
+  document.getElementById('hlBetWrap').style.display = 'none';
+  document.getElementById('hlGameWrap').style.display = 'flex';
+  document.getElementById('hlCard').textContent = cardLabel;
+  document.getElementById('hlMult').textContent = parseFloat(mult).toFixed(2);
+  document.getElementById('hlPotential').textContent = fmt(potential);
+  document.getElementById('hlCashoutBtn').disabled = parseFloat(mult) <= 1.0;
+}
+
+async function startHighLow() {
+  const bet = parseInt(document.getElementById('hlBet').value);
+  document.getElementById('hlErr').textContent = '';
+  document.getElementById('hlStartBtn').disabled = true;
+  try {
+    const data = await api('/api/play/highlow/start', { method:'POST', json:{ user_id:+state.userId, bet } });
+    state.balance = data.new_balance;
+    document.getElementById('hlBal').textContent = fmt(state.balance);
+    refreshHeaderBal();
+    _hlEnterGame(data.card_label, 1.0, bet);
+  } catch (e) {
+    document.getElementById('hlErr').textContent = e.message || 'Error';
+  } finally {
+    document.getElementById('hlStartBtn').disabled = false;
+  }
+}
+
+async function guessHighLow(direction) {
+  document.getElementById('hlHigherBtn').disabled = true;
+  document.getElementById('hlLowerBtn').disabled = true;
+  document.getElementById('hlErr').textContent = '';
+  try {
+    const data = await api('/api/play/highlow/guess', { method:'POST', json:{ user_id:+state.userId, direction } });
+    if (data.result === 'correct') {
+      _hlEnterGame(data.next_card_label, data.multiplier, data.potential_win);
+      document.getElementById('hlStatus').textContent = `✅ Correct! Card was ${data.next_card_label}`;
+    } else {
+      state.balance = data.new_balance;
+      document.getElementById('hlBal').textContent = fmt(state.balance);
+      refreshHeaderBal();
+      const resEl = document.getElementById('hlResult');
+      resEl.textContent = `❌ Wrong! Card was ${data.next_card_label}. Lost ${fmt(data.lost)} WRK$.`;
+      resEl.className = 'result-box show lose-box';
+      _hlShowBet();
+    }
+  } catch (e) {
+    document.getElementById('hlErr').textContent = e.message || 'Error';
+  } finally {
+    document.getElementById('hlHigherBtn').disabled = false;
+    document.getElementById('hlLowerBtn').disabled = false;
+  }
+}
+
+async function cashoutHighLow() {
+  document.getElementById('hlCashoutBtn').disabled = true;
+  try {
+    const data = await api('/api/play/highlow/cashout', { method:'POST', json:{ user_id:+state.userId } });
+    state.balance = data.new_balance;
+    document.getElementById('hlBal').textContent = fmt(state.balance);
+    refreshHeaderBal();
+    const resEl = document.getElementById('hlResult');
+    resEl.textContent = `💰 Cashed out at ${parseFloat(data.multiplier).toFixed(2)}×! +${fmt(data.winnings)} WRK$`;
+    resEl.className = 'result-box show win-box';
+    _hlShowBet();
+  } catch (e) {
+    document.getElementById('hlErr').textContent = e.message || 'Error';
+    document.getElementById('hlCashoutBtn').disabled = false;
+  }
+}
+
+// ── Street Craps ──────────────────────────────────────────────────────────────
+const _DICE_EMOJI = ['','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣'];
+
+async function openCraps() {
+  if (!state.userId) return alert('Open in Telegram to play.');
+  document.getElementById('crapsResult').className = 'result-box';
+  document.getElementById('crapsErr').textContent = '';
+  document.getElementById('crapsBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
+  buildPresets('crapsPresets', 'crapsBet');
+  document.getElementById('crapsModal').classList.add('open');
+  try {
+    const status = await api(`/api/play/craps/status/${state.userId}`);
+    if (status.active) {
+      _crapsEnterGame(status.point);
+    } else {
+      _crapsShowBet();
+    }
+  } catch { _crapsShowBet(); }
+}
+
+function _crapsShowBet() {
+  document.getElementById('crapsBetWrap').style.display = '';
+  document.getElementById('crapsGameWrap').style.display = 'none';
+  document.getElementById('crapsStatus').textContent = '';
+}
+
+function _crapsEnterGame(point) {
+  document.getElementById('crapsBetWrap').style.display = 'none';
+  document.getElementById('crapsGameWrap').style.display = 'flex';
+  document.getElementById('crapsStatus').textContent = point
+    ? `Point: ${point} — roll it again before a 7!`
+    : 'Come-out roll — hit 7 or 11 to win!';
+  document.getElementById('crapsDie1').textContent = '⬜';
+  document.getElementById('crapsDie2').textContent = '⬜';
+  document.getElementById('crapsTotal').textContent = '';
+}
+
+async function startCraps() {
+  const bet = parseInt(document.getElementById('crapsBet').value);
+  document.getElementById('crapsErr').textContent = '';
+  document.getElementById('crapsStartBtn').disabled = true;
+  try {
+    const data = await api('/api/play/craps/start', { method:'POST', json:{ user_id:+state.userId, bet } });
+    state.balance = data.new_balance;
+    document.getElementById('crapsBal').textContent = fmt(state.balance);
+    refreshHeaderBal();
+    _crapsEnterGame(null);
+  } catch (e) {
+    document.getElementById('crapsErr').textContent = e.message || 'Error';
+  } finally {
+    document.getElementById('crapsStartBtn').disabled = false;
+  }
+}
+
+async function rollCraps() {
+  document.getElementById('crapsRollBtn').disabled = true;
+  document.getElementById('crapsErr').textContent = '';
+  try {
+    const data = await api('/api/play/craps/roll', { method:'POST', json:{ user_id:+state.userId } });
+    document.getElementById('crapsDie1').textContent = _DICE_EMOJI[data.d1];
+    document.getElementById('crapsDie2').textContent = _DICE_EMOJI[data.d2];
+    document.getElementById('crapsTotal').textContent = `Total: ${data.total}`;
+    if (data.result === 'win') {
+      state.balance = data.new_balance;
+      document.getElementById('crapsBal').textContent = fmt(state.balance);
+      refreshHeaderBal();
+      const resEl = document.getElementById('crapsResult');
+      resEl.textContent = `🎉 Winner! +${fmt(data.winnings)} WRK$`;
+      resEl.className = 'result-box show win-box';
+      _crapsShowBet();
+    } else if (data.result === 'lose') {
+      state.balance = data.new_balance;
+      document.getElementById('crapsBal').textContent = fmt(state.balance);
+      refreshHeaderBal();
+      const resEl = document.getElementById('crapsResult');
+      resEl.textContent = `💀 Seven out. Lost ${fmt(data.lost)} WRK$.`;
+      resEl.className = 'result-box show lose-box';
+      _crapsShowBet();
+    } else if (data.result === 'point') {
+      document.getElementById('crapsStatus').textContent = `Point set: ${data.point} — roll it again before a 7!`;
+    } else {
+      document.getElementById('crapsStatus').textContent = `Point: ${data.point} — rolled ${data.total}, keep going!`;
+    }
+  } catch (e) {
+    document.getElementById('crapsErr').textContent = e.message || 'Error';
+  } finally {
+    document.getElementById('crapsRollBtn').disabled = false;
+  }
+}
+
+// ── Hack ──────────────────────────────────────────────────────────────────────
+async function openHack() {
+  if (!state.userId) return alert('Open in Telegram to play.');
+  document.getElementById('hackResult').className = 'result-box';
+  document.getElementById('hackErr').textContent = '';
+  document.getElementById('hackModal').classList.add('open');
+  try {
+    const status = await api(`/api/hack/status/${state.userId}`);
+    if (status.active) {
+      _hackEnterGame(status.display, status.clue, status.attempts, status.reward);
+    } else if (status.cooldown_remaining > 0) {
+      document.getElementById('hackStartWrap').style.display = 'block';
+      document.getElementById('hackGameWrap').style.display = 'none';
+      document.getElementById('hackStartBtn').disabled = true;
+      const m = Math.floor(status.cooldown_remaining / 60), s = status.cooldown_remaining % 60;
+      document.getElementById('hackCooldown').textContent = `⏳ Cooldown: ${m}m ${s}s`;
+    } else {
+      document.getElementById('hackStartWrap').style.display = 'block';
+      document.getElementById('hackGameWrap').style.display = 'none';
+      document.getElementById('hackStartBtn').disabled = false;
+      document.getElementById('hackCooldown').textContent = '';
+    }
+  } catch (e) {
+    document.getElementById('hackErr').textContent = e.message || 'Error loading status';
+  }
+}
+
+function _hackEnterGame(display, clue, attempts, reward) {
+  document.getElementById('hackStartWrap').style.display = 'none';
+  document.getElementById('hackGameWrap').style.display = 'flex';
+  document.getElementById('hackDisplay').textContent = display;
+  document.getElementById('hackClue').textContent = `Clue: ${clue}`;
+  document.getElementById('hackAttempts').textContent = attempts;
+  document.getElementById('hackReward').textContent = fmt(reward);
+  document.getElementById('hackGuessInput').value = '';
+}
+
+async function startHack() {
+  document.getElementById('hackStartBtn').disabled = true;
+  document.getElementById('hackErr').textContent = '';
+  try {
+    const data = await api('/api/hack/start', { method:'POST', json:{ user_id:+state.userId } });
+    _hackEnterGame(data.display, data.clue, data.attempts, data.reward);
+  } catch (e) {
+    document.getElementById('hackErr').textContent = e.message || 'Error';
+    document.getElementById('hackStartBtn').disabled = false;
+  }
+}
+
+async function submitHackGuess() {
+  const word = document.getElementById('hackGuessInput').value.trim();
+  if (!word) return;
+  document.getElementById('hackGuessBtn').disabled = true;
+  document.getElementById('hackErr').textContent = '';
+  try {
+    const data = await api('/api/hack/guess', { method:'POST', json:{ user_id:+state.userId, word } });
+    if (data.result === 'win') {
+      state.balance = data.new_balance;
+      refreshHeaderBal();
+      const resEl = document.getElementById('hackResult');
+      resEl.textContent = `✅ ACCESS GRANTED — "${data.word}" +${fmt(data.reward)} WRK$`;
+      resEl.className = 'result-box show win-box';
+      document.getElementById('hackGameWrap').style.display = 'none';
+      document.getElementById('hackStartWrap').style.display = 'block';
+      document.getElementById('hackStartBtn').disabled = true;
+      document.getElementById('hackCooldown').textContent = '⏳ Cooldown: 60m';
+    } else if (data.result === 'lose') {
+      const resEl = document.getElementById('hackResult');
+      resEl.textContent = `❌ CONNECTION TERMINATED — the word was "${data.word}"`;
+      resEl.className = 'result-box show lose-box';
+      document.getElementById('hackGameWrap').style.display = 'none';
+      document.getElementById('hackStartWrap').style.display = 'block';
+      document.getElementById('hackStartBtn').disabled = true;
+      document.getElementById('hackCooldown').textContent = '⏳ Cooldown: 60m';
+    } else {
+      document.getElementById('hackDisplay').textContent = data.display;
+      document.getElementById('hackAttempts').textContent = data.attempts_left;
+      document.getElementById('hackGuessInput').value = '';
+    }
+  } catch (e) {
+    document.getElementById('hackErr').textContent = e.message || 'Error';
+  } finally {
+    document.getElementById('hackGuessBtn').disabled = false;
+  }
+}
+
+// ── Rob ───────────────────────────────────────────────────────────────────────
+let robTargetId = null;
+let robTargetName = null;
+
+async function openRob() {
+  if (!state.userId) return alert('Open in Telegram to play.');
+  robTargetId = null;
+  document.getElementById('robResult').className = 'result-box';
+  document.getElementById('robErr').textContent = '';
+  document.getElementById('robTargetWrap').style.display = '';
+  document.getElementById('robConfirmWrap').style.display = 'none';
+  document.getElementById('robModal').classList.add('open');
+  try {
+    const cd = await api(`/api/rob/cooldown/${state.userId}`);
+    if (cd.cooldown_remaining > 0) {
+      const m = Math.floor(cd.cooldown_remaining / 60), s = cd.cooldown_remaining % 60;
+      document.getElementById('robCooldown').textContent = `⏳ Cooldown: ${m}m ${s}s`;
+      document.getElementById('robTargetList').innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center">On cooldown — come back later.</div>';
+      return;
+    }
+    document.getElementById('robCooldown').textContent = '';
+  } catch { }
+  try {
+    const targets = await api(`/api/rob/targets?user_id=${state.userId}`);
+    const list = document.getElementById('robTargetList');
+    if (!targets.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center">No targets with enough WRK$.</div>';
+      return;
+    }
+    list.innerHTML = targets.map(t =>
+      `<div class="card" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 14px"
+           onclick="selectRobTarget(${t.user_id}, ${JSON.stringify(t.name)})">
+        <span>${t.name}</span>
+        <span style="color:var(--gold);font-size:13px;font-weight:600">${fmt(t.balance)} WRK$</span>
+      </div>`
+    ).join('');
+  } catch (e) {
+    document.getElementById('robErr').textContent = e.message || 'Error loading targets';
+  }
+}
+
+function selectRobTarget(userId, name) {
+  robTargetId = userId;
+  robTargetName = name;
+  document.getElementById('robTargetWrap').style.display = 'none';
+  document.getElementById('robConfirmWrap').style.display = 'flex';
+  document.getElementById('robConfirmText').textContent = `Rob ${name}?`;
+}
+
+function cancelRob() {
+  robTargetId = null;
+  document.getElementById('robConfirmWrap').style.display = 'none';
+  document.getElementById('robTargetWrap').style.display = '';
+}
+
+async function attemptRob() {
+  if (!robTargetId) return;
+  document.getElementById('robAttemptBtn').disabled = true;
+  document.getElementById('robErr').textContent = '';
+  try {
+    const data = await api('/api/rob/attempt', { method:'POST', json:{ user_id:+state.userId, target_id:robTargetId } });
+    state.balance = data.new_balance;
+    refreshHeaderBal();
+    const resEl = document.getElementById('robResult');
+    resEl.textContent = `${data.emoji} ${data.flavor}`;
+    resEl.className = `result-box show ${data.outcome === 'success' ? 'win-box' : 'lose-box'}`;
+    document.getElementById('robConfirmWrap').style.display = 'none';
+    document.getElementById('robTargetWrap').style.display = '';
+    document.getElementById('robTargetList').innerHTML = `<div style="color:var(--muted);font-size:13px;text-align:center">Balance: ${fmt(data.new_balance)} WRK$</div>`;
+  } catch (e) {
+    document.getElementById('robErr').textContent = e.message || 'Error';
+    document.getElementById('robAttemptBtn').disabled = false;
+  }
 }
 
 function openSlots() {
