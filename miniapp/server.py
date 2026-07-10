@@ -139,11 +139,24 @@ def leaderboard(tab: str = "balance", limit: int = 20):
 
 def _load_profile(db, user_id: int) -> dict:
     row = db.execute(
-        "SELECT user_id, username, full_name, balance, streak, last_daily, pinned_gift_id "
-        "FROM economy WHERE user_id = ?", (user_id,)
+        """SELECT e.user_id,
+                  e.username  AS e_username,  e.full_name  AS e_full_name,
+                  a.username  AS a_username,  a.full_name  AS a_full_name,
+                  e.balance, e.streak, e.last_daily, e.pinned_gift_id
+           FROM economy e
+           LEFT JOIN (
+               SELECT user_id, username, full_name FROM user_activity
+               WHERE (user_id, last_seen) IN (
+                   SELECT user_id, MAX(last_seen) FROM user_activity GROUP BY user_id
+               )
+           ) a ON a.user_id = e.user_id
+           WHERE e.user_id = ?""", (user_id,)
     ).fetchone()
     if not row:
         raise HTTPException(404, "User not found")
+    username  = row["a_username"]  or row["e_username"]
+    full_name = row["a_full_name"] or row["e_full_name"]
+    display   = f"@{username}" if username else (full_name or f"User {user_id}")
 
     gifts = db.execute(
         "SELECT gi.id, gi.gift_number, gi.background, gi.acquired_at, "
@@ -180,8 +193,8 @@ def _load_profile(db, user_id: int) -> dict:
 
     return {
         "user_id": row["user_id"],
-        "name": _display_name(row),
-        "username": row["username"],
+        "name": display,
+        "username": username,
         "balance": row["balance"],
         "streak": row["streak"],
         "last_daily": row["last_daily"],
@@ -206,8 +219,13 @@ def profile_by_username(username: str):
     username = username.lstrip("@")
     with db_conn() as db:
         row = db.execute(
-            "SELECT user_id FROM economy WHERE username = ?", (username,)
+            "SELECT user_id FROM economy WHERE LOWER(username) = LOWER(?)", (username,)
         ).fetchone()
+        if not row:
+            row = db.execute(
+                "SELECT user_id FROM user_activity WHERE LOWER(username) = LOWER(?) "
+                "ORDER BY last_seen DESC LIMIT 1", (username,)
+            ).fetchone()
         if not row:
             raise HTTPException(404, "Username not found")
         return _load_profile(db, row["user_id"])
@@ -1069,7 +1087,20 @@ async def _startup():
             db.execute("ALTER TABLE economy ADD COLUMN pinned_gift_id INTEGER")
             db.commit()
         except Exception:
-            pass  # column already exists
+            pass
+        db.execute("""CREATE TABLE IF NOT EXISTS game_stats (
+            user_id         INTEGER PRIMARY KEY,
+            slots_won       INTEGER NOT NULL DEFAULT 0,
+            slots_lost      INTEGER NOT NULL DEFAULT 0,
+            coinflip_won    INTEGER NOT NULL DEFAULT 0,
+            coinflip_lost   INTEGER NOT NULL DEFAULT 0,
+            blackjack_won   INTEGER NOT NULL DEFAULT 0,
+            blackjack_lost  INTEGER NOT NULL DEFAULT 0,
+            crash_won       INTEGER NOT NULL DEFAULT 0,
+            crash_lost      INTEGER NOT NULL DEFAULT 0,
+            crash_best_mult REAL    NOT NULL DEFAULT 0
+        )""")
+        db.commit()
 
 
 @app.websocket("/ws/crash")

@@ -1402,12 +1402,19 @@ function _pinnedBadgeHtml(pg) {
   const imgHtml = pg.custom_emoji_id
     ? `<img src="/emoji/${pg.custom_emoji_id}" alt="" onerror="this.outerHTML='${esc(pg.model_emoji||'🎁')}'"><span>#${pg.gift_number}</span>`
     : `<span>${esc(pg.model_emoji||'🎁')}</span><span>#${pg.gift_number}</span>`;
-  return `<span class="pin-badge" title="${esc(pg.model_name)} #${pg.gift_number}">📌 ${imgHtml}</span>`;
+  return `<span class="pin-badge" title="${esc(pg.model_name)} #${pg.gift_number}" style="cursor:pointer" onclick="openProfileGiftModal(${pg.id})">📌 ${imgHtml}</span>`;
 }
 
 function buildProfileHtml(d, isOwn) {
   const initials = d.name.replace(/^@/,'').slice(0,2).toUpperCase();
   const tierColor = { common:'', uncommon:'', rare:'rare', epic:'epic', legendary:'legendary' };
+
+  // store gift data for detail modal
+  window._profileGifts = {};
+  window._profileIsOwn = isOwn;
+  window._profilePinnedId = d.pinned_gift_id || null;
+  d.gifts.forEach(g => { window._profileGifts[g.id] = g; });
+  if (d.pinned_gift) window._profileGifts[d.pinned_gift.id] = d.pinned_gift;
 
   const giftHtml = d.gifts.length
     ? d.gifts.map(g => {
@@ -1417,9 +1424,8 @@ function buildProfileHtml(d, isOwn) {
         const isPinned = d.pinned_gift_id === g.id;
         const ownCls = isOwn ? ' own-gift' : '';
         const pinnedCls = isPinned ? ' pinned-gift' : '';
-        const tapAttr = isOwn ? `onclick="showPinSheet(${g.id},${isPinned})"` : '';
         return `
-        <div class="gift-card${ownCls}${pinnedCls}" ${tapAttr}>
+        <div class="gift-card${ownCls}${pinnedCls}" style="cursor:pointer" onclick="openProfileGiftModal(${g.id})">
           ${gemHtml}
           <div class="gname">${esc(g.model_name)}</div>
           <div class="gtier ${tierColor[g.tier]||''}">${g.tier} #${g.gift_number||g.id}</div>
@@ -2102,6 +2108,9 @@ function openGiftCard(idx) {
   `;
 
   const buyBtn = document.getElementById('giftDetailBuyBtn');
+  buyBtn.style.display = '';
+  buyBtn.className = 'btn green-btn';
+  buyBtn.style.cssText = 'width:100%;padding:14px;font-size:16px;font-weight:800';
   buyBtn.disabled = false;
   buyBtn.textContent = 'Buy Now';
   buyBtn.onclick = () => executeGiftDetailBuy(buyBtn);
@@ -2113,6 +2122,63 @@ function closeGiftDetail() {
   if (_gdLottie) { _gdLottie.destroy(); _gdLottie = null; }
   document.getElementById('giftDetailModal').classList.remove('open');
   _gdCurrent = null;
+}
+
+function openProfileGiftModal(giftId) {
+  const g = (window._profileGifts || {})[giftId];
+  if (!g) return;
+  if (_gdLottie) { _gdLottie.destroy(); _gdLottie = null; }
+  _gdCurrent = null;
+
+  const bg = BG_HEX[g.background] || '#161717';
+  const hero = document.getElementById('giftDetailHero');
+  hero.style.background = bg;
+
+  const emojiEl = document.getElementById('giftDetailEmoji');
+  emojiEl.innerHTML = '';
+  if (g.custom_emoji_id) {
+    const wrap = document.createElement('div');
+    wrap.className = 'gift-lottie-wrap';
+    emojiEl.appendChild(wrap);
+    fetch(`/emoji-anim/${g.custom_emoji_id}`)
+      .then(r => { if (!r.ok) throw new Error('static'); return r.json(); })
+      .then(animData => {
+        _gdLottie = lottie.loadAnimation({ container: wrap, renderer: 'svg', loop: true, autoplay: true, animationData: animData });
+      })
+      .catch(() => {
+        emojiEl.innerHTML = `<img src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<span>🎁</span>'">`;
+      });
+  } else {
+    emojiEl.textContent = g.model_emoji || '🎁';
+  }
+
+  document.getElementById('giftDetailTitle').textContent = `${g.model_name} #${g.gift_number || g.id}`;
+  document.getElementById('giftDetailRows').innerHTML = `
+    <div class="gift-detail-row"><span class="lbl">Collection</span><span class="val">${esc(fmtCollection(g.collection || g.model_name))}</span></div>
+    <div class="gift-detail-row"><span class="lbl">Background</span><span class="val">${esc(BG_LABEL[g.background] || g.background || '—')}</span></div>
+    <div class="gift-detail-row"><span class="lbl">Tier</span><span class="val">${esc(g.tier || '—')}</span></div>
+    <div class="gift-detail-row"><span class="lbl">Gift #</span><span class="val">#${g.gift_number || g.id}</span></div>
+  `;
+
+  const buyBtn = document.getElementById('giftDetailBuyBtn');
+  const isOwn = window._profileIsOwn;
+  if (isOwn) {
+    const isPinned = g.id === window._profilePinnedId;
+    buyBtn.style.display = '';
+    buyBtn.className = 'btn outline';
+    buyBtn.style.cssText = 'width:100%;padding:14px;font-size:16px;font-weight:800';
+    buyBtn.disabled = false;
+    buyBtn.textContent = isPinned ? '📌 Unpin from profile' : '📌 Pin to profile';
+    buyBtn.onclick = async () => {
+      buyBtn.disabled = true;
+      await setPinnedGift(isPinned ? null : g.id);
+      closeGiftDetail();
+    };
+  } else {
+    buyBtn.style.display = 'none';
+  }
+
+  document.getElementById('giftDetailModal').classList.add('open');
 }
 
 async function executeGiftDetailBuy(btn) {
