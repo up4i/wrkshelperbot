@@ -105,7 +105,33 @@ def leaderboard(tab: str = "balance", limit: int = 20):
             return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
                      "value": r["gift_count"], "balance": r["balance"]} for i, r in enumerate(rows)]
 
-        raise HTTPException(400, "tab must be balance | streak | gifts")
+        # ── Game stat tabs ────────────────────────────────────────────────────
+        _gs_col = {
+            "gamble_won":  "gs.slots_won + gs.coinflip_won + gs.blackjack_won + gs.crash_won",
+            "gamble_lost": "gs.slots_lost + gs.coinflip_lost + gs.blackjack_lost + gs.crash_lost",
+            "slots":       "gs.slots_won",
+            "coinflip":    "gs.coinflip_won",
+            "blackjack":   "gs.blackjack_won",
+            "crash":       "gs.crash_won",
+            "crash_mult":  "gs.crash_best_mult",
+        }
+        if tab not in _gs_col:
+            raise HTTPException(400, "unknown tab")
+
+        col = _gs_col[tab]
+        rows = db.execute(
+            f"""SELECT e.user_id,
+                       e.username AS e_username, e.full_name AS e_full_name,
+                       a.username AS a_username, a.full_name AS a_full_name,
+                       ({col}) AS value
+                FROM game_stats gs
+                JOIN economy e ON e.user_id = gs.user_id
+                {_name_subquery.replace('ON a.user_id = e.user_id', 'ON a.user_id = gs.user_id')}
+                WHERE ({col}) > 0
+                ORDER BY ({col}) DESC LIMIT ?""", (limit,)
+        ).fetchall()
+        return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
+                 "value": r["value"]} for i, r in enumerate(rows)]
 
 
 # ── Profile ───────────────────────────────────────────────────────────────────

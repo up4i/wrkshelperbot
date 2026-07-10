@@ -107,6 +107,18 @@ CREATE TABLE IF NOT EXISTS work_sessions (
     job_tier_index  INTEGER NOT NULL DEFAULT 0,
     tap_count_start INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS game_stats (
+    user_id         INTEGER PRIMARY KEY,
+    slots_won       INTEGER NOT NULL DEFAULT 0,
+    slots_lost      INTEGER NOT NULL DEFAULT 0,
+    coinflip_won    INTEGER NOT NULL DEFAULT 0,
+    coinflip_lost   INTEGER NOT NULL DEFAULT 0,
+    blackjack_won   INTEGER NOT NULL DEFAULT 0,
+    blackjack_lost  INTEGER NOT NULL DEFAULT 0,
+    crash_won       INTEGER NOT NULL DEFAULT 0,
+    crash_lost      INTEGER NOT NULL DEFAULT 0,
+    crash_best_mult REAL    NOT NULL DEFAULT 0
+);
 """
 
 async def _migrate(db) -> None:
@@ -420,6 +432,42 @@ async def update_balance(db_path: str, user_id: int, delta: int) -> int | None:
             row = await cur.fetchone()
         await db.commit()
         return row[0] if row else None
+
+
+async def record_game_stats(
+    db_path: str,
+    user_id: int,
+    *,
+    slots_won: int = 0,
+    slots_lost: int = 0,
+    coinflip_won: int = 0,
+    coinflip_lost: int = 0,
+    blackjack_won: int = 0,
+    blackjack_lost: int = 0,
+    crash_won: int = 0,
+    crash_lost: int = 0,
+    crash_mult: float = 0.0,
+) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            """INSERT INTO game_stats
+               (user_id, slots_won, slots_lost, coinflip_won, coinflip_lost,
+                blackjack_won, blackjack_lost, crash_won, crash_lost, crash_best_mult)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(user_id) DO UPDATE SET
+                   slots_won       = slots_won       + excluded.slots_won,
+                   slots_lost      = slots_lost      + excluded.slots_lost,
+                   coinflip_won    = coinflip_won    + excluded.coinflip_won,
+                   coinflip_lost   = coinflip_lost   + excluded.coinflip_lost,
+                   blackjack_won   = blackjack_won   + excluded.blackjack_won,
+                   blackjack_lost  = blackjack_lost  + excluded.blackjack_lost,
+                   crash_won       = crash_won       + excluded.crash_won,
+                   crash_lost      = crash_lost      + excluded.crash_lost,
+                   crash_best_mult = MAX(crash_best_mult, excluded.crash_best_mult)""",
+            (user_id, slots_won, slots_lost, coinflip_won, coinflip_lost,
+             blackjack_won, blackjack_lost, crash_won, crash_lost, crash_mult),
+        )
+        await db.commit()
 
 
 async def get_leaderboard(db_path: str, limit: int = 10) -> list[dict]:

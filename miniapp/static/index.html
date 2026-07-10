@@ -225,10 +225,11 @@
   .gift-card .gtier.legendary { color: var(--gold); }
 
   /* ── Leaderboard ── */
-  .tab-row { display: flex; gap: 6px; margin-bottom: 12px; }
+  .tab-row { display: flex; gap: 6px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .tab-row::-webkit-scrollbar { display: none; }
   .tab-btn {
-    flex: 1;
-    padding: 8px;
+    flex-shrink: 0;
+    padding: 8px 12px;
     background: var(--card2);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -238,6 +239,7 @@
     cursor: pointer;
     text-align: center;
     transition: all .15s;
+    white-space: nowrap;
   }
   .tab-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
@@ -274,6 +276,7 @@
   .lb-value.gold { color: var(--gold); }
   .lb-value.green { color: var(--green); }
   .lb-value.purple { color: var(--primary); }
+  .lb-value.red { color: var(--red); }
 
   /* ── Games grid ── */
   .games-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -952,10 +955,17 @@
         <div class="section-title">Leaderboard</div>
         <div class="section-sub">Top players in the server</div>
       </div>
-      <div class="tab-row">
+      <div class="tab-row" id="lbTabRow">
         <div class="tab-btn active" onclick="setLbTab('balance',this)">💰 Balance</div>
         <div class="tab-btn" onclick="setLbTab('streak',this)">🔥 Streak</div>
         <div class="tab-btn" onclick="setLbTab('gifts',this)">🎁 Gifts</div>
+        <div class="tab-btn" onclick="setLbTab('gamble_won',this)">🤑 Gamble Won</div>
+        <div class="tab-btn" onclick="setLbTab('gamble_lost',this)">💀 Gamble Lost</div>
+        <div class="tab-btn" onclick="setLbTab('slots',this)">🎰 Slots</div>
+        <div class="tab-btn" onclick="setLbTab('coinflip',this)">🪙 Coinflip</div>
+        <div class="tab-btn" onclick="setLbTab('blackjack',this)">🃏 Blackjack</div>
+        <div class="tab-btn" onclick="setLbTab('crash',this)">🚀 Crash</div>
+        <div class="tab-btn" onclick="setLbTab('crash_mult',this)">📈 Best ×</div>
       </div>
       <div class="lb-list" id="lbList"><div class="loading">Loading...</div></div>
     </div>
@@ -1234,6 +1244,19 @@ function setUser(id) {
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────
+const LB_META = {
+  balance:     { fmt: v => `${fmtK(v)} WRK$`,   color: 'gold',   sub: r => r.streak ? `🔥 ${r.streak}d streak` : '' },
+  streak:      { fmt: v => `${v}d`,              color: 'green',  sub: r => `${fmtK(r.balance)} WRK$` },
+  gifts:       { fmt: v => `${v} gifts`,         color: 'purple', sub: r => `${fmtK(r.balance)} WRK$` },
+  gamble_won:  { fmt: v => `+${fmtK(v)} WRK$`,  color: 'green',  sub: () => '' },
+  gamble_lost: { fmt: v => `-${fmtK(v)} WRK$`,  color: 'red',    sub: () => '' },
+  slots:       { fmt: v => `+${fmtK(v)} WRK$`,  color: 'gold',   sub: () => '' },
+  coinflip:    { fmt: v => `+${fmtK(v)} WRK$`,  color: 'gold',   sub: () => '' },
+  blackjack:   { fmt: v => `+${fmtK(v)} WRK$`,  color: 'gold',   sub: () => '' },
+  crash:       { fmt: v => `+${fmtK(v)} WRK$`,  color: 'gold',   sub: () => '' },
+  crash_mult:  { fmt: v => `${Number(v).toFixed(2)}×`, color: 'purple', sub: () => '' },
+};
+
 async function loadLeaderboard(tab) {
   state.lbTab = tab;
   const list = document.getElementById('lbList');
@@ -1242,14 +1265,14 @@ async function loadLeaderboard(tab) {
     const rows = await api(`/api/leaderboard?tab=${tab}&limit=20`);
     const medals = ['🥇','🥈','🥉'];
     const rankClass = ['top1','top2','top3'];
-    const valueLabel = { balance: 'WRK$', streak: 'day streak', gifts: 'gifts' };
-    const valueColor = { balance: 'gold', streak: 'green', gifts: 'purple' };
+    const meta = LB_META[tab] || LB_META.balance;
+    if (!rows.length) { list.innerHTML = '<div class="empty">No data yet — play some games!</div>'; return; }
     list.innerHTML = rows.map(r => {
       const medal = r.rank <= 3 ? medals[r.rank-1] : `#${r.rank}`;
       const cls = r.rank <= 3 ? rankClass[r.rank-1] : '';
       const initials = r.name.replace(/^@/,'').slice(0,2).toUpperCase();
-      const val = tab === 'balance' ? `${fmtK(r.value)} WRK$` : tab === 'streak' ? `${r.value}d` : `${r.value}`;
-      const sub = tab !== 'balance' ? `${fmtK(r.balance)} WRK$` : r.streak ? `🔥 ${r.streak}d streak` : '';
+      const val = meta.fmt(r.value);
+      const sub = meta.sub(r);
       return `<div class="lb-row ${cls}" onclick="viewUser(${r.user_id})">
         <div class="lb-rank">${medal}</div>
         <div class="lb-avatar">${initials}</div>
@@ -1257,7 +1280,7 @@ async function loadLeaderboard(tab) {
           <div class="lb-name">${esc(r.name)}</div>
           ${sub ? `<div class="lb-sub">${sub}</div>` : ''}
         </div>
-        <div class="lb-value ${valueColor[tab]}">${val}</div>
+        <div class="lb-value ${meta.color}">${val}</div>
       </div>`;
     }).join('');
   } catch(e) {

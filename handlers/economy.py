@@ -856,10 +856,12 @@ async def cmd_slots(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if outcome == "no_match":
         new_bal = await db.update_balance(config.DB_PATH, user.id, -bet)
+        await db.record_game_stats(config.DB_PATH, user.id, slots_lost=bet)
         await msg.reply_text(f"🎰 {display}\n\nNo match. Lost {bet:,} WRK$.\n💰 {new_bal:,} WRK$")
     else:
         winnings = bet * mult - bet
         new_bal = await db.update_balance(config.DB_PATH, user.id, winnings)
+        await db.record_game_stats(config.DB_PATH, user.id, slots_won=winnings)
         label = {"jackpot": "🎉 JACKPOT!", "three_match": "Three of a kind!", "two_match": "Two of a kind!"}[outcome]
         await msg.reply_text(
             f"🎰 {display}\n\n{label} {mult}x → +{winnings:,} WRK$\n💰 {new_bal:,} WRK$"
@@ -898,12 +900,14 @@ async def cmd_coinflip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     pick_line = f"You picked {pick}. " if pick else ""
     if won:
         new_bal = await db.update_balance(config.DB_PATH, user.id, bet)
+        await db.record_game_stats(config.DB_PATH, user.id, coinflip_won=bet)
         await msg.reply_text(
             f"🪙 **{result.capitalize()}**\n\n{pick_line}You won! +{bet:,} WRK$\n💰 {new_bal:,} WRK$",
             parse_mode="Markdown"
         )
     else:
         new_bal = await db.update_balance(config.DB_PATH, user.id, -bet)
+        await db.record_game_stats(config.DB_PATH, user.id, coinflip_lost=bet)
         await msg.reply_text(
             f"🪙 **{result.capitalize()}**\n\n{pick_line}You lost! -{bet:,} WRK$\n💰 {new_bal:,} WRK$",
             parse_mode="Markdown"
@@ -1033,6 +1037,10 @@ async def _bj_resolve(query, game: dict, user_id: int, wallet: dict):
         result_lines = [result_lines[0].replace("Hand 1: ", "")]
 
     new_bal = await db.update_balance(config.DB_PATH, user_id, total_delta)
+    if total_delta > 0:
+        await db.record_game_stats(config.DB_PATH, user_id, blackjack_won=total_delta)
+    elif total_delta < 0:
+        await db.record_game_stats(config.DB_PATH, user_id, blackjack_lost=-total_delta)
     result_text = "\n".join(result_lines)
     if len(game["hands"]) > 1:
         sign = "+" if total_delta > 0 else ""
@@ -1083,6 +1091,7 @@ async def cmd_blackjack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         del _bj_games[user.id]
         winnings = int(bet * 1.5)
         new_bal = await db.update_balance(config.DB_PATH, user.id, winnings)
+        await db.record_game_stats(config.DB_PATH, user.id, blackjack_won=winnings)
         await msg.reply_text(
             f"{_bj_render([player], dealer, hide_dealer=False)}\n\n"
             f"🎉 Blackjack! +{winnings:,} WRK$\n💰 {new_bal:,} WRK$",
@@ -1361,7 +1370,9 @@ async def cmd_cashout(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     player["cashed_out"] = True
     player["cash_out_mult"] = mult
 
+    profit = winnings - player["bet"]
     new_bal = await db.update_balance(config.DB_PATH, user.id, winnings)
+    await db.record_game_stats(config.DB_PATH, user.id, crash_won=profit, crash_mult=mult)
     await msg.reply_text(
         f"💰 Cashed out @ {mult}x! +{winnings:,} WRK$\n"
         f"Balance: {new_bal:,} WRK$"
@@ -1377,6 +1388,7 @@ async def _crash_end(bot, chat_id: int, game: dict, crashed_at: float):
             lines.append(f"✅ {escape(p['name'])} — cashed @ {p['cash_out_mult']}x (+{profit:,} WRK$)")
         else:
             lines.append(f"💀 {escape(p['name'])} — lost {p['bet']:,} WRK$")
+            await db.record_game_stats(config.DB_PATH, uid, crash_lost=p["bet"])
 
     try:
         await bot.edit_message_text(
