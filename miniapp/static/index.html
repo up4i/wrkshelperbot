@@ -183,17 +183,15 @@
   .avatar {
     width: 64px; height: 64px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary), #06b6d4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 26px;
-    font-weight: 700;
     margin: 0 auto 12px;
-    color: #fff;
-    object-fit: cover;
     flex-shrink: 0;
   }
+  div.avatar {
+    background: linear-gradient(135deg, var(--primary), #06b6d4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: 700; color: #fff;
+  }
+  img.avatar { object-fit: cover; display: block; }
   .header-avatar {
     width: 30px; height: 30px;
     border-radius: 50%;
@@ -295,15 +293,14 @@
   .lb-avatar {
     width: 36px; height: 36px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary), #06b6d4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: 700;
-    color: #fff;
     flex-shrink: 0;
   }
+  div.lb-avatar {
+    background: linear-gradient(135deg, var(--primary), #06b6d4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: #fff;
+  }
+  img.lb-avatar { object-fit: cover; display: block; }
   .lb-info { flex: 1; min-width: 0; }
   .lb-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .lb-sub { font-size: 11px; color: var(--muted); }
@@ -1414,7 +1411,7 @@ async function loadLeaderboard(tab) {
       const sub = meta.sub(r);
       return `<div class="lb-row ${cls}" onclick="viewUser(${r.user_id})">
         <div class="lb-rank">${medal}</div>
-        <div class="lb-avatar">${initials}</div>
+        <img class="lb-avatar" src="/api/avatar/${r.user_id}" alt="${initials}" onerror="avatarError(this,'${initials}')">
         <div class="lb-info">
           <div class="lb-name">${esc(r.name)}</div>
           ${sub ? `<div class="lb-sub">${sub}</div>` : ''}
@@ -1506,7 +1503,7 @@ function _pinnedBadgeHtml(pg) {
 
 function buildProfileHtml(d, isOwn) {
   const initials = d.name.replace(/^@/,'').slice(0,2).toUpperCase();
-  const avatarHtml = `<img class="avatar" src="/api/avatar/${d.user_id}" alt="${initials}" onerror="this.outerHTML='<div class=\\"avatar\\">${initials}</div>'">`;
+  const avatarHtml = `<img class="avatar" src="/api/avatar/${d.user_id}" alt="${initials}" onerror="avatarError(this,'${initials}')">`;
   const tierColor = { common:'', uncommon:'', rare:'rare', epic:'epic', legendary:'legendary' };
 
   // store gift data for detail modal
@@ -1605,6 +1602,13 @@ function resetSlotsUI() {
   ['r0','r1','r2'].forEach(id => { const el = document.getElementById(id); el.className='reel'; el.textContent='❓'; });
   document.getElementById('slotsResult').className='result-box';
   document.getElementById('slotsErr').textContent='';
+}
+
+function avatarError(el, initials) {
+  const d = document.createElement('div');
+  d.className = el.className;
+  d.textContent = initials;
+  el.replaceWith(d);
 }
 
 function toggleSlotsLegend() {
