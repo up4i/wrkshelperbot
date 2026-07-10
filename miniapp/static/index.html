@@ -589,6 +589,46 @@
   }
   .market-buy-btn:active { background: rgba(255,255,255,.32); }
   .market-load-more { width: 100%; grid-column: 1/-1; }
+  .market-search {
+    width: 100%;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  .market-search:focus { border-color: var(--primary); }
+  .market-search::placeholder { color: var(--muted); }
+  .bg-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .bg-pill {
+    padding: 5px 11px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255,255,255,.8);
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color .12s, opacity .12s;
+    opacity: .65;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bg-pill.active { border-color: #fff; opacity: 1; }
+  .collection-select {
+    width: 100%;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+  }
+  .collection-select option { background: var(--surface); }
 
   /* ── Crash ── */
   .crash-history {
@@ -866,10 +906,27 @@
         <div class="section-title">Market</div>
         <div class="section-sub">Buy gifts from the bank</div>
       </div>
+      <!-- Tier tabs -->
       <div class="tab-row" id="marketTabs">
         <div class="tab-btn active" onclick="setMarketTier('low',this)">Low</div>
         <div class="tab-btn" onclick="setMarketTier('mid',this)">Mid</div>
         <div class="tab-btn" onclick="setMarketTier('high',this)">High</div>
+      </div>
+      <!-- Search -->
+      <input class="market-search" id="marketSearch" placeholder="Search gifts or collections…" oninput="onMarketSearch(this.value)">
+      <!-- Collection filter -->
+      <select class="collection-select" id="marketCollection" onchange="onMarketCollection(this.value)">
+        <option value="">All collections</option>
+      </select>
+      <!-- Background pills -->
+      <div class="bg-pills" id="bgPills">
+        <div class="bg-pill active" style="background:#444" data-bg="" onclick="setMarketBg('',this)">All</div>
+        <div class="bg-pill" style="background:#161717" data-bg="black" onclick="setMarketBg('black',this)">Black</div>
+        <div class="bg-pill" style="background:#33373a" data-bg="onyx" onclick="setMarketBg('onyx',this)">Onyx</div>
+        <div class="bg-pill" style="background:#7e52a4" data-bg="grape" onclick="setMarketBg('grape',this)">Grape</div>
+        <div class="bg-pill" style="background:#4ba774" data-bg="emerald" onclick="setMarketBg('emerald',this)">Emerald</div>
+        <div class="bg-pill" style="background:#3c475f" data-bg="midnight" onclick="setMarketBg('midnight',this)">Midnight</div>
+        <div class="bg-pill" style="background:#c47b42" data-bg="orange" onclick="setMarketBg('orange',this)">Orange</div>
       </div>
       <div class="market-grid" id="marketGrid"><div class="loading">Loading…</div></div>
     </div>
@@ -1024,7 +1081,7 @@ function showPage(id, btn) {
   btn.classList.add('active');
   if (id === 'lb') loadLeaderboard(state.lbTab);
   if (id === 'work') openWorkPage();
-  if (id === 'market') loadMarket();
+  if (id === 'market') { loadMarketCollections(); loadMarket(true); }
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -1585,6 +1642,10 @@ const BG_LABEL = {
 let marketTier = 'low';
 let marketOffset = 0;
 let marketTotal = 0;
+let marketSearch = '';
+let marketBg = '';
+let marketCollection = '';
+let marketSearchTimer = null;
 
 function fmtCollection(s) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -1595,19 +1656,53 @@ function setMarketTier(tier, btn) {
   btn.classList.add('active');
   marketTier = tier;
   marketOffset = 0;
+  loadMarketCollections();
   loadMarket(true);
+}
+
+function setMarketBg(bg, el) {
+  marketBg = bg;
+  document.querySelectorAll('#bgPills .bg-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  loadMarket(true);
+}
+
+function onMarketSearch(val) {
+  clearTimeout(marketSearchTimer);
+  marketSearchTimer = setTimeout(() => { marketSearch = val.trim(); loadMarket(true); }, 300);
+}
+
+function onMarketCollection(val) {
+  marketCollection = val;
+  loadMarket(true);
+}
+
+async function loadMarketCollections() {
+  try {
+    const cols = await api(`/api/market/collections?tier=${marketTier}`);
+    const sel = document.getElementById('marketCollection');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">All collections</option>' +
+      cols.map(c => `<option value="${c}"${c === marketCollection ? ' selected' : ''}>${esc(fmtCollection(c))}</option>`).join('');
+  } catch {}
 }
 
 async function loadMarket(reset = false) {
   if (reset) marketOffset = 0;
   const grid = document.getElementById('marketGrid');
   if (marketOffset === 0) grid.innerHTML = '<div class="loading">Loading…</div>';
+  const params = new URLSearchParams({
+    tier: marketTier, limit: 40, offset: marketOffset,
+    ...(marketSearch && { search: marketSearch }),
+    ...(marketBg && { background: marketBg }),
+    ...(marketCollection && { collection: marketCollection }),
+  });
   try {
-    const data = await api(`/api/market?tier=${marketTier}&limit=40&offset=${marketOffset}`);
+    const data = await api(`/api/market?${params}`);
     marketTotal = data.total;
     const items = data.items;
     if (marketOffset === 0 && !items.length) {
-      grid.innerHTML = '<div class="empty">No gifts in stock</div>';
+      grid.innerHTML = '<div class="empty">No gifts match your filters</div>';
       return;
     }
     const cards = items.map(g => {
@@ -1631,7 +1726,6 @@ async function loadMarket(reset = false) {
       document.getElementById('marketLoadMore')?.remove();
       grid.insertAdjacentHTML('beforeend', cards);
     }
-
     marketOffset += items.length;
     if (marketOffset < marketTotal) {
       grid.insertAdjacentHTML('beforeend',

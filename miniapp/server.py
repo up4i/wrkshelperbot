@@ -439,30 +439,57 @@ def work_end(req: WorkEndRequest):
 
 # ── Market ────────────────────────────────────────────────────────────────────
 
+@app.get("/api/market/collections")
+def market_collections(tier: str = "low"):
+    with db_conn() as db:
+        rows = db.execute(
+            """SELECT DISTINCT gm.collection FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               WHERE gi.owner_id IS NULL AND gm.tier = ?
+               ORDER BY gm.collection""",
+            (tier,),
+        ).fetchall()
+    return [r["collection"] for r in rows]
+
+
 @app.get("/api/market")
-def market_listings(tier: str = "low", limit: int = 40, offset: int = 0):
+def market_listings(tier: str = "low", limit: int = 40, offset: int = 0,
+                    search: str = "", background: str = "", collection: str = ""):
     valid_tiers = ("low", "mid", "high")
     if tier not in valid_tiers:
         raise HTTPException(400, "tier must be low | mid | high")
+    where = ["gi.owner_id IS NULL", "gm.tier = ?"]
+    params: list = [tier]
+    if search:
+        where.append("(gm.model_name LIKE ? OR gm.collection LIKE ?)")
+        params += [f"%{search}%", f"%{search}%"]
+    if background:
+        where.append("gi.background = ?")
+        params.append(background)
+    if collection:
+        where.append("gm.collection = ?")
+        params.append(collection)
+    where_sql = " AND ".join(where)
     with db_conn() as db:
         rows = db.execute(
-            """SELECT gm.collection, gm.model_number, gm.model_name, gm.tier,
-                      gi.background, COUNT(gi.id) AS stock, gp.current_price
-               FROM gift_instances gi
-               JOIN gift_models gm ON gm.id = gi.model_id
-               JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
-               WHERE gi.owner_id IS NULL AND gm.tier = ?
-               GROUP BY gm.collection, gm.model_number, gi.background
-               ORDER BY gp.current_price ASC, gm.collection, gm.model_number
-               LIMIT ? OFFSET ?""",
-            (tier, limit, offset),
+            f"""SELECT gm.collection, gm.model_number, gm.model_name, gm.tier,
+                       gi.background, COUNT(gi.id) AS stock, gp.current_price
+                FROM gift_instances gi
+                JOIN gift_models gm ON gm.id = gi.model_id
+                JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+                WHERE {where_sql}
+                GROUP BY gm.collection, gm.model_number, gi.background
+                ORDER BY gp.current_price ASC, gm.collection, gm.model_number
+                LIMIT ? OFFSET ?""",
+            params + [limit, offset],
         ).fetchall()
         total = db.execute(
-            """SELECT COUNT(DISTINCT gm.collection || gm.model_number || gi.background)
-               FROM gift_instances gi
-               JOIN gift_models gm ON gm.id = gi.model_id
-               WHERE gi.owner_id IS NULL AND gm.tier = ?""",
-            (tier,),
+            f"""SELECT COUNT(*) FROM (
+                SELECT 1 FROM gift_instances gi
+                JOIN gift_models gm ON gm.id = gi.model_id
+                WHERE {where_sql}
+                GROUP BY gm.collection, gm.model_number, gi.background)""",
+            params,
         ).fetchone()[0]
     return {"items": [dict(r) for r in rows], "total": total, "offset": offset}
 
