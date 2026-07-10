@@ -998,7 +998,7 @@ def hack_status(user_id: int):
 @app.post("/api/hack/start")
 def hack_start(req: HackStartRequest):
     with db_conn() as db:
-        row = db.execute("SELECT last_hack FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+        row = db.execute("SELECT last_hack, balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
         if not row:
             raise HTTPException(404, "User not found — use the bot first")
         now = int(time.time())
@@ -1009,7 +1009,11 @@ def hack_start(req: HackStartRequest):
         if existing:
             raise HTTPException(400, "You already have an active hack session")
         word, clue = random.choice(_WORDLIST)
-        reward = random.randint(5000, 15000)
+        balance = row["balance"] or 0
+        reward = random.randint(
+            max(5_000, int(balance * 0.005)),
+            max(15_000, min(int(balance * 0.015), 500_000)),
+        )
         db.execute(
             "INSERT INTO hack_sessions (user_id, word, clue, reward, attempts, revealed_indices, started_at) "
             "VALUES (?, ?, ?, ?, 5, '0', ?)",

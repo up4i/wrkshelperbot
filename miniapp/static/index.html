@@ -844,6 +844,17 @@
     50% { transform: translateX(8px) scale(1.04); }
     75% { transform: translateX(-5px); }
   }
+  @keyframes rl-spin { to { transform: rotate(360deg); } }
+  .rl-wrap { position:relative; width:200px; height:200px; margin:0 auto 10px; }
+  .rl-pointer {
+    position:absolute; top:-4px; left:50%; transform:translateX(-50%); z-index:10;
+    width:0; height:0;
+    border-left:8px solid transparent; border-right:8px solid transparent;
+    border-top:16px solid #d4af37;
+    filter:drop-shadow(0 2px 4px rgba(0,0,0,.7));
+  }
+  .rl-wheel { width:200px; height:200px; }
+  .rl-wheel svg { display:block; width:100%; height:100%; transform-origin:center; }
   .crash-phase-txt { font-size: 13px; color: var(--muted); min-height: 20px; }
   .crash-bet-info {
     background: rgba(139,92,246,.1); border: 1px solid var(--border);
@@ -1196,6 +1207,10 @@
   <div class="modal" style="position:relative">
     <button class="modal-close" onclick="closeModal('rouletteModal')">✕</button>
     <div class="modal-title">🎡 Roulette</div>
+    <div class="rl-wrap">
+      <div class="rl-pointer"></div>
+      <div id="rouletteWheelSvg" class="rl-wheel"></div>
+    </div>
     <div class="result-box" id="rouletteResult"></div>
     <div class="cf-choice" id="rouletteColors">
       <div class="cf-btn" id="rouletteRed" onclick="setRouletteColor('red')" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.5)">🔴 Red ×2</div>
@@ -1773,6 +1788,67 @@ function toggleFastMode() {
 // ── Roulette ──────────────────────────────────────────────────────────────────
 let rouletteColor = null;
 
+// American roulette wheel segment colors (0, 28, 9, 26, 30, 11, ... order)
+const _RL_COLORS = ['G','R','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','G','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B'];
+const _RL_N = 38;
+let _rlBuilt = false;
+
+function _buildRouletteWheel() {
+  if (_rlBuilt) return;
+  _rlBuilt = true;
+  const cx = 100, cy = 100, R = 95, innerR = 24;
+  const deg = 360 / _RL_N;
+  const cmap = { G:'#10b981', R:'#dc2626', B:'#1a1a2e' };
+  let paths = '';
+  for (let i = 0; i < _RL_N; i++) {
+    const a0 = (i * deg - 90) * Math.PI / 180;
+    const a1 = ((i + 1) * deg - 90) * Math.PI / 180;
+    const x1 = cx + R * Math.cos(a0), y1 = cy + R * Math.sin(a0);
+    const x2 = cx + R * Math.cos(a1), y2 = cy + R * Math.sin(a1);
+    paths += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 0,1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${cmap[_RL_COLORS[i]]}" stroke="#09090f" stroke-width="0.7"/>`;
+  }
+  document.getElementById('rouletteWheelSvg').innerHTML =
+    `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="${cx}" cy="${cy}" r="${R+3}" fill="#09090f"/>
+      ${paths}
+      <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#d4af37" stroke-width="2"/>
+      <circle cx="${cx}" cy="${cy}" r="${innerR}" fill="#09090f" stroke="#d4af37" stroke-width="1.5"/>
+      <circle cx="${cx}" cy="${cy}" r="5" fill="#d4af37"/>
+    </svg>`;
+}
+
+function _rlGetAngle(el) {
+  const m = window.getComputedStyle(el).transform;
+  if (!m || m === 'none') return 0;
+  const v = m.match(/matrix.*\((.+)\)/)[1].split(', ');
+  const angle = Math.atan2(parseFloat(v[1]), parseFloat(v[0])) * (180 / Math.PI);
+  return ((angle % 360) + 360) % 360;
+}
+
+async function _rlLand(winColor) {
+  const svg = document.getElementById('rouletteWheelSvg').querySelector('svg');
+  if (!svg) return;
+  const cur = _rlGetAngle(svg);
+  svg.style.animation = 'none';
+  svg.style.transition = 'none';
+  svg.style.transform = `rotate(${cur}deg)`;
+  svg.offsetHeight; // reflow
+  const code = winColor === 'red' ? 'R' : winColor === 'black' ? 'B' : 'G';
+  const matches = _RL_COLORS.reduce((a, c, i) => { if (c === code) a.push(i); return a; }, []);
+  const seg = matches[Math.floor(Math.random() * matches.length)];
+  const deg = 360 / _RL_N;
+  const target = (seg + 0.5) * deg + (Math.random() - 0.5) * deg * 0.6;
+  let delta = (target - cur % 360 + 360) % 360;
+  if (delta < 30) delta += 360;
+  const final = cur + 7 * 360 + delta;
+  svg.style.transition = 'transform 4s cubic-bezier(0.17, 0, 0.12, 1)';
+  svg.style.transform = `rotate(${final}deg)`;
+  await new Promise(r => setTimeout(r, 4100));
+  svg.style.transition = 'none';
+  svg.style.transform = `rotate(${final % 360}deg)`;
+  svg.offsetHeight;
+}
+
 function openRoulette() {
   if (!state.userId) return alert('Open in Telegram to play.');
   rouletteColor = null;
@@ -1781,6 +1857,7 @@ function openRoulette() {
   document.getElementById('rouletteErr').textContent = '';
   document.getElementById('rouletteBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
   buildPresets('roulettePresets', 'rouletteBet');
+  _buildRouletteWheel();
   document.getElementById('rouletteModal').classList.add('open');
 }
 
@@ -1797,8 +1874,12 @@ async function spinRoulette() {
   errEl.textContent = '';
   document.getElementById('rouletteSpinBtn').disabled = true;
   document.getElementById('rouletteResult').className = 'result-box';
+  // Start fast spin while waiting for API
+  const svg = document.getElementById('rouletteWheelSvg').querySelector('svg');
+  if (svg) { svg.style.transition = 'none'; svg.style.animation = 'rl-spin 0.35s linear infinite'; }
   try {
     const data = await api('/api/play/roulette', { method:'POST', json:{ user_id:+state.userId, bet, color:rouletteColor } });
+    await _rlLand(data.winning_color);
     const resEl = document.getElementById('rouletteResult');
     const colorEmoji = { red:'🔴', black:'⚫', green:'🟢' }[data.winning_color];
     const delta = data.delta > 0 ? `+${fmt(data.delta)}` : fmt(data.delta);
@@ -1810,6 +1891,7 @@ async function spinRoulette() {
     document.getElementById('rouletteBal').textContent = fmt(state.balance);
     refreshHeaderBal();
   } catch (e) {
+    if (svg) svg.style.animation = 'none';
     errEl.textContent = e.message || 'Error';
   } finally {
     document.getElementById('rouletteSpinBtn').disabled = false;
@@ -2116,12 +2198,14 @@ async function openRob() {
       return;
     }
     list.innerHTML = targets.map(t =>
-      `<div class="card" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 14px"
-           onclick="selectRobTarget(${t.user_id}, ${JSON.stringify(t.name)})">
+      `<div class="card rob-target" data-uid="${t.user_id}" data-name="${t.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 14px">
         <span>${t.name}</span>
         <span style="color:var(--gold);font-size:13px;font-weight:600">${fmt(t.balance)} WRK$</span>
       </div>`
     ).join('');
+    list.querySelectorAll('.rob-target').forEach(el => {
+      el.addEventListener('click', () => selectRobTarget(+el.dataset.uid, el.dataset.name));
+    });
   } catch (e) {
     document.getElementById('robErr').textContent = e.message || 'Error loading targets';
   }
@@ -2924,7 +3008,8 @@ function openCrash() {
 
 function connectCrashWs() {
   if (crashWs && crashWs.readyState <= 1) return; // CONNECTING or OPEN
-  crashWs = new WebSocket(`ws://${location.host}/ws/crash`);
+  const _wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  crashWs = new WebSocket(`${_wsProto}//${location.host}/ws/crash`);
   crashWs.onmessage = e => handleCrashMsg(JSON.parse(e.data));
   crashWs.onclose = () => {
     setTimeout(() => {
