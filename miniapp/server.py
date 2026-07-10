@@ -262,6 +262,8 @@ _EMOJI_CACHE = STATIC_DIR / "emoji_cache"
 _EMOJI_CACHE.mkdir(exist_ok=True)
 _EMOJI_ANIM_CACHE = STATIC_DIR / "emoji_anim_cache"
 _EMOJI_ANIM_CACHE.mkdir(exist_ok=True)
+_AVATAR_CACHE = STATIC_DIR / "avatar_cache"
+_AVATAR_CACHE.mkdir(exist_ok=True)
 
 
 @app.get("/emoji/{emoji_id}")
@@ -360,6 +362,48 @@ def get_emoji_animation(emoji_id: str):
         raise
     except Exception:
         raise HTTPException(502, "Could not fetch animation from Telegram")
+
+
+# ── Avatar proxy ─────────────────────────────────────────────────────────────
+
+@app.get("/api/avatar/{user_id}")
+def get_avatar(user_id: int):
+    cached = _AVATAR_CACHE / f"{user_id}.jpg"
+    if cached.exists():
+        return FileResponse(str(cached), media_type="image/jpeg",
+                            headers={"Cache-Control": "public, max-age=86400"})
+    token = config.BOT_TOKEN
+    try:
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{token}/getUserProfilePhotos",
+            data=json.dumps({"user_id": user_id, "limit": 1}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as r:
+            data = json.loads(r.read())
+        photos = data.get("result", {}).get("photos", [])
+        if not photos:
+            raise HTTPException(404, "No profile photo")
+        file_id = photos[0][-1]["file_id"]  # largest size
+
+        with urllib.request.urlopen(
+            f"https://api.telegram.org/bot{token}/getFile?file_id={file_id}", timeout=8
+        ) as r:
+            file_data = json.loads(r.read())
+        file_path = file_data["result"]["file_path"]
+
+        with urllib.request.urlopen(
+            f"https://api.telegram.org/file/bot{token}/{file_path}", timeout=10
+        ) as r:
+            img_bytes = r.read()
+
+        cached.write_bytes(img_bytes)
+        return Response(content=img_bytes, media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(404, "Could not fetch avatar")
 
 
 # ── Telegram auth ─────────────────────────────────────────────────────────────

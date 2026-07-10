@@ -191,7 +191,19 @@
     font-weight: 700;
     margin: 0 auto 12px;
     color: #fff;
+    object-fit: cover;
+    flex-shrink: 0;
   }
+  .header-avatar {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    cursor: pointer;
+    display: none;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+  }
+  .header-avatar.visible { display: block; }
   .profile-name { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
   .profile-id { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
   .rank-pills { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
@@ -937,7 +949,10 @@
 <div id="app">
   <header class="header">
     <div class="logo">wrk<span>.</span>money</div>
-    <div class="balance-pill" id="headerBal" onclick="goProfile()"></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="balance-pill" id="headerBal" onclick="goProfile()"></div>
+      <img class="header-avatar" id="headerAvatar" src="" alt="" onclick="goProfile()" onerror="this.style.display='none'">
+    </div>
   </header>
 
   <main>
@@ -1308,6 +1323,9 @@ async function refreshBalance() {
     const pill = document.getElementById('headerBal');
     pill.textContent = `${fmt(data.balance)} WRK$`;
     pill.classList.add('visible');
+    const av = document.getElementById('headerAvatar');
+    av.src = `/api/avatar/${state.userId}`;
+    av.classList.add('visible');
   } catch {}
 }
 
@@ -1488,6 +1506,7 @@ function _pinnedBadgeHtml(pg) {
 
 function buildProfileHtml(d, isOwn) {
   const initials = d.name.replace(/^@/,'').slice(0,2).toUpperCase();
+  const avatarHtml = `<img class="avatar" src="/api/avatar/${d.user_id}" alt="${initials}" onerror="this.outerHTML='<div class=\\"avatar\\">${initials}</div>'">`;
   const tierColor = { common:'', uncommon:'', rare:'rare', epic:'epic', legendary:'legendary' };
 
   // store gift data for detail modal
@@ -1517,7 +1536,7 @@ function buildProfileHtml(d, isOwn) {
 
   return `
     <div class="profile-hero">
-      <div class="avatar">${initials}</div>
+      ${avatarHtml}
       <div class="profile-name-wrap">
         <span class="profile-name">${esc(d.name)}</span>
         ${_pinnedBadgeHtml(d.pinned_gift)}
