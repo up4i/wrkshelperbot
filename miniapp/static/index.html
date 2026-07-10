@@ -1847,8 +1847,11 @@ async function _rlLand(winColor) {
   const matches = _RL_COLORS.reduce((a, c, i) => { if (c === code) a.push(i); return a; }, []);
   const seg = matches[Math.floor(Math.random() * matches.length)];
   const degPerSlot = 360 / _RL_N;
-  const target = (seg + 0.5) * degPerSlot + (Math.random() - 0.5) * degPerSlot * 0.6;
-  let delta = (target - _rlAngle % 360 + 360) % 360;
+  const segCenter = (seg + 0.5) * degPerSlot + (Math.random() - 0.5) * degPerSlot * 0.6;
+  // Clockwise rotation X puts the original position (360-X) under the pointer,
+  // so to show segCenter we need rotation ≡ (360 - segCenter) mod 360.
+  const desired = (360 - segCenter % 360 + 360) % 360;
+  let delta = (desired - _rlAngle % 360 + 360) % 360;
   if (delta < 30) delta += 360;
   const final = _rlAngle + 5 * 360 + delta;
   svg.style.transition = 'transform 4s cubic-bezier(0.17, 0, 0.12, 1)';
