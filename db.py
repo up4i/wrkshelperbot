@@ -492,6 +492,139 @@ async def get_leaderboard(db_path: str, limit: int = 10) -> list[dict]:
             return [dict(r) async for r in cur]
 
 
+_STAT_COLS = {
+    "balance":   ("e.balance",                                                                   "WRK$"),
+    "streak":    ("e.streak",                                                                    "day streak"),
+    "gifts":     ("COUNT(gi.id)",                                                                "gifts"),
+    "gamble":    ("gs.slots_won+gs.coinflip_won+gs.blackjack_won+gs.crash_won",                 "WRK$ won"),
+    "loss":      ("gs.slots_lost+gs.coinflip_lost+gs.blackjack_lost+gs.crash_lost",             "WRK$ lost"),
+    "slots":     ("gs.slots_won",                                                                "WRK$ won"),
+    "coinflip":  ("gs.coinflip_won",                                                             "WRK$ won"),
+    "blackjack": ("gs.blackjack_won",                                                            "WRK$ won"),
+    "crash":     ("gs.crash_won",                                                                "WRK$ won"),
+    "mult":      ("gs.crash_best_mult",                                                          "× best mult"),
+}
+
+async def get_stats_leaderboard(db_path: str, tab: str, limit: int = 10) -> list[dict]:
+    if tab not in _STAT_COLS:
+        return []
+    col, unit = _STAT_COLS[tab]
+    name_sub = """LEFT JOIN (
+                SELECT user_id, COALESCE(full_name,'') AS full_name, username
+                FROM user_activity
+                WHERE (user_id, last_seen) IN (
+                    SELECT user_id, MAX(last_seen) FROM user_activity GROUP BY user_id
+                )
+            ) a ON a.user_id = e.user_id"""
+
+    if tab == "balance":
+        sql = f"""SELECT e.user_id, ({col}) AS value,
+                         COALESCE(a.username, e.username) AS username,
+                         COALESCE(a.full_name, e.full_name) AS full_name
+                  FROM economy e {name_sub}
+                  ORDER BY value DESC LIMIT ?"""
+        params = (limit,)
+    elif tab == "streak":
+        sql = f"""SELECT e.user_id, ({col}) AS value,
+                         COALESCE(a.username, e.username) AS username,
+                         COALESCE(a.full_name, e.full_name) AS full_name
+                  FROM economy e {name_sub}
+                  ORDER BY value DESC LIMIT ?"""
+        params = (limit,)
+    elif tab == "gifts":
+        sql = f"""SELECT e.user_id, ({col}) AS value,
+                         COALESCE(a.username, e.username) AS username,
+                         COALESCE(a.full_name, e.full_name) AS full_name
+                  FROM economy e
+                  LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id
+                  {name_sub}
+                  GROUP BY e.user_id ORDER BY value DESC LIMIT ?"""
+        params = (limit,)
+    else:
+        sql = f"""SELECT e.user_id, ({col}) AS value,
+                         COALESCE(a.username, e.username) AS username,
+                         COALESCE(a.full_name, e.full_name) AS full_name
+                  FROM game_stats gs
+                  JOIN economy e ON e.user_id = gs.user_id
+                  {name_sub.replace('ON a.user_id = e.user_id', 'ON a.user_id = gs.user_id')}
+                  WHERE ({col}) > 0
+                  ORDER BY value DESC LIMIT ?"""
+        params = (limit,)
+
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(sql, params) as cur:
+            return [{"user_id": r["user_id"], "value": r["value"],
+                     "username": r["username"], "full_name": r["full_name"], "unit": unit}
+                    async for r in cur]
+
+
+async def get_profile(db_path: str, user_id: int) -> dict | None:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT e.user_id, e.balance, e.streak, e.pinned_gift_id,
+                      COALESCE(a.username, e.username) AS username,
+                      COALESCE(a.full_name, e.full_name) AS full_name
+               FROM economy e
+               LEFT JOIN (
+                   SELECT user_id, username, full_name FROM user_activity
+                   WHERE (user_id, last_seen) IN (
+                       SELECT user_id, MAX(last_seen) FROM user_activity GROUP BY user_id
+                   )
+               ) a ON a.user_id = e.user_id
+               WHERE e.user_id = ?""", (user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return None
+        d = dict(row)
+
+        async with db.execute(
+            "SELECT COUNT(*)+1 FROM economy WHERE balance > ?", (d["balance"],)
+        ) as cur:
+            d["balance_rank"] = (await cur.fetchone())[0]
+        async with db.execute(
+            "SELECT COUNT(*)+1 FROM economy WHERE streak > ?", (d["streak"],)
+        ) as cur:
+            d["streak_rank"] = (await cur.fetchone())[0]
+        async with db.execute(
+            "SELECT COUNT(*) FROM gift_instances WHERE owner_id = ?", (user_id,)
+        ) as cur:
+            d["gift_count"] = (await cur.fetchone())[0]
+        async with db.execute(
+            "SELECT COUNT(*)+1 FROM (SELECT owner_id, COUNT(*) AS c FROM gift_instances "
+            "WHERE owner_id IS NOT NULL GROUP BY owner_id HAVING c > ?)", (d["gift_count"],)
+        ) as cur:
+            d["gift_rank"] = (await cur.fetchone())[0]
+
+        pinned = None
+        if d.get("pinned_gift_id"):
+            async with db.execute(
+                "SELECT gi.gift_number, gm.model_name, gm.model_emoji "
+                "FROM gift_instances gi JOIN gift_models gm ON gm.id = gi.model_id "
+                "WHERE gi.id = ? AND gi.owner_id = ?", (d["pinned_gift_id"], user_id)
+            ) as cur:
+                pg = await cur.fetchone()
+                pinned = dict(pg) if pg else None
+        d["pinned_gift"] = pinned
+
+        gs_cols = ("slots_won","slots_lost","coinflip_won","coinflip_lost",
+                   "blackjack_won","blackjack_lost","crash_won","crash_lost","crash_best_mult")
+        async with db.execute(
+            f"SELECT {','.join(gs_cols)} FROM game_stats WHERE user_id = ?", (user_id,)
+        ) as cur:
+            gs = await cur.fetchone()
+        if gs:
+            d["total_won"]  = gs["slots_won"] + gs["coinflip_won"] + gs["blackjack_won"] + gs["crash_won"]
+            d["total_lost"] = gs["slots_lost"] + gs["coinflip_lost"] + gs["blackjack_lost"] + gs["crash_lost"]
+            d["best_mult"]  = gs["crash_best_mult"]
+        else:
+            d["total_won"] = d["total_lost"] = d["best_mult"] = 0
+
+        return d
+
+
 async def claim_work(db_path: str, user_id: int, amount: int, timestamp: int, taps: int = 1) -> tuple[int, int]:
     """Returns (new_balance, new_work_count)."""
     async with aiosqlite.connect(db_path) as db:

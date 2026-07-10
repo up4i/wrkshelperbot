@@ -437,24 +437,123 @@ async def cmd_jobs(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /leaderboard ──────────────────────────────────────────────────────────────
 
+_LB_ALIASES = {
+    "balance": "balance", "bal": "balance", "money": "balance",
+    "streak":  "streak",
+    "gifts":   "gifts",   "gift": "gifts",
+    "gamble":  "gamble",  "won":  "gamble",  "win": "gamble",
+    "loss":    "loss",    "lost": "loss",
+    "slots":   "slots",   "slot": "slots",
+    "coinflip":"coinflip","cf":   "coinflip",
+    "blackjack":"blackjack","bj": "blackjack",
+    "crash":   "crash",
+    "mult":    "mult",    "x":    "mult",     "multiplier": "mult",
+}
+_LB_TITLES = {
+    "balance":   "💰 Balance",
+    "streak":    "🔥 Streak",
+    "gifts":     "🎁 Most Gifts",
+    "gamble":    "🎰 Total Gambling Winnings",
+    "loss":      "💸 Total Gambling Losses",
+    "slots":     "🎰 Slots Winnings",
+    "coinflip":  "🪙 Coinflip Winnings",
+    "blackjack": "🃏 Blackjack Winnings",
+    "crash":     "📈 Crash Winnings",
+    "mult":      "🚀 Best Crash Multiplier",
+}
+
+def _lb_display_name(row: dict) -> str:
+    name = row.get("full_name") or row.get("username") or f"User {row['user_id']}"
+    username = row.get("username")
+    if username:
+        return f"[{name}](https://t.me/{username.lstrip('@')})"
+    return name
+
 @topic_gated
 async def cmd_leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    rows = await db.get_leaderboard(config.DB_PATH, limit=10)
-    if not rows:
-        await update.effective_message.reply_text("No one has a wallet yet.")
+    arg = (ctx.args[0].lower() if ctx.args else "balance")
+    tab = _LB_ALIASES.get(arg)
+    if tab is None:
+        tabs = "balance · streak · gifts · gamble · loss · slots · coinflip · blackjack · crash · mult"
+        await update.effective_message.reply_text(
+            f"❓ Unknown tab `{arg}`\n\nAvailable: {tabs}", parse_mode="Markdown"
+        )
         return
+
+    rows = await db.get_stats_leaderboard(config.DB_PATH, tab, limit=10)
+    if not rows:
+        await update.effective_message.reply_text("No data yet for that leaderboard.")
+        return
+
     medals = ['🥇', '🥈', '🥉']
-    lines = ["🏆 *WRK$ Leaderboard*\n"]
+    title = _LB_TITLES[tab]
+    lines = [f"*{title} Leaderboard*\n"]
     for i, row in enumerate(rows):
         prefix = medals[i] if i < 3 else f"{i + 1}."
-        name = row.get("full_name") or row.get("username") or str(row["user_id"])
-        username = row.get("username")
-        if username:
-            display = f"[{name}](https://t.me/{username.lstrip('@')})"
+        display = _lb_display_name(row)
+        val = row["value"]
+        unit = row["unit"]
+        if tab == "mult":
+            val_str = f"{val:.2f}×"
         else:
-            display = name
-        lines.append(f"{prefix} {display} — {row['balance']:,} WRK$")
+            val_str = f"{int(val):,} {unit}"
+        lines.append(f"{prefix} {display} — {val_str}")
     await update.effective_message.reply_text("\n".join(lines), parse_mode="Markdown")
+
+
+# ── /profile ──────────────────────────────────────────────────────────────────
+
+async def _resolve_profile_target(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int | None:
+    """Returns user_id from reply, @username arg, or self."""
+    msg = update.effective_message
+    # reply to someone
+    if msg.reply_to_message:
+        return msg.reply_to_message.from_user.id
+    # @username or user_id arg
+    if ctx.args:
+        arg = ctx.args[0].lstrip("@")
+        if arg.isdigit():
+            return int(arg)
+        row = await db.get_user_by_username(config.DB_PATH, update.effective_chat.id, arg)
+        if not row:
+            await msg.reply_text(f"❓ Couldn't find user `@{arg}` — they need to have chatted here first.", parse_mode="Markdown")
+            return None
+        return row["user_id"]
+    # self
+    return update.effective_user.id
+
+@topic_gated
+async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    target_id = await _resolve_profile_target(update, ctx)
+    if target_id is None:
+        return
+
+    p = await db.get_profile(config.DB_PATH, target_id)
+    if not p:
+        await msg.reply_text("❓ That user hasn't started a wallet yet.")
+        return
+
+    name = p.get("full_name") or (f"@{p['username']}" if p.get("username") else f"User {p['user_id']}")
+    username = p.get("username")
+    name_link = f"[{name}](https://t.me/{username.lstrip('@')})" if username else name
+
+    pinned = f"  📌 {p['pinned_gift']['model_emoji']} {p['pinned_gift']['model_name']} #{p['pinned_gift']['gift_number']}" if p.get("pinned_gift") else ""
+
+    net = p["total_won"] - p["total_lost"]
+    net_str = f"+{net:,}" if net >= 0 else f"{net:,}"
+    mult_str = f"{p['best_mult']:.2f}×" if p["best_mult"] else "—"
+
+    text = (
+        f"👤 *{name_link}*{pinned}\n"
+        f"ID: `{p['user_id']}`\n\n"
+        f"💰 *{p['balance']:,} WRK$* — rank #{p['balance_rank']}\n"
+        f"🔥 *{p['streak']} day streak* — rank #{p['streak_rank']}\n"
+        f"🎁 *{p['gift_count']} gifts* — rank #{p['gift_rank']}\n\n"
+        f"🎰 Gambling: +{p['total_won']:,} won · -{p['total_lost']:,} lost · net {net_str}\n"
+        f"🚀 Best crash mult: {mult_str}"
+    )
+    await msg.reply_text(text, parse_mode="Markdown")
 
 
 # ── /workreminder ─────────────────────────────────────────────────────────────
