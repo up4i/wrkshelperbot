@@ -1067,6 +1067,8 @@ def hack_guess(req: HackGuessRequest):
             db.execute("DELETE FROM hack_sessions WHERE user_id = ?", (req.user_id,))
             db.execute("UPDATE economy SET last_hack = ? WHERE user_id = ?", (int(time.time()), req.user_id))
             row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+            if not row:
+                raise HTTPException(500, "Economy record missing")
             new_bal = row["balance"] + sess["reward"]
             db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
             db.commit()
