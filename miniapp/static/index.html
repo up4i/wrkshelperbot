@@ -589,6 +589,17 @@
   }
   .market-buy-btn:active { background: rgba(255,255,255,.32); }
   .market-load-more { width: 100%; grid-column: 1/-1; }
+  .market-emoji-img {
+    width: 56px; height: 56px;
+    object-fit: contain;
+    position: relative; z-index: 1;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,.35));
+  }
+  .gift-emoji-img {
+    width: 40px; height: 40px;
+    object-fit: contain;
+    display: block; margin: 0 auto 4px;
+  }
   .market-search {
     width: 100%;
     background: var(--card2);
@@ -1192,12 +1203,17 @@ function renderProfile(d) {
   const tierColor = { common:'', uncommon:'', rare:'rare', epic:'epic', legendary:'legendary' };
 
   const giftHtml = d.gifts.length
-    ? d.gifts.map(g => `
+    ? d.gifts.map(g => {
+        const gemHtml = g.custom_emoji_id
+          ? `<img class="gift-emoji-img" src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<div class=\\'gem\\'>🎁</div>'">`
+          : `<div class="gem">${g.model_emoji || '🎁'}</div>`;
+        return `
         <div class="gift-card">
-          <div class="gem">${g.model_emoji || '🎁'}</div>
+          ${gemHtml}
           <div class="gname">${esc(g.model_name)}</div>
           <div class="gtier ${tierColor[g.tier]||''}">${g.tier} #${g.gift_number||g.id}</div>
-        </div>`).join('')
+        </div>`;
+      }).join('')
     : '<div class="empty" style="grid-column:1/-1">No gifts yet</div>';
 
   content.innerHTML = `
@@ -1707,10 +1723,13 @@ async function loadMarket(reset = false) {
     }
     const cards = items.map(g => {
       const bg = BG_HEX[g.background] || '#161717';
+      const emojiHtml = g.custom_emoji_id
+        ? `<img class="market-emoji-img" src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<div class=\\'market-emoji\\'>🎁</div>'">`
+        : `<div class="market-emoji">🎁</div>`;
       return `
         <div class="market-card" style="background:${bg}" onclick="confirmBuy('${g.collection}',${g.model_number},'${g.background}','${esc(g.model_name)}',${g.current_price},${g.stock})">
           <div class="market-glow"></div>
-          <div class="market-emoji">🎁</div>
+          ${emojiHtml}
           <div class="market-col">${esc(fmtCollection(g.collection))}</div>
           <div class="market-name">${esc(g.model_name)}</div>
           <div class="market-bg">${BG_LABEL[g.background] || g.background}</div>

@@ -7,12 +7,13 @@ import sqlite3
 import sys
 import time
 import urllib.parse
+import urllib.request
 from contextlib import contextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -89,7 +90,7 @@ def _load_profile(db, user_id: int) -> dict:
 
     gifts = db.execute(
         "SELECT gi.id, gi.gift_number, gi.background, gi.acquired_at, "
-        "gm.model_name, gm.model_emoji, gm.tier, gm.collection "
+        "gm.model_name, gm.model_emoji, gm.tier, gm.collection, gm.custom_emoji_id "
         "FROM gift_instances gi JOIN gift_models gm ON gm.id = gi.model_id "
         "WHERE gi.owner_id = ? ORDER BY gi.acquired_at DESC LIMIT 20", (user_id,)
     ).fetchall()
@@ -140,6 +141,61 @@ def profile_by_username(username: str):
         if not row:
             raise HTTPException(404, "Username not found")
         return _load_profile(db, row["user_id"])
+
+
+# ── Emoji image proxy ─────────────────────────────────────────────────────────
+
+_EMOJI_CACHE = STATIC_DIR / "emoji_cache"
+_EMOJI_CACHE.mkdir(exist_ok=True)
+
+
+@app.get("/emoji/{emoji_id}")
+def get_emoji_image(emoji_id: str):
+    if not emoji_id.isdigit():
+        raise HTTPException(400, "Invalid emoji ID")
+
+    cached = _EMOJI_CACHE / f"{emoji_id}.webp"
+    if cached.exists():
+        return FileResponse(str(cached), media_type="image/webp",
+                            headers={"Cache-Control": "public, max-age=31536000"})
+
+    token = config.BOT_TOKEN
+    try:
+        # 1. Resolve custom emoji → thumbnail file_id
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{token}/getCustomEmojiStickers",
+            data=json.dumps({"custom_emoji_ids": [emoji_id]}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as r:
+            data = json.loads(r.read())
+        sticker = data["result"][0]
+        thumb = sticker.get("thumbnail") or sticker.get("thumb")
+        if not thumb:
+            raise HTTPException(404, "No thumbnail")
+        file_id = thumb["file_id"]
+
+        # 2. Get file path
+        with urllib.request.urlopen(
+            f"https://api.telegram.org/bot{token}/getFile?file_id={file_id}", timeout=8
+        ) as r:
+            file_data = json.loads(r.read())
+        file_path = file_data["result"]["file_path"]
+
+        # 3. Download and cache
+        with urllib.request.urlopen(
+            f"https://api.telegram.org/file/bot{token}/{file_path}", timeout=10
+        ) as r:
+            image_bytes = r.read()
+
+        cached.write_bytes(image_bytes)
+        return Response(content=image_bytes, media_type="image/webp",
+                        headers={"Cache-Control": "public, max-age=31536000"})
+
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(502, "Could not fetch emoji from Telegram")
 
 
 # ── Telegram auth ─────────────────────────────────────────────────────────────
@@ -473,7 +529,7 @@ def market_listings(tier: str = "low", limit: int = 40, offset: int = 0,
     with db_conn() as db:
         rows = db.execute(
             f"""SELECT gm.collection, gm.model_number, gm.model_name, gm.tier,
-                       gi.background, COUNT(gi.id) AS stock, gp.current_price
+                       gm.custom_emoji_id, gi.background, COUNT(gi.id) AS stock, gp.current_price
                 FROM gift_instances gi
                 JOIN gift_models gm ON gm.id = gi.model_id
                 JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
