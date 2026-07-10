@@ -1229,6 +1229,35 @@ async def _startup():
             crash_best_mult REAL    NOT NULL DEFAULT 0
         )""")
         db.commit()
+        for col in ("last_rob INTEGER NOT NULL DEFAULT 0", "last_hack INTEGER NOT NULL DEFAULT 0"):
+            try:
+                db.execute(f"ALTER TABLE economy ADD COLUMN {col}")
+                db.commit()
+            except Exception:
+                pass
+        db.execute("""CREATE TABLE IF NOT EXISTS hack_sessions (
+            user_id          INTEGER PRIMARY KEY,
+            word             TEXT    NOT NULL,
+            clue             TEXT    NOT NULL,
+            reward           INTEGER NOT NULL,
+            attempts         INTEGER NOT NULL DEFAULT 5,
+            revealed_indices TEXT    NOT NULL DEFAULT '0',
+            started_at       INTEGER NOT NULL
+        )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS craps_sessions (
+            user_id    INTEGER PRIMARY KEY,
+            bet        INTEGER NOT NULL,
+            point      INTEGER,
+            started_at INTEGER NOT NULL
+        )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS highlow_sessions (
+            user_id      INTEGER PRIMARY KEY,
+            bet          INTEGER NOT NULL,
+            current_card INTEGER NOT NULL,
+            multiplier   REAL    NOT NULL DEFAULT 1.0,
+            started_at   INTEGER NOT NULL
+        )""")
+        db.commit()
 
 
 @app.websocket("/ws/crash")

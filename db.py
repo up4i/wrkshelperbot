@@ -138,6 +138,25 @@ async def _migrate(db) -> None:
             await db.execute(f"ALTER TABLE economy ADD COLUMN {col} {typedef}")
             await db.commit()
 
+    # last_rob / last_hack cooldown columns
+    for col in ("last_rob INTEGER NOT NULL DEFAULT 0", "last_hack INTEGER NOT NULL DEFAULT 0"):
+        col_name = col.split()[0]
+        if col_name not in econ_cols:
+            await db.execute(f"ALTER TABLE economy ADD COLUMN {col}")
+            await db.commit()
+
+    # hack_sessions table (shared with mini-app)
+    await db.execute("""CREATE TABLE IF NOT EXISTS hack_sessions (
+        user_id          INTEGER PRIMARY KEY,
+        word             TEXT    NOT NULL,
+        clue             TEXT    NOT NULL,
+        reward           INTEGER NOT NULL,
+        attempts         INTEGER NOT NULL DEFAULT 5,
+        revealed_indices TEXT    NOT NULL DEFAULT '0',
+        started_at       INTEGER NOT NULL
+    )""")
+    await db.commit()
+
     # groups table migrations
     async with db.execute("PRAGMA table_info(groups)") as cur:
         cols = {row[1] async for row in cur}
@@ -1034,4 +1053,80 @@ async def mark_reminder_sent(db_path: str, user_id: int, now: int) -> None:
         await db.execute(
             "UPDATE economy SET last_reminder_sent = ? WHERE user_id = ?", (now, user_id)
         )
+        await db.commit()
+
+
+async def get_rob_cooldown(db_path: str, user_id: int) -> int:
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "SELECT last_rob FROM economy WHERE user_id = ?", (user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else 0
+
+
+async def set_rob_cooldown(db_path: str, user_id: int, timestamp: int) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "UPDATE economy SET last_rob = ? WHERE user_id = ?", (timestamp, user_id)
+        )
+        await db.commit()
+
+
+async def get_hack_cooldown(db_path: str, user_id: int) -> int:
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "SELECT last_hack FROM economy WHERE user_id = ?", (user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else 0
+
+
+async def set_hack_cooldown(db_path: str, user_id: int, timestamp: int) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "UPDATE economy SET last_hack = ? WHERE user_id = ?", (timestamp, user_id)
+        )
+        await db.commit()
+
+
+async def get_hack_session(db_path: str, user_id: int) -> dict | None:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM hack_sessions WHERE user_id = ?", (user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+async def save_hack_session(
+    db_path: str, user_id: int, word: str, clue: str,
+    reward: int, revealed_indices: str
+) -> None:
+    now = int(time.time())
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            """INSERT OR REPLACE INTO hack_sessions
+               (user_id, word, clue, reward, attempts, revealed_indices, started_at)
+               VALUES (?, ?, ?, ?, 5, ?, ?)""",
+            (user_id, word, clue, reward, revealed_indices, now),
+        )
+        await db.commit()
+
+
+async def update_hack_session(
+    db_path: str, user_id: int, attempts: int, revealed_indices: str
+) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "UPDATE hack_sessions SET attempts = ?, revealed_indices = ? WHERE user_id = ?",
+            (attempts, revealed_indices, user_id),
+        )
+        await db.commit()
+
+
+async def delete_hack_session(db_path: str, user_id: int) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute("DELETE FROM hack_sessions WHERE user_id = ?", (user_id,))
         await db.commit()
