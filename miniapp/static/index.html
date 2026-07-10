@@ -919,7 +919,7 @@
         <div class="stat-card"><div class="label">Gifts Owned</div><div class="value green" id="statGifts">—</div></div>
         <div class="stat-card"><div class="label">Top Balance</div><div class="value gold" id="statTop">—</div></div>
       </div>
-      <div class="card">
+      <div class="card" id="homeAccountCard">
         <div class="card-title">Your account</div>
         <div class="search-row">
           <input class="input" id="homeUserId" placeholder="Enter your Telegram user ID" type="number">
@@ -1188,30 +1188,51 @@
 const API = '';  // same origin
 let state = {
   userId: localStorage.getItem('wrkUserId') || null,
+  inTelegram: false,
   balance: null,
   lbTab: 'balance',
   cfChoice: null,
 };
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
+const _TG_WALL_HTML = `
+  <div style="text-align:center;padding:12px 0">
+    <div style="font-size:36px;margin-bottom:8px">✈️</div>
+    <div style="font-weight:600;margin-bottom:4px">Open in Telegram</div>
+    <div style="color:var(--muted);font-size:13px">Sign-in requires the Telegram app.</div>
+  </div>`;
+
+function _applyTgWalls() {
+  document.getElementById('homeAccountCard').innerHTML = `<div class="card-title">Your account</div>${_TG_WALL_HTML}`;
+  document.getElementById('gamesLoginWall').innerHTML = `<div class="card-title">Sign in first</div>${_TG_WALL_HTML}`;
+  document.getElementById('workLoginWall').innerHTML = `<div class="card-title">Sign in first</div>${_TG_WALL_HTML}`;
+  const profileCard = document.querySelector('#profileLoginPrompt .card');
+  if (profileCard) profileCard.innerHTML = `<div class="card-title">Enter your Telegram ID</div>${_TG_WALL_HTML}`;
+}
+
 async function boot() {
   loadStats();
   loadLeaderboard('balance');
 
-  // Auto-auth from Telegram if available
   const tg = window.Telegram?.WebApp;
-  if (tg?.initData) {
+  state.inTelegram = !!(tg?.initData);
+
+  if (state.inTelegram) {
     tg.expand();
     try {
       const auth = await api('/api/auth/telegram', { method: 'POST', json: { init_data: tg.initData } });
       setUser(String(auth.user_id));
     } catch {
-      // Fall back to manual entry if validation fails
+      // initData validation failed
     }
   } else if (state.userId) {
+    // Returning user with a cached Telegram session
     refreshBalance();
     document.getElementById('gamesLoginWall').style.display = 'none';
     prefillUserInputs();
+  } else {
+    // Browser with no session — replace all login forms with "open in Telegram"
+    _applyTgWalls();
   }
 }
 
@@ -1262,6 +1283,7 @@ async function loadStats() {
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 function loginFromHome() {
+  if (!state.inTelegram && !state.userId) return;
   const v = document.getElementById('homeUserId').value.trim();
   if (!v) return;
   setUser(v);
@@ -1269,6 +1291,7 @@ function loginFromHome() {
 }
 
 function loginFromGames() {
+  if (!state.inTelegram && !state.userId) return;
   const v = document.getElementById('gamesUserId').value.trim();
   if (!v) return;
   setUser(v);
@@ -1356,6 +1379,7 @@ function openProfilePage() {
 }
 
 function loginFromProfile() {
+  if (!state.inTelegram && !state.userId) return;
   const v = document.getElementById('profileLoginId').value.trim();
   if (!v) return;
   setUser(v);
@@ -1672,6 +1696,7 @@ async function openWorkPage() {
 }
 
 function loginFromWork() {
+  if (!state.inTelegram && !state.userId) return;
   const v = document.getElementById('workUserId').value.trim();
   if (!v) return;
   setUser(v);
