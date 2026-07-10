@@ -413,6 +413,20 @@
     display: flex; align-items: center; justify-content: center;
     line-height: 1;
   }
+  .slots-fast-btn {
+    position: absolute;
+    top: 16px; left: 54px;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 32px; height: 32px;
+    color: var(--muted);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color .15s, color .15s;
+  }
+  .slots-fast-btn.active { border-color: var(--gold); color: var(--gold); }
   .slots-legend {
     display: none;
     flex-direction: column;
@@ -1157,6 +1171,7 @@
   <div class="modal" style="position:relative">
     <button class="modal-close" onclick="closeModal('slotsModal')">✕</button>
     <button class="slots-help-btn" onclick="toggleSlotsLegend()">?</button>
+    <button class="slots-fast-btn" id="fastBtn" onclick="toggleFastMode()" title="Fast mode">⚡</button>
     <div class="modal-title">🎰 Slots</div>
     <div class="slots-legend" id="slotsLegend">
       <div class="legend-row">
@@ -1594,6 +1609,13 @@ async function setPinnedGift(giftId) {
 // ── Slots ─────────────────────────────────────────────────────────────────────
 const SYMBOLS = ['🍒','🍋','7️⃣','💎','🍀','⭐'];
 let slotsSpinning = false;
+let slotsFast = localStorage.getItem('slotsFast') === '1';
+
+function toggleFastMode() {
+  slotsFast = !slotsFast;
+  localStorage.setItem('slotsFast', slotsFast ? '1' : '0');
+  document.getElementById('fastBtn').classList.toggle('active', slotsFast);
+}
 
 function openSlots() {
   if (!state.userId) return alert('Set your user ID first.');
@@ -1601,6 +1623,7 @@ function openSlots() {
   document.getElementById('slotsBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
   buildPresets('slotPresets', 'slotBet');
   document.getElementById('slotsLegend').classList.remove('open');
+  document.getElementById('fastBtn').classList.toggle('active', slotsFast);
   document.getElementById('slotsModal').classList.add('open');
 }
 
@@ -1650,14 +1673,17 @@ async function spinSlots() {
   try {
     const data = await api('/api/play/slots', { method:'POST', json:{ user_id:+state.userId, bet } });
 
-    // Stagger stop: left first
-    for (let i = 0; i < 3; i++) {
-      await sleep(350);
-      reelEls[i].classList.remove('spinning');
-      reelEls[i].textContent = data.reels[i];
+    // Stagger stop
+    if (slotsFast) {
+      reelEls.forEach((el, i) => { el.className = 'reel'; el.textContent = data.reels[i]; });
+    } else {
+      for (let i = 0; i < 3; i++) {
+        await sleep(350);
+        reelEls[i].classList.remove('spinning');
+        reelEls[i].textContent = data.reels[i];
+      }
+      await sleep(200);
     }
-
-    await sleep(200);
     const isJackpot = data.result === 'jackpot';
     const isWin = data.multiplier > 0;
 
