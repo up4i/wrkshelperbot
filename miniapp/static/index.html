@@ -1817,36 +1817,46 @@ function _buildRouletteWheel() {
     </svg>`;
 }
 
-function _rlGetAngle(el) {
-  const m = window.getComputedStyle(el).transform;
-  if (!m || m === 'none') return 0;
-  const v = m.match(/matrix.*\((.+)\)/)[1].split(', ');
-  const angle = Math.atan2(parseFloat(v[1]), parseFloat(v[0])) * (180 / Math.PI);
-  return ((angle % 360) + 360) % 360;
+// RAF-based spin — tracks exact angle in JS so we never read from computed style
+let _rlAngle = 0, _rlRaf = null, _rlLastTs = null;
+
+function _rlStartSpin() {
+  _rlLastTs = null;
+  function tick(ts) {
+    if (_rlLastTs !== null) {
+      _rlAngle = (_rlAngle + (ts - _rlLastTs) * 0.9) % 360; // 0.9 deg/ms ≈ 1.5 rev/s
+      const svg = document.getElementById('rouletteWheelSvg').querySelector('svg');
+      if (svg) svg.style.transform = `rotate(${_rlAngle}deg)`;
+    }
+    _rlLastTs = ts;
+    _rlRaf = requestAnimationFrame(tick);
+  }
+  _rlRaf = requestAnimationFrame(tick);
+}
+
+function _rlStopSpin() {
+  if (_rlRaf) { cancelAnimationFrame(_rlRaf); _rlRaf = null; }
+  _rlLastTs = null;
 }
 
 async function _rlLand(winColor) {
+  _rlStopSpin();
   const svg = document.getElementById('rouletteWheelSvg').querySelector('svg');
   if (!svg) return;
-  const cur = _rlGetAngle(svg);
-  svg.style.animation = 'none';
-  svg.style.transition = 'none';
-  svg.style.transform = `rotate(${cur}deg)`;
-  svg.offsetHeight; // reflow
   const code = winColor === 'red' ? 'R' : winColor === 'black' ? 'B' : 'G';
   const matches = _RL_COLORS.reduce((a, c, i) => { if (c === code) a.push(i); return a; }, []);
   const seg = matches[Math.floor(Math.random() * matches.length)];
-  const deg = 360 / _RL_N;
-  const target = (seg + 0.5) * deg + (Math.random() - 0.5) * deg * 0.6;
-  let delta = (target - cur % 360 + 360) % 360;
+  const degPerSlot = 360 / _RL_N;
+  const target = (seg + 0.5) * degPerSlot + (Math.random() - 0.5) * degPerSlot * 0.6;
+  let delta = (target - _rlAngle % 360 + 360) % 360;
   if (delta < 30) delta += 360;
-  const final = cur + 7 * 360 + delta;
+  const final = _rlAngle + 5 * 360 + delta;
   svg.style.transition = 'transform 4s cubic-bezier(0.17, 0, 0.12, 1)';
   svg.style.transform = `rotate(${final}deg)`;
+  _rlAngle = final % 360;
   await new Promise(r => setTimeout(r, 4100));
   svg.style.transition = 'none';
-  svg.style.transform = `rotate(${final % 360}deg)`;
-  svg.offsetHeight;
+  svg.style.transform = `rotate(${_rlAngle}deg)`;
 }
 
 function openRoulette() {
@@ -1874,9 +1884,7 @@ async function spinRoulette() {
   errEl.textContent = '';
   document.getElementById('rouletteSpinBtn').disabled = true;
   document.getElementById('rouletteResult').className = 'result-box';
-  // Start fast spin while waiting for API
-  const svg = document.getElementById('rouletteWheelSvg').querySelector('svg');
-  if (svg) { svg.style.transition = 'none'; svg.style.animation = 'rl-spin 0.35s linear infinite'; }
+  _rlStartSpin(); // RAF spin — angle tracked in _rlAngle, no CSS animation needed
   try {
     const data = await api('/api/play/roulette', { method:'POST', json:{ user_id:+state.userId, bet, color:rouletteColor } });
     await _rlLand(data.winning_color);
@@ -1891,7 +1899,7 @@ async function spinRoulette() {
     document.getElementById('rouletteBal').textContent = fmt(state.balance);
     refreshHeaderBal();
   } catch (e) {
-    if (svg) svg.style.animation = 'none';
+    _rlStopSpin();
     errEl.textContent = e.message || 'Error';
   } finally {
     document.getElementById('rouletteSpinBtn').disabled = false;
@@ -1993,7 +2001,19 @@ async function cashoutHighLow() {
 }
 
 // ── Street Craps ──────────────────────────────────────────────────────────────
-const _DICE_EMOJI = ['','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣'];
+const _DICE_EMOJI = ['','⚀','⚁','⚂','⚃','⚄','⚅'];
+
+async function _animateDice(d1, d2) {
+  const el1 = document.getElementById('crapsDie1');
+  const el2 = document.getElementById('crapsDie2');
+  for (let i = 0; i < 8; i++) {
+    el1.textContent = _DICE_EMOJI[Math.ceil(Math.random() * 6)];
+    el2.textContent = _DICE_EMOJI[Math.ceil(Math.random() * 6)];
+    await new Promise(r => setTimeout(r, 65));
+  }
+  el1.textContent = _DICE_EMOJI[d1];
+  el2.textContent = _DICE_EMOJI[d2];
+}
 
 async function openCraps() {
   if (!state.userId) return alert('Open in Telegram to play.');
@@ -2024,8 +2044,8 @@ function _crapsEnterGame(point) {
   document.getElementById('crapsStatus').textContent = point
     ? `Point: ${point} — roll it again before a 7!`
     : 'Come-out roll — hit 7 or 11 to win!';
-  document.getElementById('crapsDie1').textContent = '⬜';
-  document.getElementById('crapsDie2').textContent = '⬜';
+  document.getElementById('crapsDie1').textContent = '🎲';
+  document.getElementById('crapsDie2').textContent = '🎲';
   document.getElementById('crapsTotal').textContent = '';
 }
 
@@ -2049,10 +2069,12 @@ async function startCraps() {
 async function rollCraps() {
   document.getElementById('crapsRollBtn').disabled = true;
   document.getElementById('crapsErr').textContent = '';
+  document.getElementById('crapsDie1').textContent = '⬜';
+  document.getElementById('crapsDie2').textContent = '⬜';
+  document.getElementById('crapsTotal').textContent = '';
   try {
     const data = await api('/api/play/craps/roll', { method:'POST', json:{ user_id:+state.userId } });
-    document.getElementById('crapsDie1').textContent = _DICE_EMOJI[data.d1];
-    document.getElementById('crapsDie2').textContent = _DICE_EMOJI[data.d2];
+    await _animateDice(data.d1, data.d2);
     document.getElementById('crapsTotal').textContent = `Total: ${data.total}`;
     if (data.result === 'win') {
       state.balance = data.new_balance;
@@ -2061,7 +2083,7 @@ async function rollCraps() {
       const resEl = document.getElementById('crapsResult');
       resEl.textContent = `🎉 Winner! +${fmt(data.winnings)} WRK$`;
       resEl.className = 'result-box show win-box';
-      _crapsShowBet();
+      setTimeout(_crapsShowBet, 2000); // keep dice visible before resetting
     } else if (data.result === 'lose') {
       state.balance = data.new_balance;
       document.getElementById('crapsBal').textContent = fmt(state.balance);
@@ -2069,7 +2091,7 @@ async function rollCraps() {
       const resEl = document.getElementById('crapsResult');
       resEl.textContent = `💀 Seven out. Lost ${fmt(data.lost)} WRK$.`;
       resEl.className = 'result-box show lose-box';
-      _crapsShowBet();
+      setTimeout(_crapsShowBet, 2000);
     } else if (data.result === 'point') {
       document.getElementById('crapsStatus').textContent = `Point set: ${data.point} — roll it again before a 7!`;
     } else {
