@@ -1668,6 +1668,7 @@ async function loadOwnProfile() {
   try {
     const d = await api(`/api/profile/${state.userId}`);
     el.innerHTML = buildProfileHtml(d, true);
+    _setupGiftsObserver();
   } catch(e) {
     el.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
   }
@@ -1685,6 +1686,7 @@ async function loadProfile() {
     const d = await api(url);
     content.innerHTML = buildProfileHtml(d, false);
     content.style.display = 'flex';
+    _setupGiftsObserver();
   } catch(e) {
     errEl.textContent = e.message;
   }
@@ -1698,11 +1700,28 @@ function _pinnedBadgeHtml(pg) {
   return `<span class="pin-badge" title="${esc(pg.model_name)} #${pg.gift_number}" style="cursor:pointer" onclick="openProfileGiftModal(${pg.id})">📌 ${imgHtml}</span>`;
 }
 
+function _buildGiftCardHtml(g, isOwn, pinnedGiftId) {
+  const tierColor = { common:'', uncommon:'', rare:'rare', epic:'epic', legendary:'legendary' };
+  const gemHtml = g.custom_emoji_id
+    ? `<img class="gift-emoji-img" src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<div class=\\'gem\\'>🎁</div>'">`
+    : `<div class="gem">${g.model_emoji || '🎁'}</div>`;
+  const isPinned = pinnedGiftId === g.id;
+  const ownCls = isOwn ? ' own-gift' : '';
+  const pinnedCls = isPinned ? ' pinned-gift' : '';
+  const bgColor = (g.background && BG_HEX[g.background]) || 'var(--card2)';
+  return `
+        <div class="gift-card${ownCls}${pinnedCls}" style="cursor:pointer;background:${bgColor}" onclick="openProfileGiftModal(${g.id})">
+          ${gemHtml}
+          <div class="gname">${esc(g.model_name)}</div>
+          <div class="gtier ${tierColor[g.tier]||''}">${g.tier} #${g.gift_number||g.id}</div>
+          ${isPinned ? '<div style="font-size:10px;color:var(--primary);margin-top:2px">📌 pinned</div>' : ''}
+        </div>`;
+}
+
 function buildProfileHtml(d, isOwn) {
   const initials = d.name.replace(/^@/,'').slice(0,2).toUpperCase();
   const ownPhoto = isOwn && state.photoUrl ? state.photoUrl : `/api/avatar/${d.user_id}`;
   const avatarHtml = `<img class="avatar" src="${ownPhoto}" alt="${initials}" onerror="avatarError(this,'${initials}')">`;
-  const tierColor = { common:'', uncommon:'', rare:'rare', epic:'epic', legendary:'legendary' };
 
   // store gift data for detail modal
   window._profileGifts = {};
@@ -1711,24 +1730,18 @@ function buildProfileHtml(d, isOwn) {
   d.gifts.forEach(g => { window._profileGifts[g.id] = g; });
   if (d.pinned_gift) window._profileGifts[d.pinned_gift.id] = d.pinned_gift;
 
+  // track scroll state
+  _giftsProfileId = d.user_id;
+  _giftsOffset = d.gifts.length;
+  _giftsHasMore = d.has_more || false;
+
   const giftHtml = d.gifts.length
-    ? d.gifts.map(g => {
-        const gemHtml = g.custom_emoji_id
-          ? `<img class="gift-emoji-img" src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<div class=\\'gem\\'>🎁</div>'">`
-          : `<div class="gem">${g.model_emoji || '🎁'}</div>`;
-        const isPinned = d.pinned_gift_id === g.id;
-        const ownCls = isOwn ? ' own-gift' : '';
-        const pinnedCls = isPinned ? ' pinned-gift' : '';
-        const bgColor = (g.background && BG_HEX[g.background]) || 'var(--card2)';
-        return `
-        <div class="gift-card${ownCls}${pinnedCls}" style="cursor:pointer;background:${bgColor}" onclick="openProfileGiftModal(${g.id})">
-          ${gemHtml}
-          <div class="gname">${esc(g.model_name)}</div>
-          <div class="gtier ${tierColor[g.tier]||''}">${g.tier} #${g.gift_number||g.id}</div>
-          ${isPinned ? '<div style="font-size:10px;color:var(--primary);margin-top:2px">📌 pinned</div>' : ''}
-        </div>`;
-      }).join('')
+    ? d.gifts.map(g => _buildGiftCardHtml(g, isOwn, d.pinned_gift_id)).join('')
     : '<div class="empty" style="grid-column:1/-1">No gifts yet</div>';
+
+  const sentinelHtml = _giftsHasMore
+    ? `<div id="giftSentinel" style="grid-column:1/-1;text-align:center;padding:12px;color:var(--muted);font-size:13px">Loading…</div>`
+    : '';
 
   return `
     <div class="profile-hero">
@@ -1751,9 +1764,44 @@ function buildProfileHtml(d, isOwn) {
     </div>
     <div>
       <div class="card-title">Gift Collection (${d.gift_count})${isOwn ? ' — tap to pin' : ''}</div>
-      <div class="gifts-grid">${giftHtml}</div>
+      <div class="gifts-grid" id="giftsGrid">${giftHtml}${sentinelHtml}</div>
     </div>
   `;
+}
+
+function _setupGiftsObserver() {
+  if (_giftsObserver) { _giftsObserver.disconnect(); _giftsObserver = null; }
+  if (!_giftsHasMore) return;
+  const sentinel = document.getElementById('giftSentinel');
+  if (!sentinel) return;
+  _giftsObserver = new IntersectionObserver(async entries => {
+    if (!entries[0].isIntersecting || !_giftsHasMore) return;
+    _giftsHasMore = false; // prevent double-fire while loading
+    try {
+      const d = await api(`/api/profile/${_giftsProfileId}?gifts_offset=${_giftsOffset}&gifts_limit=20`);
+      const grid = document.getElementById('giftsGrid');
+      if (!grid) return;
+      const old = document.getElementById('giftSentinel');
+      if (old) old.remove();
+      const isOwn = window._profileIsOwn || false;
+      const pinnedId = window._profilePinnedId || null;
+      d.gifts.forEach(g => {
+        if (window._profileGifts) window._profileGifts[g.id] = g;
+        grid.insertAdjacentHTML('beforeend', _buildGiftCardHtml(g, isOwn, pinnedId));
+      });
+      _giftsOffset += d.gifts.length;
+      _giftsHasMore = d.has_more || false;
+      if (_giftsHasMore) {
+        grid.insertAdjacentHTML('beforeend',
+          `<div id="giftSentinel" style="grid-column:1/-1;text-align:center;padding:12px;color:var(--muted);font-size:13px">Loading…</div>`);
+        _setupGiftsObserver();
+      }
+    } catch(e) {
+      console.error('gift scroll error', e);
+      _giftsHasMore = true; // allow retry on next intersection
+    }
+  }, { threshold: 0.1 });
+  _giftsObserver.observe(sentinel);
 }
 
 function showPinSheet(instanceId, isCurrentlyPinned) {
@@ -1796,6 +1844,11 @@ function toggleFastMode() {
 }
 
 // ── Roulette ──────────────────────────────────────────────────────────────────
+let _giftsProfileId = null;
+let _giftsOffset = 0;
+let _giftsHasMore = false;
+let _giftsObserver = null;
+
 let rouletteColor = null;
 
 // American roulette wheel segment colors (0, 28, 9, 26, 30, 11, ... order)
