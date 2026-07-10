@@ -1540,7 +1540,7 @@ async function spinSlots() {
   document.getElementById('spinBtn').disabled = true;
 
   const reelEls = ['r0','r1','r2'].map(id => document.getElementById(id));
-  reelEls.forEach(el => { el.classList.add('spinning'); el.textContent = '❓'; });
+  reelEls.forEach(el => { el.className = 'reel spinning'; el.textContent = '❓'; });
 
   try {
     const data = await api('/api/play/slots', { method:'POST', json:{ user_id:+state.userId, bet } });
