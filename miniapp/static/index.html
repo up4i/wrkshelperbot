@@ -1257,6 +1257,7 @@
 const API = '';  // same origin
 let state = {
   userId: localStorage.getItem('wrkUserId') || null,
+  photoUrl: localStorage.getItem('wrkPhotoUrl') || null,
   inTelegram: false,
   balance: null,
   lbTab: 'balance',
@@ -1290,6 +1291,10 @@ async function boot() {
     tg.expand();
     try {
       const auth = await api('/api/auth/telegram', { method: 'POST', json: { init_data: tg.initData } });
+      if (auth.photo_url) {
+        state.photoUrl = auth.photo_url;
+        localStorage.setItem('wrkPhotoUrl', auth.photo_url);
+      }
       setUser(String(auth.user_id));
     } catch {
       // initData validation failed
@@ -1321,7 +1326,7 @@ async function refreshBalance() {
     pill.textContent = `${fmt(data.balance)} WRK$`;
     pill.classList.add('visible');
     const av = document.getElementById('headerAvatar');
-    av.src = `/api/avatar/${state.userId}`;
+    av.src = state.photoUrl || `/api/avatar/${state.userId}`;
     av.classList.add('visible');
   } catch {}
 }
@@ -1503,7 +1508,8 @@ function _pinnedBadgeHtml(pg) {
 
 function buildProfileHtml(d, isOwn) {
   const initials = d.name.replace(/^@/,'').slice(0,2).toUpperCase();
-  const avatarHtml = `<img class="avatar" src="/api/avatar/${d.user_id}" alt="${initials}" onerror="avatarError(this,'${initials}')">`;
+  const ownPhoto = isOwn && state.photoUrl ? state.photoUrl : `/api/avatar/${d.user_id}`;
+  const avatarHtml = `<img class="avatar" src="${ownPhoto}" alt="${initials}" onerror="avatarError(this,'${initials}')">`;
   const tierColor = { common:'', uncommon:'', rare:'rare', epic:'epic', legendary:'legendary' };
 
   // store gift data for detail modal

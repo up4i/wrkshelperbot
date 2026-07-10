@@ -372,38 +372,23 @@ def get_avatar(user_id: int):
     if cached.exists():
         return FileResponse(str(cached), media_type="image/jpeg",
                             headers={"Cache-Control": "public, max-age=86400"})
-    token = config.BOT_TOKEN
-    try:
-        req = urllib.request.Request(
-            f"https://api.telegram.org/bot{token}/getUserProfilePhotos",
-            data=json.dumps({"user_id": user_id, "limit": 1}).encode(),
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=8) as r:
-            data = json.loads(r.read())
-        photos = data.get("result", {}).get("photos", [])
-        if not photos:
-            raise HTTPException(404, "No profile photo")
-        file_id = photos[0][-1]["file_id"]  # largest size
 
-        with urllib.request.urlopen(
-            f"https://api.telegram.org/bot{token}/getFile?file_id={file_id}", timeout=8
-        ) as r:
-            file_data = json.loads(r.read())
-        file_path = file_data["result"]["file_path"]
+    # Try stored photo_url from mini-app auth first
+    with db_conn() as db:
+        row = db.execute("SELECT photo_url FROM economy WHERE user_id = ?", (user_id,)).fetchone()
+    photo_url = row["photo_url"] if row else None
 
-        with urllib.request.urlopen(
-            f"https://api.telegram.org/file/bot{token}/{file_path}", timeout=10
-        ) as r:
-            img_bytes = r.read()
+    if photo_url:
+        try:
+            with urllib.request.urlopen(photo_url, timeout=8) as r:
+                img_bytes = r.read()
+            cached.write_bytes(img_bytes)
+            return Response(content=img_bytes, media_type="image/jpeg",
+                            headers={"Cache-Control": "public, max-age=86400"})
+        except Exception:
+            pass
 
-        cached.write_bytes(img_bytes)
-        return Response(content=img_bytes, media_type="image/jpeg",
-                        headers={"Cache-Control": "public, max-age=86400"})
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(404, "Could not fetch avatar")
+    raise HTTPException(404, "No avatar available")
 
 
 # ── Telegram auth ─────────────────────────────────────────────────────────────
@@ -435,7 +420,17 @@ def auth_telegram(req: TelegramAuthRequest):
     if not user_id:
         raise HTTPException(400, "No user in initData")
 
-    return {"user_id": user_id, "first_name": user.get("first_name", ""), "username": user.get("username", "")}
+    photo_url = user.get("photo_url")
+    if photo_url:
+        with db_conn() as db:
+            db.execute(
+                "UPDATE economy SET photo_url = ? WHERE user_id = ?",
+                (photo_url, user_id),
+            )
+            db.commit()
+
+    return {"user_id": user_id, "first_name": user.get("first_name", ""),
+            "username": user.get("username", ""), "photo_url": photo_url}
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
@@ -1170,11 +1165,12 @@ async def _crash_loop():
 async def _startup():
     asyncio.create_task(_crash_loop())
     with db_conn() as db:
-        try:
-            db.execute("ALTER TABLE economy ADD COLUMN pinned_gift_id INTEGER")
-            db.commit()
-        except Exception:
-            pass
+        for col in ("pinned_gift_id INTEGER", "photo_url TEXT"):
+            try:
+                db.execute(f"ALTER TABLE economy ADD COLUMN {col}")
+                db.commit()
+            except Exception:
+                pass
         db.execute("""CREATE TABLE IF NOT EXISTS game_stats (
             user_id         INTEGER PRIMARY KEY,
             slots_won       INTEGER NOT NULL DEFAULT 0,
