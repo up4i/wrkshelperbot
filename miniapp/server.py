@@ -590,9 +590,9 @@ def _slot_payout(reels: list[str]) -> tuple[str, int]:
     if reels == ["7️⃣", "7️⃣", "7️⃣"]:
         return "jackpot", 50
     if reels[0] == reels[1] == reels[2]:
-        return "three_match", 10
+        return "three_match", 12
     if reels[0] == reels[1] or reels[1] == reels[2] or reels[0] == reels[2]:
-        return "two_match", 2
+        return "two_match", 1  # push — bet returned, no profit
     return "no_match", 0
 
 
@@ -641,7 +641,7 @@ def play_slots(req: BetRequest):
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
         if delta > 0:
             _record_stats(db, req.user_id, slots_won=delta)
-        else:
+        elif delta < 0:
             _record_stats(db, req.user_id, slots_lost=req.bet)
         return {"reels": reels, "result": kind, "multiplier": mult,
                 "delta": delta, "new_balance": new_bal}

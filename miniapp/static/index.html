@@ -1350,12 +1350,12 @@
       <div class="legend-row">
         <span class="legend-combo">⭐⭐⭐</span>
         <span class="legend-label">Three of a kind</span>
-        <span class="legend-mult" style="color:var(--green)">10×</span>
+        <span class="legend-mult" style="color:var(--green)">12×</span>
       </div>
       <div class="legend-row">
         <span class="legend-combo">🍒🍒 </span>
         <span class="legend-label">Two of a kind</span>
-        <span class="legend-mult" style="color:var(--green)">2×</span>
+        <span class="legend-mult" style="color:var(--muted)">Push</span>
       </div>
       <div class="legend-row">
         <span class="legend-combo">🍒🍋⭐</span>
@@ -2313,7 +2313,8 @@ async function spinSlots() {
       await sleep(200);
     }
     const isJackpot = data.result === 'jackpot';
-    const isWin = data.multiplier > 0;
+    const isWin = data.delta > 0;
+    const isPush = data.result === 'two_match';
 
     reelEls.forEach(el => {
       if (isJackpot) el.classList.add('jackpot');
@@ -2324,10 +2325,10 @@ async function spinSlots() {
     else if (data.result === 'three_match') fireConfetti();
 
     const resEl = document.getElementById('slotsResult');
-    const labels = { jackpot: `🎰 JACKPOT! ${data.multiplier}×`, three_match: `🎉 Three of a kind! ${data.multiplier}×`, two_match: `✨ Two match! ${data.multiplier}×`, no_match: '💀 No match' };
-    const delta = data.delta > 0 ? `+${fmt(data.delta)}` : fmt(data.delta);
-    resEl.textContent = `${labels[data.result]} — ${delta} WRK$`;
-    resEl.className = `result-box show ${isWin ? 'win-box' : 'lose-box'}`;
+    const labels = { jackpot: `🎰 JACKPOT! ${data.multiplier}×`, three_match: `🎉 Three of a kind! ${data.multiplier}×`, two_match: `🤝 Push — bet returned`, no_match: '💀 No match' };
+    const deltaStr = data.delta > 0 ? `+${fmt(data.delta)} WRK$` : data.delta < 0 ? `${fmt(data.delta)} WRK$` : '';
+    resEl.textContent = deltaStr ? `${labels[data.result]} — ${deltaStr}` : labels[data.result];
+    resEl.className = `result-box show ${isWin ? 'win-box' : isPush ? '' : 'lose-box'}`;
 
     state.balance = data.new_balance;
     document.getElementById('slotsBal').textContent = fmt(data.new_balance);
