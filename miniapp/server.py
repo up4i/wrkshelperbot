@@ -373,11 +373,10 @@ def get_avatar(user_id: int):
         return FileResponse(str(cached), media_type="image/jpeg",
                             headers={"Cache-Control": "public, max-age=86400"})
 
-    # Try stored photo_url from mini-app auth first
+    # Try stored photo_url (from initData when available)
     with db_conn() as db:
         row = db.execute("SELECT photo_url FROM economy WHERE user_id = ?", (user_id,)).fetchone()
     photo_url = row["photo_url"] if row else None
-
     if photo_url:
         try:
             with urllib.request.urlopen(photo_url, timeout=8) as r:
@@ -388,7 +387,53 @@ def get_avatar(user_id: int):
         except Exception:
             pass
 
-    raise HTTPException(404, "No avatar available")
+    # Fall back to bot API (works for users with public profile photos)
+    token = config.BOT_TOKEN
+    try:
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{token}/getUserProfilePhotos",
+            data=json.dumps({"user_id": user_id, "limit": 1}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as r:
+            data = json.loads(r.read())
+        photos = data.get("result", {}).get("photos", [])
+        if not photos:
+            raise HTTPException(404, "No profile photo")
+        file_id = photos[0][-1]["file_id"]
+
+        with urllib.request.urlopen(
+            f"https://api.telegram.org/bot{token}/getFile?file_id={file_id}", timeout=8
+        ) as r:
+            file_data = json.loads(r.read())
+        file_path = file_data["result"]["file_path"]
+
+        with urllib.request.urlopen(
+            f"https://api.telegram.org/file/bot{token}/{file_path}", timeout=10
+        ) as r:
+            img_bytes = r.read()
+
+        cached.write_bytes(img_bytes)
+        return Response(content=img_bytes, media_type="image/jpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(404, "No avatar available")
+
+
+# ── Avatar debug ─────────────────────────────────────────────────────────────
+
+@app.get("/api/avatar-debug/{user_id}")
+def avatar_debug(user_id: int):
+    token = config.BOT_TOKEN
+    req = urllib.request.Request(
+        f"https://api.telegram.org/bot{token}/getUserProfilePhotos",
+        data=json.dumps({"user_id": user_id, "limit": 1}).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=8) as r:
+        return json.loads(r.read())
 
 
 # ── Telegram auth ─────────────────────────────────────────────────────────────
