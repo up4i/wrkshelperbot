@@ -1667,6 +1667,10 @@ function togglePlayerSearch() {
 
 async function loadOwnProfile() {
   const el = document.getElementById('ownProfileContent');
+  // Clean up stale Sortable instance and pending debounce on re-render
+  if (_sortableInstance) { _sortableInstance.destroy(); _sortableInstance = null; }
+  clearTimeout(_reorderDebounce);
+  _reorderDebounce = null;
   el.innerHTML = '<div class="loading">Loading…</div>';
   try {
     const d = await api(`/api/profile/${state.userId}`);
@@ -1790,7 +1794,7 @@ function toggleReorderMode() {
   }
 
   // Can't reorder partial load — all gifts must be loaded first
-  if (_giftsHasMore) {
+  if (_giftsHasMore || _giftsObserver) {
     alert('Scroll to load all your gifts before reordering.');
     return;
   }
