@@ -437,6 +437,83 @@ def work_end(req: WorkEndRequest):
         return _collect_shift(db, req.user_id, session["taps"], session["earned"])
 
 
+# ── Market ────────────────────────────────────────────────────────────────────
+
+@app.get("/api/market")
+def market_listings(tier: str = "low", limit: int = 40, offset: int = 0):
+    valid_tiers = ("low", "mid", "high")
+    if tier not in valid_tiers:
+        raise HTTPException(400, "tier must be low | mid | high")
+    with db_conn() as db:
+        rows = db.execute(
+            """SELECT gm.collection, gm.model_number, gm.model_name, gm.tier,
+                      gi.background, COUNT(gi.id) AS stock, gp.current_price
+               FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+               WHERE gi.owner_id IS NULL AND gm.tier = ?
+               GROUP BY gm.collection, gm.model_number, gi.background
+               ORDER BY gp.current_price ASC, gm.collection, gm.model_number
+               LIMIT ? OFFSET ?""",
+            (tier, limit, offset),
+        ).fetchall()
+        total = db.execute(
+            """SELECT COUNT(DISTINCT gm.collection || gm.model_number || gi.background)
+               FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               WHERE gi.owner_id IS NULL AND gm.tier = ?""",
+            (tier,),
+        ).fetchone()[0]
+    return {"items": [dict(r) for r in rows], "total": total, "offset": offset}
+
+
+class MarketBuyRequest(BaseModel):
+    user_id: int
+    collection: str
+    model_number: int
+    background: str
+
+
+@app.post("/api/market/buy")
+def market_buy(req: MarketBuyRequest):
+    with db_conn() as db:
+        row = db.execute(
+            """SELECT gi.id, gi.gift_number FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               WHERE gi.owner_id IS NULL AND gm.collection = ? AND gm.model_number = ? AND gi.background = ?
+               ORDER BY gi.gift_number ASC LIMIT 1""",
+            (req.collection, req.model_number, req.background),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "Out of stock")
+        instance_id, gift_number = row["id"], row["gift_number"]
+
+        price_row = db.execute(
+            "SELECT current_price FROM gift_prices WHERE collection = ? AND background = ?",
+            (req.collection, req.background),
+        ).fetchone()
+        if not price_row:
+            raise HTTPException(500, "No price data")
+        price = price_row["current_price"]
+
+        user_row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+        if not user_row:
+            raise HTTPException(404, "User not found — use the bot first")
+        if user_row["balance"] < price:
+            raise HTTPException(400, f"Insufficient balance ({user_row['balance']:,} WRK$)")
+
+        db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (price, req.user_id))
+        db.execute("UPDATE gift_instances SET owner_id = ? WHERE id = ?", (req.user_id, instance_id))
+        db.execute(
+            "UPDATE gift_prices SET demand_pressure = demand_pressure + 1 WHERE collection = ? AND background = ?",
+            (req.collection, req.background),
+        )
+        new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()["balance"]
+        db.commit()
+
+    return {"gift_number": gift_number, "price": price, "new_balance": new_bal}
+
+
 # ── Blackjack ─────────────────────────────────────────────────────────────────
 
 _bj_games: dict[int, dict] = {}

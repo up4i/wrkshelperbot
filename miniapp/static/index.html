@@ -543,6 +543,53 @@
   .cooldown-label { font-size: 13px; color: var(--muted); }
   .cooldown-timer { font-size: 36px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--primary); }
 
+  /* ── Market ── */
+  .market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .market-card {
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 18px 10px 14px;
+    gap: 4px;
+    cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+    -webkit-tap-highlight-color: transparent;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .market-card:active { transform: scale(.96); }
+  .market-glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 42%, rgba(255,255,255,0.22) 0%, transparent 62%);
+    pointer-events: none;
+  }
+  .market-emoji { font-size: 42px; position: relative; z-index: 1; line-height: 1.1; }
+  .market-col  { font-size: 11px; font-weight: 700; color: rgba(255,255,255,.85); text-align: center; position: relative; z-index: 1; line-height: 1.3; }
+  .market-name { font-size: 10px; color: rgba(255,255,255,.55); text-align: center; position: relative; z-index: 1; }
+  .market-bg   { font-size: 10px; color: rgba(255,255,255,.45); position: relative; z-index: 1; }
+  .market-price { font-size: 13px; font-weight: 800; color: #fff; position: relative; z-index: 1; margin-top: 2px; }
+  .market-stock { font-size: 10px; color: rgba(255,255,255,.45); position: relative; z-index: 1; }
+  .market-buy-btn {
+    margin-top: 6px;
+    background: rgba(255,255,255,.18);
+    border: 1px solid rgba(255,255,255,.28);
+    border-radius: 8px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+    transition: background .12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .market-buy-btn:active { background: rgba(255,255,255,.32); }
+  .market-load-more { width: 100%; grid-column: 1/-1; }
+
   /* ── Crash ── */
   .crash-history {
     display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; padding: 4px 0 8px;
@@ -812,6 +859,20 @@
       <!-- dynamic job content (hidden until logged in) -->
       <div id="workContent" style="display:none;flex-direction:column;gap:14px"></div>
     </div>
+
+    <!-- MARKET -->
+    <div class="page" id="page-market">
+      <div>
+        <div class="section-title">Market</div>
+        <div class="section-sub">Buy gifts from the bank</div>
+      </div>
+      <div class="tab-row" id="marketTabs">
+        <div class="tab-btn active" onclick="setMarketTier('low',this)">Low</div>
+        <div class="tab-btn" onclick="setMarketTier('mid',this)">Mid</div>
+        <div class="tab-btn" onclick="setMarketTier('high',this)">High</div>
+      </div>
+      <div class="market-grid" id="marketGrid"><div class="loading">Loading…</div></div>
+    </div>
   </main>
 
   <nav>
@@ -829,6 +890,9 @@
     </button>
     <button class="nav-btn" onclick="showPage('work',this)" data-page="work">
       <span class="icon">💼</span>Work
+    </button>
+    <button class="nav-btn" onclick="showPage('market',this)" data-page="market">
+      <span class="icon">🏪</span>Market
     </button>
   </nav>
 </div>
@@ -960,6 +1024,7 @@ function showPage(id, btn) {
   btn.classList.add('active');
   if (id === 'lb') loadLeaderboard(state.lbTab);
   if (id === 'work') openWorkPage();
+  if (id === 'market') loadMarket();
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -1505,6 +1570,121 @@ function handleShiftComplete(result) {
     </div>`;
 
   setTimeout(() => refreshWorkStatus(), 2000);
+}
+
+// ── Market ────────────────────────────────────────────────────────────────────
+const BG_HEX = {
+  black: '#161717', onyx: '#33373a', grape: '#7e52a4',
+  emerald: '#4ba774', midnight: '#3c475f', orange: '#c47b42',
+};
+const BG_LABEL = {
+  black: 'Black', onyx: 'Onyx', grape: 'Grape',
+  emerald: 'Emerald', midnight: 'Midnight', orange: 'Orange',
+};
+
+let marketTier = 'low';
+let marketOffset = 0;
+let marketTotal = 0;
+
+function fmtCollection(s) {
+  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function setMarketTier(tier, btn) {
+  document.querySelectorAll('#marketTabs .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  marketTier = tier;
+  marketOffset = 0;
+  loadMarket(true);
+}
+
+async function loadMarket(reset = false) {
+  if (reset) marketOffset = 0;
+  const grid = document.getElementById('marketGrid');
+  if (marketOffset === 0) grid.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const data = await api(`/api/market?tier=${marketTier}&limit=40&offset=${marketOffset}`);
+    marketTotal = data.total;
+    const items = data.items;
+    if (marketOffset === 0 && !items.length) {
+      grid.innerHTML = '<div class="empty">No gifts in stock</div>';
+      return;
+    }
+    const cards = items.map(g => {
+      const bg = BG_HEX[g.background] || '#161717';
+      return `
+        <div class="market-card" style="background:${bg}" onclick="confirmBuy('${g.collection}',${g.model_number},'${g.background}','${esc(g.model_name)}',${g.current_price},${g.stock})">
+          <div class="market-glow"></div>
+          <div class="market-emoji">🎁</div>
+          <div class="market-col">${esc(fmtCollection(g.collection))}</div>
+          <div class="market-name">${esc(g.model_name)}</div>
+          <div class="market-bg">${BG_LABEL[g.background] || g.background}</div>
+          <div class="market-price">${fmtK(g.current_price)} WRK$</div>
+          <div class="market-stock">${g.stock} in stock</div>
+          <button class="market-buy-btn">Buy</button>
+        </div>`;
+    }).join('');
+
+    if (marketOffset === 0) {
+      grid.innerHTML = cards;
+    } else {
+      document.getElementById('marketLoadMore')?.remove();
+      grid.insertAdjacentHTML('beforeend', cards);
+    }
+
+    marketOffset += items.length;
+    if (marketOffset < marketTotal) {
+      grid.insertAdjacentHTML('beforeend',
+        `<button class="btn outline market-load-more" id="marketLoadMore" onclick="loadMarket()">Load more (${marketTotal - marketOffset} left)</button>`);
+    }
+  } catch(e) {
+    grid.innerHTML = `<div class="error-msg">${e.message}</div>`;
+  }
+}
+
+// Simple inline confirmation — replaces the card's buy button
+function confirmBuy(collection, modelNumber, background, name, price, stock) {
+  if (!state.userId) return alert('Set your user ID first.');
+  // Build a quick bottom-confirm modal rather than confirm()
+  const existing = document.getElementById('marketConfirmBar');
+  if (existing) existing.remove();
+  const bar = document.createElement('div');
+  bar.id = 'marketConfirmBar';
+  bar.style.cssText = 'position:fixed;bottom:calc(var(--nav-h) + 12px);left:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;z-index:200;display:flex;flex-direction:column;gap:10px;box-shadow:0 -4px 24px rgba(0,0,0,.5)';
+  bar.innerHTML = `
+    <div style="font-size:14px;font-weight:700">Buy <span style="color:var(--gold)">${esc(fmtCollection(collection))} — ${esc(name)}</span> (${BG_LABEL[background]})?</div>
+    <div style="font-size:13px;color:var(--muted)">Cost: <b style="color:#fff">${fmt(price)} WRK$</b> · Your balance: <b style="color:var(--gold)">${fmt(state.balance)} WRK$</b></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn outline" style="flex:1" onclick="document.getElementById('marketConfirmBar').remove()">Cancel</button>
+      <button class="btn green-btn" style="flex:1" onclick="executeBuy('${collection}',${modelNumber},'${background}',this)">Confirm</button>
+    </div>
+  `;
+  document.body.appendChild(bar);
+}
+
+async function executeBuy(collection, modelNumber, background, btn) {
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const data = await api('/api/market/buy', {
+      method: 'POST',
+      json: { user_id: +state.userId, collection, model_number: modelNumber, background },
+    });
+    document.getElementById('marketConfirmBar')?.remove();
+    state.balance = data.new_balance;
+    refreshHeaderBal();
+    // Show quick success toast
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:calc(var(--nav-h)+80px);left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:10px 20px;border-radius:20px;font-weight:700;font-size:13px;z-index:300;animation:float-earn .9s ease-out 1.5s forwards';
+    toast.textContent = `✅ Got gift #${data.gift_number}!`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2600);
+    loadMarket(true);
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Confirm';
+    document.getElementById('marketConfirmBar').insertAdjacentHTML('beforeend', `<div class="error-msg">${esc(e.message)}</div>`);
+  }
 }
 
 // ── Crash ─────────────────────────────────────────────────────────────────────
