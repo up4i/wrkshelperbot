@@ -7,6 +7,7 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 <style>
   :root {
     --bg: #07071a;
@@ -239,6 +240,7 @@
   .gift-card.own-gift { cursor: pointer; }
   .gift-card.own-gift:active { opacity: .7; transform: scale(.95); transition: all .1s; }
   .gift-card.pinned-gift { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+  .gift-card-ghost { opacity: .4; background: var(--primary) !important; }
 
   /* ── Gifts grid ── */
   .gifts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -1764,10 +1766,73 @@ function buildProfileHtml(d, isOwn) {
       </div>
     </div>
     <div>
-      <div class="card-title">Gift Collection (${d.gift_count})${isOwn ? ' — tap to pin' : ''}</div>
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Gift Collection (${d.gift_count})${isOwn ? ' — tap to pin' : ''}</span>
+        ${isOwn ? `<button class="btn outline" id="reorderBtn" onclick="toggleReorderMode()" style="font-size:12px;padding:4px 10px">⠿ Reorder</button>` : ''}
+      </div>
       <div class="gifts-grid" id="giftsGrid">${giftHtml}${sentinelHtml}</div>
     </div>
   `;
+}
+
+function toggleReorderMode() {
+  const btn = document.getElementById('reorderBtn');
+  const grid = document.getElementById('giftsGrid');
+  if (!grid || !btn) return;
+
+  if (_sortableInstance) {
+    // Exit reorder mode
+    _sortableInstance.destroy();
+    _sortableInstance = null;
+    btn.textContent = '⠿ Reorder';
+    grid.querySelectorAll('.reorder-handle').forEach(h => h.remove());
+    return;
+  }
+
+  // Can't reorder partial load — all gifts must be loaded first
+  if (_giftsHasMore) {
+    alert('Scroll to load all your gifts before reordering.');
+    return;
+  }
+
+  btn.textContent = '✓ Done';
+
+  // Add drag handles to each gift card
+  grid.querySelectorAll('.gift-card').forEach(card => {
+    const handle = document.createElement('div');
+    handle.className = 'reorder-handle';
+    handle.style.cssText = 'position:absolute;top:4px;left:4px;font-size:14px;cursor:grab;color:var(--muted);z-index:5;line-height:1';
+    handle.textContent = '⠿';
+    card.style.position = 'relative';
+    card.prepend(handle);
+  });
+
+  _sortableInstance = new Sortable(grid, {
+    animation: 150,
+    handle: '.reorder-handle',
+    ghostClass: 'gift-card-ghost',
+    onEnd() {
+      clearTimeout(_reorderDebounce);
+      _reorderDebounce = setTimeout(_saveGiftOrder, 800);
+    }
+  });
+}
+
+async function _saveGiftOrder() {
+  const grid = document.getElementById('giftsGrid');
+  if (!grid) return;
+  const giftIds = [...grid.querySelectorAll('.gift-card[onclick]')]
+    .map(el => {
+      const m = el.getAttribute('onclick').match(/openProfileGiftModal\((\d+)\)/);
+      return m ? +m[1] : null;
+    })
+    .filter(Boolean);
+  if (!giftIds.length) return;
+  try {
+    await api('/api/profile/reorder', { method: 'POST', json: { user_id: +state.userId, gift_ids: giftIds } });
+  } catch(e) {
+    console.error('reorder save failed', e);
+  }
 }
 
 function _setupGiftsObserver() {
@@ -1852,6 +1917,8 @@ let _giftsProfileId = null;
 let _giftsOffset = 0;
 let _giftsHasMore = false;
 let _giftsObserver = null;
+let _sortableInstance = null;
+let _reorderDebounce = null;
 
 let rouletteColor = null;
 
