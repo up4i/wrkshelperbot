@@ -1719,9 +1719,7 @@ function buildProfileHtml(d, isOwn) {
         const isPinned = d.pinned_gift_id === g.id;
         const ownCls = isOwn ? ' own-gift' : '';
         const pinnedCls = isPinned ? ' pinned-gift' : '';
-        const bgColor = g.background
-          ? (g.background.startsWith('#') ? g.background : `#${g.background}`)
-          : 'var(--card2)';
+        const bgColor = (g.background && BG_HEX[g.background]) || 'var(--card2)';
         return `
         <div class="gift-card${ownCls}${pinnedCls}" style="cursor:pointer;background:${bgColor}" onclick="openProfileGiftModal(${g.id})">
           ${gemHtml}
