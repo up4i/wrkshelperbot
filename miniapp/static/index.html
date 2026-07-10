@@ -1792,7 +1792,10 @@ function toggleReorderMode() {
     _sortableInstance.destroy();
     _sortableInstance = null;
     btn.textContent = '⠿ Reorder';
-    grid.querySelectorAll('.reorder-handle').forEach(h => h.remove());
+    grid.querySelectorAll('.gift-card').forEach(c => {
+      c.style.cursor = '';
+      c.style.position = '';
+    });
     return;
   }
 
@@ -1804,19 +1807,14 @@ function toggleReorderMode() {
 
   btn.textContent = '✓ Done';
 
-  // Add drag handles to each gift card
+  // Make entire gift card draggable
   grid.querySelectorAll('.gift-card').forEach(card => {
-    const handle = document.createElement('div');
-    handle.className = 'reorder-handle';
-    handle.style.cssText = 'position:absolute;top:4px;left:4px;font-size:14px;cursor:grab;color:var(--muted);z-index:5;line-height:1';
-    handle.textContent = '⠿';
+    card.style.cursor = 'grab';
     card.style.position = 'relative';
-    card.prepend(handle);
   });
 
   _sortableInstance = new Sortable(grid, {
     animation: 150,
-    handle: '.reorder-handle',
     ghostClass: 'gift-card-ghost',
     onEnd() {
       clearTimeout(_reorderDebounce);
@@ -3095,6 +3093,7 @@ function closeGiftDetail() {
 }
 
 function openProfileGiftModal(giftId) {
+  if (_sortableInstance) return; // block modal opens during reorder
   const g = (window._profileGifts || {})[giftId];
   if (!g) return;
   if (_gdLottie) { _gdLottie.destroy(); _gdLottie = null; }
