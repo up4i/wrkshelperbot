@@ -389,6 +389,39 @@
     0%, 100% { box-shadow: 0 0 20px rgba(245,158,11,.6); }
     50%       { box-shadow: 0 0 40px rgba(245,158,11,.9); }
   }
+  .slots-help-btn {
+    position: absolute;
+    top: 16px; left: 16px;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 32px; height: 32px;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+  }
+  .slots-legend {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .slots-legend.open { display: flex; }
+  .legend-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .legend-combo { font-size: 17px; flex-shrink: 0; }
+  .legend-label { flex: 1; color: var(--muted); }
+  .legend-mult { font-weight: 700; font-size: 14px; }
 
   /* ── Coinflip ── */
   .coin-wrap {
@@ -1110,7 +1143,30 @@
 <div class="modal-bg" id="slotsModal" onclick="closeModal('slotsModal',event)">
   <div class="modal" style="position:relative">
     <button class="modal-close" onclick="closeModal('slotsModal')">✕</button>
+    <button class="slots-help-btn" onclick="toggleSlotsLegend()">?</button>
     <div class="modal-title">🎰 Slots</div>
+    <div class="slots-legend" id="slotsLegend">
+      <div class="legend-row">
+        <span class="legend-combo">7️⃣7️⃣7️⃣</span>
+        <span class="legend-label">Jackpot</span>
+        <span class="legend-mult" style="color:var(--gold)">50×</span>
+      </div>
+      <div class="legend-row">
+        <span class="legend-combo">⭐⭐⭐</span>
+        <span class="legend-label">Three of a kind</span>
+        <span class="legend-mult" style="color:var(--green)">10×</span>
+      </div>
+      <div class="legend-row">
+        <span class="legend-combo">🍒🍒 </span>
+        <span class="legend-label">Two of a kind</span>
+        <span class="legend-mult" style="color:var(--green)">2×</span>
+      </div>
+      <div class="legend-row">
+        <span class="legend-combo">🍒🍋⭐</span>
+        <span class="legend-label">No match</span>
+        <span class="legend-mult" style="color:var(--red)">−bet</span>
+      </div>
+    </div>
     <div class="reels">
       <div class="reel" id="r0">🍒</div>
       <div class="reel" id="r1">💎</div>
@@ -1521,6 +1577,7 @@ function openSlots() {
   resetSlotsUI();
   document.getElementById('slotsBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
   buildPresets('slotPresets', 'slotBet');
+  document.getElementById('slotsLegend').classList.remove('open');
   document.getElementById('slotsModal').classList.add('open');
 }
 
@@ -1528,6 +1585,10 @@ function resetSlotsUI() {
   ['r0','r1','r2'].forEach(id => { const el = document.getElementById(id); el.className='reel'; el.textContent='❓'; });
   document.getElementById('slotsResult').className='result-box';
   document.getElementById('slotsErr').textContent='';
+}
+
+function toggleSlotsLegend() {
+  document.getElementById('slotsLegend').classList.toggle('open');
 }
 
 async function spinSlots() {
