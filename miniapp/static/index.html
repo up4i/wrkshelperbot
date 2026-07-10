@@ -1529,6 +1529,7 @@ function goProfile() {
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 function showPage(id, btn) {
+  if (id !== 'profile' && _giftsObserver) { _giftsObserver.disconnect(); _giftsObserver = null; }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
@@ -1774,11 +1775,13 @@ function _setupGiftsObserver() {
   if (!_giftsHasMore) return;
   const sentinel = document.getElementById('giftSentinel');
   if (!sentinel) return;
+  const profileId = _giftsProfileId;
+  let localOffset = _giftsOffset;
   _giftsObserver = new IntersectionObserver(async entries => {
     if (!entries[0].isIntersecting || !_giftsHasMore) return;
     _giftsHasMore = false; // prevent double-fire while loading
     try {
-      const d = await api(`/api/profile/${_giftsProfileId}?gifts_offset=${_giftsOffset}&gifts_limit=20`);
+      const d = await api(`/api/profile/${profileId}?gifts_offset=${localOffset}&gifts_limit=20`);
       const grid = document.getElementById('giftsGrid');
       if (!grid) return;
       const old = document.getElementById('giftSentinel');
@@ -1789,7 +1792,8 @@ function _setupGiftsObserver() {
         if (window._profileGifts) window._profileGifts[g.id] = g;
         grid.insertAdjacentHTML('beforeend', _buildGiftCardHtml(g, isOwn, pinnedId));
       });
-      _giftsOffset += d.gifts.length;
+      localOffset += d.gifts.length;
+      _giftsOffset = localOffset;
       _giftsHasMore = d.has_more || false;
       if (_giftsHasMore) {
         grid.insertAdjacentHTML('beforeend',
