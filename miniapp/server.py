@@ -137,7 +137,7 @@ def leaderboard(tab: str = "balance", limit: int = 20):
 
 # ── Profile ───────────────────────────────────────────────────────────────────
 
-def _load_profile(db, user_id: int) -> dict:
+def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20) -> dict:
     row = db.execute(
         """SELECT e.user_id,
                   e.username  AS e_username,  e.full_name  AS e_full_name,
@@ -162,7 +162,9 @@ def _load_profile(db, user_id: int) -> dict:
         "SELECT gi.id, gi.gift_number, gi.background, gi.acquired_at, "
         "gm.model_name, gm.model_emoji, gm.tier, gm.collection, gm.custom_emoji_id "
         "FROM gift_instances gi JOIN gift_models gm ON gm.id = gi.model_id "
-        "WHERE gi.owner_id = ? ORDER BY gi.acquired_at DESC LIMIT 20", (user_id,)
+        "WHERE gi.owner_id = ? "
+        "ORDER BY COALESCE(gi.sort_index, 999999) ASC, gi.acquired_at DESC "
+        "LIMIT ? OFFSET ?", (user_id, gifts_limit, gifts_offset)
     ).fetchall()
 
     balance_rank = db.execute(
@@ -205,13 +207,15 @@ def _load_profile(db, user_id: int) -> dict:
         "gifts": [dict(g) for g in gifts],
         "pinned_gift": pinned_gift,
         "pinned_gift_id": row["pinned_gift_id"],
+        "has_more": len(gifts) == gifts_limit and (gifts_offset + gifts_limit) < gift_count,
+        "gifts_offset": gifts_offset,
     }
 
 
 @app.get("/api/profile/{user_id}")
-def profile_by_id(user_id: int):
+def profile_by_id(user_id: int, gifts_offset: int = 0, gifts_limit: int = 20):
     with db_conn() as db:
-        return _load_profile(db, user_id)
+        return _load_profile(db, user_id, gifts_offset, gifts_limit)
 
 
 @app.get("/api/profile/username/{username}")
@@ -1823,6 +1827,11 @@ async def _startup():
                 db.commit()
             except Exception:
                 pass
+        try:
+            db.execute("ALTER TABLE gift_instances ADD COLUMN sort_index INTEGER")
+            db.commit()
+        except Exception:
+            pass
         db.execute("""CREATE TABLE IF NOT EXISTS hack_sessions (
             user_id          INTEGER PRIMARY KEY,
             word             TEXT    NOT NULL,
