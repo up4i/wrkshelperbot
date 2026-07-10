@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>wrk.money</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   :root {
     --bg: #07071a;
@@ -907,7 +908,18 @@ let state = {
 async function boot() {
   loadStats();
   loadLeaderboard('balance');
-  if (state.userId) {
+
+  // Auto-auth from Telegram if available
+  const tg = window.Telegram?.WebApp;
+  if (tg?.initData) {
+    tg.expand();
+    try {
+      const auth = await api('/api/auth/telegram', { method: 'POST', json: { init_data: tg.initData } });
+      setUser(String(auth.user_id));
+    } catch {
+      // Fall back to manual entry if validation fails
+    }
+  } else if (state.userId) {
     refreshBalance();
     document.getElementById('gamesLoginWall').style.display = 'none';
     prefillUserInputs();

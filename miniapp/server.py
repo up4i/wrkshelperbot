@@ -1,8 +1,12 @@
 import asyncio
+import hashlib
+import hmac
+import json
 import random
 import sqlite3
 import sys
 import time
+import urllib.parse
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -136,6 +140,38 @@ def profile_by_username(username: str):
         if not row:
             raise HTTPException(404, "Username not found")
         return _load_profile(db, row["user_id"])
+
+
+# ── Telegram auth ─────────────────────────────────────────────────────────────
+
+class TelegramAuthRequest(BaseModel):
+    init_data: str
+
+
+@app.post("/api/auth/telegram")
+def auth_telegram(req: TelegramAuthRequest):
+    parsed = dict(urllib.parse.parse_qsl(req.init_data, keep_blank_values=True))
+    received_hash = parsed.pop("hash", None)
+    if not received_hash:
+        raise HTTPException(400, "Missing hash")
+
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
+    secret_key = hmac.new(b"WebAppData", config.BOT_TOKEN.encode(), hashlib.sha256).digest()
+    computed = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+
+    if not hmac.compare_digest(computed, received_hash):
+        raise HTTPException(403, "Invalid signature")
+
+    auth_date = int(parsed.get("auth_date", 0))
+    if time.time() - auth_date > 86400:
+        raise HTTPException(403, "initData expired")
+
+    user = json.loads(parsed.get("user", "{}"))
+    user_id = user.get("id")
+    if not user_id:
+        raise HTTPException(400, "No user in initData")
+
+    return {"user_id": user_id, "first_name": user.get("first_name", ""), "username": user.get("username", "")}
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
