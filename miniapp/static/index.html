@@ -844,6 +844,14 @@
     50% { transform: translateX(8px) scale(1.04); }
     75% { transform: translateX(-5px); }
   }
+  @keyframes bj-flip-reveal {
+    from { transform: rotateY(90deg) scaleX(0.5); opacity: 0; }
+    to   { transform: rotateY(0deg)  scaleX(1);   opacity: 1; }
+  }
+  @keyframes bj-deal-in {
+    from { opacity: 0; transform: translateY(-14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
   @keyframes rl-spin { to { transform: rotate(360deg); } }
   .rl-wrap { position:relative; width:200px; height:200px; margin:0 auto 10px; }
   .rl-pointer {
@@ -3294,8 +3302,17 @@ function renderBjFinished(data) {
     refreshHeaderBal();
   }
 
-  const isBlackjack = data.status === 'blackjack';
-  const dealerCards = (data.dealer_hand || []).map(c => bjCard(c)).join('');
+  // Dealer hand: first card was already visible (no anim), hole card flips,
+  // extra drawn cards slide in. Each step is 380ms after the previous.
+  const dealerCardHtml = (data.dealer_hand || []).map((c, i) => {
+    if (i === 0) return bjCard(c); // already visible
+    const delay = (i - 1) * 380;
+    const anim = i === 1
+      ? `animation:bj-flip-reveal .35s ease ${delay}ms both`
+      : `animation:bj-deal-in .3s ease ${delay}ms both`;
+    return `<div style="${anim}">${bjCard(c)}</div>`;
+  }).join('');
+
   const playerHtml = data.hands.map((h, i) => {
     const r = data.results[i];
     return bjHandHtml(h, r.player_value, false);
@@ -3313,11 +3330,16 @@ function renderBjFinished(data) {
     ? `<br><b>Net: ${data.total_delta >= 0 ? '+' : ''}${fmt(data.total_delta)} WRK$</b>` : '';
   const resClass = data.total_delta > 0 ? 'win-box' : data.total_delta < 0 ? 'lose-box' : '';
 
+  // Result and buttons appear after last dealer card lands
+  const lastCardDelay = Math.max(0, ((data.dealer_hand || []).length - 2) * 380);
+  const resultDelay = lastCardDelay + 420;
+  const fadeIn = (d) => `animation:bj-deal-in .3s ease ${d}ms both`;
+
   document.getElementById('bjContent').innerHTML = `
     <div class="bj-table">
       <div>
         <div class="bj-section-label">Dealer — ${data.dealer_value ?? ''}</div>
-        <div class="bj-hand-row">${dealerCards}</div>
+        <div class="bj-hand-row">${dealerCardHtml}</div>
       </div>
       <div class="divider"></div>
       <div>
@@ -3325,9 +3347,9 @@ function renderBjFinished(data) {
         ${playerHtml}
       </div>
     </div>
-    <div class="result-box show ${resClass}" style="font-size:14px;line-height:1.7">${resultLines}${netLine}</div>
-    <div class="balance-display">Balance: <span class="b">${fmt(data.new_balance)}</span> WRK$</div>
-    <button class="btn" style="width:100%" onclick="renderBjBetting()">Play Again</button>
+    <div class="result-box show ${resClass}" style="font-size:14px;line-height:1.7;${fadeIn(resultDelay)}">${resultLines}${netLine}</div>
+    <div class="balance-display" style="${fadeIn(resultDelay + 80)}">Balance: <span class="b">${fmt(data.new_balance)}</span> WRK$</div>
+    <button class="btn" style="width:100%;${fadeIn(resultDelay + 160)}" onclick="renderBjBetting()">Play Again</button>
   `;
 }
 
