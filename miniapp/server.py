@@ -1169,7 +1169,18 @@ def rob_attempt(req: RobAttemptRequest):
         raise HTTPException(400, "You can't rob yourself")
     with db_conn() as db:
         robber_row = db.execute(
-            "SELECT balance, last_rob FROM economy WHERE user_id = ?", (req.user_id,)
+            """SELECT e.balance, e.last_rob,
+                      COALESCE(a.username, e.username) AS username,
+                      COALESCE(a.full_name, e.full_name, 'User ' || e.user_id) AS full_name
+               FROM economy e
+               LEFT JOIN (
+                   SELECT user_id, username, full_name FROM user_activity
+                   WHERE (user_id, last_seen) IN (
+                       SELECT user_id, MAX(last_seen) FROM user_activity GROUP BY user_id
+                   )
+               ) a ON a.user_id = e.user_id
+               WHERE e.user_id = ?""",
+            (req.user_id,)
         ).fetchone()
         if not robber_row:
             raise HTTPException(404, "Robber not found")
@@ -1199,6 +1210,10 @@ def rob_attempt(req: RobAttemptRequest):
         success = random.random() < 0.50
         result = _rob_outcome(success, robber_row["balance"], target_row["balance"])
         target_name = target_row["name"]
+        robber_display = (
+            f"@{robber_row['username']}" if robber_row["username"]
+            else robber_row["full_name"]
+        )
 
         if result["outcome"] == "success":
             amount = result["amount"]
@@ -1206,7 +1221,7 @@ def rob_attempt(req: RobAttemptRequest):
             db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (amount, req.user_id))
             emoji, template = random.choice(_ROB_SUCCESS)
             flavor = template.format(robber="You", target=target_name, amount=f"{amount:,}")
-            _send_telegram_dm(req.target_id, f"{emoji} Your wallet was robbed! Someone stole {amount:,} WRK$ from you.")
+            _send_telegram_dm(req.target_id, f"{emoji} {robber_display} robbed you and stole {amount:,} WRK$ from your wallet!")
         elif result["outcome"] == "fine":
             amount = result["amount"]
             db.execute("UPDATE economy SET balance = MAX(0, balance - ?) WHERE user_id = ?", (amount, req.user_id))
