@@ -542,6 +542,55 @@
   .cooldown-label { font-size: 13px; color: var(--muted); }
   .cooldown-timer { font-size: 36px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--primary); }
 
+  /* ── Crash ── */
+  .crash-history {
+    display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; padding: 4px 0 8px;
+  }
+  .crash-chip {
+    padding: 3px 9px; border-radius: 20px; font-size: 12px; font-weight: 700; line-height: 1.4;
+  }
+  .crash-chip.low  { background: rgba(239,68,68,.18); color: var(--red); }
+  .crash-chip.mid  { background: rgba(245,158,11,.18); color: var(--gold); }
+  .crash-chip.high { background: rgba(16,185,129,.18); color: var(--green); }
+  .crash-arena {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 16px 0 8px; min-height: 150px; justify-content: center;
+  }
+  .crash-rocket { font-size: 48px; transition: transform .1s; }
+  .crash-rocket.flying { animation: rocket-fly 1s ease-in-out infinite alternate; }
+  @keyframes rocket-fly {
+    0%   { transform: translateY(0) rotate(-8deg); }
+    100% { transform: translateY(-14px) rotate(-14deg); }
+  }
+  .crash-mult {
+    font-size: 60px; font-weight: 900; font-variant-numeric: tabular-nums;
+    color: var(--green); line-height: 1; min-height: 68px;
+    display: flex; align-items: center; letter-spacing: -1px;
+  }
+  .crash-mult.red { color: var(--red); animation: crash-shake .4s ease; }
+  @keyframes crash-shake {
+    0%,100% { transform: translateX(0) scale(1); }
+    20% { transform: translateX(-10px) scale(1.08); }
+    50% { transform: translateX(8px) scale(1.04); }
+    75% { transform: translateX(-5px); }
+  }
+  .crash-phase-txt { font-size: 13px; color: var(--muted); min-height: 20px; }
+  .crash-bet-info {
+    background: rgba(139,92,246,.1); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 14px; font-size: 13px; text-align: center;
+    display: none;
+  }
+  .crash-bet-info.win  { background: rgba(16,185,129,.1); border-color: rgba(16,185,129,.3); color: var(--green); }
+  .crash-bet-info.lose { background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.2); color: var(--red); }
+  .crash-cashout-btn {
+    width: 100%; padding: 16px; font-size: 17px; font-weight: 800;
+    background: var(--green); animation: cashout-pulse 1s ease infinite alternate;
+  }
+  @keyframes cashout-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(16,185,129,.4); }
+    100% { box-shadow: 0 0 20px 4px rgba(16,185,129,.25); }
+  }
+
   /* ── Blackjack ── */
   .bj-table {
     background: rgba(13, 80, 40, 0.22);
@@ -701,10 +750,10 @@
           <div class="gname">Blackjack</div>
           <div class="gdesc">Hit, stand, or bust</div>
         </div>
-        <div class="game-card soon">
+        <div class="game-card" onclick="openCrash()">
           <div class="gicon">🚀</div>
           <div class="gname">Crash</div>
-          <div class="gdesc">Coming soon</div>
+          <div class="gdesc">Cash out before it crashes</div>
         </div>
       </div>
     </div>
@@ -824,6 +873,15 @@
     </div>
     <div class="balance-display">Balance: <span class="b" id="cfBal">—</span> WRK$</div>
     <div class="error-msg" id="cfErr"></div>
+  </div>
+</div>
+
+<!-- CRASH MODAL -->
+<div class="modal-bg" id="crashModal" onclick="if(event.target.id==='crashModal')document.getElementById('crashModal').classList.remove('open')">
+  <div class="modal" style="position:relative;max-height:90vh;overflow-y:auto">
+    <button class="modal-close" onclick="document.getElementById('crashModal').classList.remove('open')">✕</button>
+    <div class="modal-title">🚀 Crash</div>
+    <div id="crashContent"><div class="loading">Connecting…</div></div>
   </div>
 </div>
 
@@ -1435,6 +1493,155 @@ function handleShiftComplete(result) {
     </div>`;
 
   setTimeout(() => refreshWorkStatus(), 2000);
+}
+
+// ── Crash ─────────────────────────────────────────────────────────────────────
+let crashWs = null;
+let crashMyBet = 0;
+let crashLastPhase = null;
+
+function openCrash() {
+  if (!state.userId) return alert('Set your user ID first.');
+  document.getElementById('crashModal').classList.add('open');
+  connectCrashWs();
+}
+
+function connectCrashWs() {
+  if (crashWs && crashWs.readyState <= 1) return; // CONNECTING or OPEN
+  crashWs = new WebSocket(`ws://${location.host}/ws/crash`);
+  crashWs.onmessage = e => handleCrashMsg(JSON.parse(e.data));
+  crashWs.onclose = () => {
+    setTimeout(() => {
+      if (document.getElementById('crashModal').classList.contains('open')) connectCrashWs();
+    }, 2000);
+  };
+}
+
+function handleCrashMsg(msg) {
+  if (msg.type === 'state' || msg.type === 'crashed') {
+    if (!document.getElementById('crashMult')) initCrashUI();
+    updateCrashDisplay(msg);
+  } else if (msg.type === 'bet_placed') {
+    crashMyBet = msg.bet;
+    state.balance = msg.new_balance;
+    refreshHeaderBal();
+    const infoEl = document.getElementById('crashBetInfo');
+    if (infoEl) { infoEl.style.display='block'; infoEl.className='crash-bet-info'; infoEl.textContent=`✅ Bet: ${fmt(crashMyBet)} WRK$ — round starting soon`; }
+    document.getElementById('crashActionsArea').innerHTML = '';
+  } else if (msg.type === 'cashed_out') {
+    crashMyBet = 0;
+    state.balance = msg.new_balance;
+    refreshHeaderBal();
+    const infoEl = document.getElementById('crashBetInfo');
+    if (infoEl) { infoEl.style.display='block'; infoEl.className='crash-bet-info win'; infoEl.textContent=`✅ Cashed out ${msg.multiplier.toFixed(2)}× · +${fmt(msg.profit)} WRK$`; }
+    document.getElementById('crashActionsArea').innerHTML = '';
+  } else if (msg.type === 'error') {
+    const el = document.getElementById('crashErr');
+    if (el) { el.textContent = msg.message; setTimeout(()=>el.textContent='', 3000); }
+  }
+}
+
+function initCrashUI() {
+  document.getElementById('crashContent').innerHTML = `
+    <div class="crash-history" id="crashHistory"></div>
+    <div class="crash-arena">
+      <div class="crash-rocket" id="crashRocket">🚀</div>
+      <div class="crash-mult" id="crashMult"></div>
+      <div class="crash-phase-txt" id="crashPhase">Connecting…</div>
+    </div>
+    <div class="crash-bet-info" id="crashBetInfo"></div>
+    <div id="crashActionsArea"></div>
+    <div class="error-msg" id="crashErr"></div>
+  `;
+}
+
+function updateCrashDisplay(msg) {
+  const phase = msg.phase;
+  const mult = msg.multiplier || 1.0;
+  const phaseChanged = phase !== crashLastPhase;
+  crashLastPhase = phase;
+
+  const multEl = document.getElementById('crashMult');
+  const phaseEl = document.getElementById('crashPhase');
+  const rocketEl = document.getElementById('crashRocket');
+  const histEl = document.getElementById('crashHistory');
+  const actEl = document.getElementById('crashActionsArea');
+  const infoEl = document.getElementById('crashBetInfo');
+  if (!multEl) return;
+
+  // History (only changes between rounds)
+  if (msg.history) {
+    histEl.innerHTML = [...msg.history].reverse().map(cp => {
+      const cls = cp < 1.5 ? 'low' : cp < 3 ? 'mid' : 'high';
+      return `<span class="crash-chip ${cls}">${cp.toFixed(2)}×</span>`;
+    }).join('');
+  }
+
+  if (phase === 'running') {
+    multEl.textContent = `${mult.toFixed(2)}×`;
+    multEl.className = 'crash-mult';
+    phaseEl.textContent = '🚀 Flying…';
+    rocketEl.textContent = '🚀';
+    rocketEl.className = 'crash-rocket flying';
+    if (crashMyBet > 0) {
+      const payout = Math.floor(crashMyBet * mult);
+      const btn = document.getElementById('crashCashoutBtn');
+      if (btn) {
+        btn.textContent = `💰 Cash Out · ${fmt(payout)} WRK$ (${mult.toFixed(2)}×)`;
+      } else {
+        actEl.innerHTML = `<button class="btn crash-cashout-btn" id="crashCashoutBtn" onclick="crashCashout()">💰 Cash Out · ${fmt(payout)} WRK$ (${mult.toFixed(2)}×)</button>`;
+      }
+    } else if (phaseChanged) {
+      actEl.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:13px;padding:8px 0">Bet in the next round</div>`;
+    }
+
+  } else if (phase === 'crashed') {
+    multEl.textContent = `${mult.toFixed(2)}×`;
+    multEl.className = 'crash-mult red';
+    phaseEl.textContent = `💥 Crashed at ${mult.toFixed(2)}×`;
+    rocketEl.textContent = '💥';
+    rocketEl.className = 'crash-rocket';
+    actEl.innerHTML = '';
+    if (crashMyBet > 0) {
+      if (infoEl) { infoEl.style.display='block'; infoEl.className='crash-bet-info lose'; infoEl.textContent=`💀 Lost ${fmt(crashMyBet)} WRK$ — crashed!`; }
+      crashMyBet = 0;
+    }
+
+  } else {
+    // waiting
+    if (phaseChanged) crashMyBet = 0; // new round, clear any stale bet state
+    multEl.textContent = '';
+    multEl.className = 'crash-mult';
+    phaseEl.textContent = msg.countdown > 0 ? `Next round in ${msg.countdown.toFixed(1)}s` : 'Starting…';
+    rocketEl.textContent = '🚀';
+    rocketEl.className = 'crash-rocket';
+    if (phaseChanged && crashMyBet === 0) {
+      actEl.innerHTML = `
+        <div class="bet-row" style="margin-bottom:8px">
+          <input class="input bet-input" id="crashBetInput" type="number" min="10" placeholder="Min 10 WRK$">
+          <button class="btn" onclick="crashPlaceBet()">Bet 🎯</button>
+        </div>
+        <div class="bet-presets" id="crashPresets"></div>
+        <div class="balance-display">Balance: <span class="b">${state.balance !== null ? fmt(state.balance) : '—'}</span> WRK$</div>
+      `;
+      buildPresets('crashPresets', 'crashBetInput');
+      if (infoEl) { infoEl.style.display='none'; infoEl.className='crash-bet-info'; }
+    }
+  }
+}
+
+function crashPlaceBet() {
+  const bet = parseInt(document.getElementById('crashBetInput')?.value);
+  const errEl = document.getElementById('crashErr');
+  if (!bet || bet < 10) { if(errEl) errEl.textContent='Min 10 WRK$'; return; }
+  if (!crashWs || crashWs.readyState !== 1) { if(errEl) errEl.textContent='Not connected'; return; }
+  if (errEl) errEl.textContent = '';
+  crashWs.send(JSON.stringify({ type: 'bet', user_id: +state.userId, amount: bet }));
+}
+
+function crashCashout() {
+  if (!crashWs || crashWs.readyState !== 1) return;
+  crashWs.send(JSON.stringify({ type: 'cashout', user_id: +state.userId }));
 }
 
 // ── Blackjack ─────────────────────────────────────────────────────────────────

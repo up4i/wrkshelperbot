@@ -1,3 +1,4 @@
+import asyncio
 import random
 import sqlite3
 import sys
@@ -5,7 +6,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -623,6 +624,161 @@ def blackjack_action(req: BlackjackActionRequest):
             return _bj_playing_state(game, balance)
 
     return _bj_playing_state(game, balance)  # unreachable but satisfies linter
+
+
+# ── Crash ─────────────────────────────────────────────────────────────────────
+
+_CRASH_BETTING_SECS = 7.0
+_CRASH_TICK_MS = 100
+_CRASH_GROWTH = 0.015  # 1.5% per tick → ~2× at 5s, ~4.4× at 10s
+
+
+class _CrashState:
+    def __init__(self):
+        self.phase = "waiting"
+        self.multiplier = 1.0
+        self.crash_point = 1.0
+        self.countdown = _CRASH_BETTING_SECS
+        self.history: list[float] = []
+        self.bets: dict[int, dict] = {}  # user_id -> {bet, cashed_out}
+        self.connections: set[WebSocket] = set()
+
+
+_crash = _CrashState()
+
+
+def _gen_crash_point() -> float:
+    r = random.random()
+    if r < 0.03:
+        return 1.0
+    cp = 0.97 / (1 - r)
+    return round(min(cp, 1000.0), 2)
+
+
+async def _crash_broadcast(msg: dict):
+    dead = set()
+    for ws in list(_crash.connections):
+        try:
+            await ws.send_json(msg)
+        except Exception:
+            dead.add(ws)
+    _crash.connections -= dead
+
+
+def _crash_snapshot() -> dict:
+    return {
+        "phase": _crash.phase,
+        "multiplier": _crash.multiplier,
+        "countdown": round(_crash.countdown, 1),
+        "history": _crash.history[-10:],
+    }
+
+
+async def _crash_loop():
+    while True:
+        try:
+            # Betting phase
+            _crash.phase = "waiting"
+            _crash.bets = {}
+            _crash.multiplier = 1.0
+            _crash.crash_point = _gen_crash_point()
+            deadline = asyncio.get_running_loop().time() + _CRASH_BETTING_SECS
+
+            while True:
+                _crash.countdown = max(0.0, deadline - asyncio.get_running_loop().time())
+                await _crash_broadcast({"type": "state", **_crash_snapshot()})
+                if _crash.countdown <= 0:
+                    break
+                await asyncio.sleep(0.5)
+
+            # Running phase
+            _crash.phase = "running"
+            _crash.multiplier = 1.0
+            _crash.countdown = 0.0
+
+            while _crash.multiplier < _crash.crash_point:
+                await asyncio.sleep(_CRASH_TICK_MS / 1000)
+                _crash.multiplier = round(_crash.multiplier * (1 + _CRASH_GROWTH), 2)
+                if _crash.multiplier >= _crash.crash_point:
+                    _crash.multiplier = _crash.crash_point
+                await _crash_broadcast({"type": "state", **_crash_snapshot()})
+
+            # Crash
+            _crash.phase = "crashed"
+            _crash.history.append(_crash.crash_point)
+            _crash.history = _crash.history[-10:]
+            await _crash_broadcast({"type": "crashed", **_crash_snapshot()})
+            await asyncio.sleep(3.0)
+
+        except Exception:
+            await asyncio.sleep(2.0)
+
+
+@app.on_event("startup")
+async def _startup():
+    asyncio.create_task(_crash_loop())
+
+
+@app.websocket("/ws/crash")
+async def crash_ws(ws: WebSocket):
+    await ws.accept()
+    _crash.connections.add(ws)
+    await ws.send_json({"type": "state", **_crash_snapshot()})
+    try:
+        while True:
+            data = await ws.receive_json()
+            uid = data.get("user_id")
+            if not uid:
+                continue
+            uid = int(uid)
+
+            if data.get("type") == "bet":
+                amount = int(data.get("amount", 0))
+                if _crash.phase != "waiting":
+                    await ws.send_json({"type": "error", "message": "Betting phase has ended"})
+                    continue
+                if uid in _crash.bets:
+                    await ws.send_json({"type": "error", "message": "Already bet this round"})
+                    continue
+                if amount < 10:
+                    await ws.send_json({"type": "error", "message": "Minimum bet is 10 WRK$"})
+                    continue
+                with db_conn() as db:
+                    row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()
+                    if not row:
+                        await ws.send_json({"type": "error", "message": "User not found — use the bot first"})
+                        continue
+                    if row["balance"] < amount:
+                        await ws.send_json({"type": "error", "message": f"Insufficient balance ({row['balance']:,} WRK$)"})
+                        continue
+                    db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (amount, uid))
+                    new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
+                    db.commit()
+                _crash.bets[uid] = {"bet": amount, "cashed_out": False}
+                await ws.send_json({"type": "bet_placed", "bet": amount, "new_balance": new_bal})
+
+            elif data.get("type") == "cashout":
+                if _crash.phase != "running":
+                    await ws.send_json({"type": "error", "message": "Game is not running"})
+                    continue
+                bet_info = _crash.bets.get(uid)
+                if not bet_info or bet_info["cashed_out"]:
+                    await ws.send_json({"type": "error", "message": "No active bet"})
+                    continue
+                mult = _crash.multiplier
+                payout = int(bet_info["bet"] * mult)
+                bet_info["cashed_out"] = True
+                with db_conn() as db:
+                    db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (payout, uid))
+                    new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
+                    db.commit()
+                await ws.send_json({"type": "cashed_out", "multiplier": mult, "payout": payout,
+                                    "profit": payout - bet_info["bet"], "new_balance": new_bal})
+
+    except WebSocketDisconnect:
+        _crash.connections.discard(ws)
+    except Exception:
+        _crash.connections.discard(ws)
 
 
 # ── Serve SPA ─────────────────────────────────────────────────────────────────
