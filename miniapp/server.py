@@ -922,7 +922,41 @@ def craps_status(user_id: int):
 
 # ── Hack ──────────────────────────────────────────────────────────────────────
 
-from handlers.economy import _WORDLIST, _hack_display
+_WORDLIST = [
+    ("whale",  "Someone who moves markets just by breathing."),
+    ("degen",  "Someone who apes into anything with triple-digit APY."),
+    ("shill",  "Promoting a token you hold and hope others buy."),
+    ("block",  "A bundle of transactions added to the chain."),
+    ("miner",  "Solves puzzles to add blocks and earn rewards."),
+    ("stake",  "Locking tokens to earn passive income."),
+    ("yield",  "The return you earn on a DeFi position."),
+    ("token",  "The unit of value native to a blockchain."),
+    ("alpha",  "Trading before the crowd catches on. Being early is everything."),
+    ("chart",  "Where every degen spends half their waking hours."),
+    ("trade",  "Buy low, sell high. Simple in theory."),
+    ("vault",  "Where DeFi stores your funds. Hopefully."),
+    ("chain",  "The backbone. It's in the name."),
+    ("proof",  "The mechanism that keeps a blockchain honest."),
+    ("audit",  "When a dev firm checks if the code won't rug you."),
+    ("floor",  "The lowest price an NFT collection will sell for."),
+    ("layer",  "L2s sit on top of L1s to make things faster and cheaper."),
+    ("short",  "Betting the price goes down. High risk, high reward."),
+    ("crash",  "When the market decides to humble everyone at once."),
+    ("rally",  "A sudden surge upward. WAGMI season."),
+    ("greed",  "The emotion that buys tops and sells bottoms."),
+    ("limit",  "An order that only executes at your chosen price."),
+    ("burns",  "Destroying tokens to reduce supply and pump holders."),
+    ("runes",  "Bitcoin's answer to tokens. Inscribed, not bridged."),
+    ("nodes",  "The machines keeping the network alive and verified."),
+    ("pools",  "Where liquidity lives in a DEX. Provide at your own risk."),
+    ("proxy",  "A contract that points to another. Used for upgradeable protocols."),
+    ("coins",  "The currency of the chain. Not tokens — native coins."),
+    ("smart",  "As in contract. The code that runs without humans."),
+    ("ratio",  "Risk/reward. The one number degens ignore."),
+]
+
+def _hack_display(word: str, revealed: set) -> str:
+    return " ".join(c if i in revealed else "_" for i, c in enumerate(word))
 
 class HackStartRequest(BaseModel):
     user_id: int
@@ -1028,7 +1062,59 @@ def hack_guess(req: HackGuessRequest):
 
 # ── Rob ───────────────────────────────────────────────────────────────────────
 
-from handlers.economy import _rob_outcome, _ROB_SUCCESS, _ROB_FINE, _ROB_BAIL, _ROB_GETAWAY
+def _rob_outcome(success: bool, robber_balance: int, victim_balance: int) -> dict:
+    if success:
+        pct = random.uniform(0.03, 0.10)
+        amount = max(1, int(victim_balance * pct))
+        return {"outcome": "success", "amount": amount}
+    r = random.random()
+    if r < 0.60:
+        amount = random.randint(50, 200)
+        return {"outcome": "fine", "amount": amount}
+    elif r < 0.90:
+        amount = max(1, int(robber_balance * random.uniform(0.05, 0.15)))
+        return {"outcome": "bail", "amount": amount}
+    else:
+        return {"outcome": "getaway", "amount": 0}
+
+_ROB_SUCCESS = [
+    ("🔫", "{robber} robbed {target} at gunpoint and walked away with {amount} WRK$!"),
+    ("🌱", "{robber} was randomly guessing seed phrases and cracked {target}'s wallet for {amount} WRK$!"),
+    ("📞", "{robber} was on a call and sneakily drained {target}'s wallet for {amount} WRK$!"),
+    ("🎭", "{robber} pulled a classic social engineering play on {target} and got {amount} WRK$!"),
+    ("🧢", "{robber} rug pulled {target} for {amount} WRK$. It was just a 'test token', bro."),
+    ("🕵️", "{robber} deployed a honeypot contract and {target} fell for it. -{amount} WRK$!"),
+    ("💌", "{robber} sent {target} a phishing link and drained {amount} WRK$ from their wallet!"),
+    ("🔧", "{robber} exploited a zero-day in {target}'s opsec and extracted {amount} WRK$!"),
+    ("🚗", "{robber} pulled up on {target}, took the bag, and peeled out with {amount} WRK$!"),
+    ("🎯", "{robber} front-ran {target}'s transaction and sniped {amount} WRK$ in the mempool!"),
+    ("🛸", "{robber} airdropped a malicious token into {target}'s wallet and drained {amount} WRK$!"),
+    ("🏦", "{robber} bribed {target}'s validator and quietly skimmed {amount} WRK$!"),
+    ("🧠", "{robber} talked {target} into a 'collab' and bounced with {amount} WRK$!"),
+    ("💣", "{robber} flash-loaned their way into {target}'s liquidity pool and escaped with {amount} WRK$!"),
+    ("😿", "{target} panic-listed their scared cat on MRKT under floor and {robber} scooped it for {amount} WRK$ profit!"),
+]
+_ROB_FINE = [
+    ("🚔", "{robber} tried to rob {target} but got spooked and dropped {amount} WRK$ running away!"),
+    ("👮", "{robber} got caught mid-heist on {target} and bribed the cop for {amount} WRK$!"),
+    ("🐕", "{robber} set off {target}'s wallet alarm and tripped over their own getaway dog. Lost {amount} WRK$."),
+    ("🧂", "{robber} fumbled the bag trying to rob {target} and scattered {amount} WRK$ on the floor."),
+    ("🏃", "{robber} tried robbing {target} but {target}'s security was wild — lost {amount} WRK$ in the sprint!"),
+    ("🪤", "{robber} walked into {target}'s honeypot trying to rob them. Ate a {amount} WRK$ fine."),
+]
+_ROB_BAIL = [
+    ("🚨", "{robber} got arrested trying to rob {target}! Had to post {amount} WRK$ bail."),
+    ("⛓️", "{robber} got cuffed outside {target}'s wallet. Lawyer fees: {amount} WRK$."),
+    ("🏛️", "{robber} went to trial for robbing {target} and lost. Court fined them {amount} WRK$!"),
+    ("📡", "{robber}'s heist on {target} was traced on-chain. Investigators froze {amount} WRK$."),
+    ("🕵️", "{robber} got doxxed attempting to rob {target}. Restitution order: {amount} WRK$."),
+]
+_ROB_GETAWAY = [
+    ("😮‍💨", "{robber} botched the rob on {target} but vanished into the crowd. No trace, no loss."),
+    ("🌫️", "{robber} failed to crack {target}'s wallet but ghosted before anyone noticed."),
+    ("🐱", "{robber} slipped away like a shadow after failing to hit {target}. Clean getaway."),
+    ("🧊", "{robber} fumbled the job on {target} but kept their cool and disappeared. No loss."),
+]
 
 _ROB_COOLDOWN = 900  # 15 minutes
 
