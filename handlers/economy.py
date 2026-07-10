@@ -734,11 +734,6 @@ _WORDLIST = [
     ("ratio",  "Risk/reward. The one number degens ignore."),
 ]
 
-_hack_cooldowns: dict[int, float] = {}   # user_id -> timestamp
-_hack_games: dict[int, dict] = {}        # user_id -> active game state
-_HACK_GAME_TTL = 3600  # abandon after 1 hour
-
-
 def _hack_display(word: str, revealed: set[int]) -> str:
     return " ".join(c if i in revealed else "_" for i, c in enumerate(word))
 
@@ -750,43 +745,36 @@ async def cmd_hack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await _ensure_wallet(user, config.DB_PATH)
 
     now = time.time()
-    last = _hack_cooldowns.get(user.id, 0)
+    last = await db.get_hack_cooldown(config.DB_PATH, user.id)
     if now - last < 3600:
         remaining = int(3600 - (now - last))
         m, s = divmod(remaining, 60)
         await msg.reply_text(f"⏳ Hack cooldown: {m}m {s}s remaining.")
         return
 
-    if user.id in _hack_games:
-        game = _hack_games[user.id]
-        # Auto-expire abandoned games older than 1 hour
-        if now - game.get("started_at", 0) > _HACK_GAME_TTL:
-            del _hack_games[user.id]
-            _hack_cooldowns[user.id] = now  # still apply cooldown
+    existing = await db.get_hack_session(config.DB_PATH, user.id)
+    if existing:
+        if now - existing["started_at"] > 3600:
+            await db.delete_hack_session(config.DB_PATH, user.id)
+            await db.set_hack_cooldown(config.DB_PATH, user.id, int(now))
         else:
-            display = _hack_display(game["word"], game["revealed"])
+            revealed = set(int(x) for x in existing["revealed_indices"].split(",") if x)
+            display = _hack_display(existing["word"], revealed)
             await msg.reply_text(
                 f"🖥️ You already have an active hack session!\n\n"
-                f"`{display}`\n_{game['clue']}_\n\n"
-                f"Attempts left: {game['attempts']}\nUse `/guess <word>` to answer.",
+                f"`{display}`\n_{existing['clue']}_\n\n"
+                f"Attempts left: {existing['attempts']}\nUse `/guess <word>` to answer.",
                 parse_mode="Markdown"
             )
-            return
+        return
 
     word, clue = random.choice(_WORDLIST)
     reward = random.randint(5000, 15000)
-    revealed = {0}  # always reveal first letter
+    revealed_indices = "0"  # always reveal first letter
 
-    _hack_games[user.id] = {
-        "word": word,
-        "clue": clue,
-        "reward": reward,
-        "attempts": 5,
-        "revealed": revealed,
-        "started_at": now,
-    }
+    await db.save_hack_session(config.DB_PATH, user.id, word, clue, reward, revealed_indices)
 
-    display = _hack_display(word, revealed)
+    display = _hack_display(word, {0})
     await msg.reply_text(
         f"🖥️ *Hacking a wallet...*\n\n"
         f"Clue: _{clue}_\n\n"
@@ -802,7 +790,7 @@ async def cmd_guess(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
 
-    game = _hack_games.get(user.id)
+    game = await db.get_hack_session(config.DB_PATH, user.id)
     if not game:
         await msg.reply_text("❌ No active hack session. Start one with `/hack`.", parse_mode="Markdown")
         return
@@ -813,10 +801,11 @@ async def cmd_guess(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     guess = " ".join(ctx.args).lower().strip()
     word = game["word"]
+    revealed = set(int(x) for x in game["revealed_indices"].split(",") if x)
 
     if guess == word:
-        del _hack_games[user.id]
-        _hack_cooldowns[user.id] = time.time()
+        await db.delete_hack_session(config.DB_PATH, user.id)
+        await db.set_hack_cooldown(config.DB_PATH, user.id, int(time.time()))
         reward = game["reward"]
         new_bal = await db.update_balance(config.DB_PATH, user.id, reward)
         await msg.reply_text(
@@ -829,11 +818,11 @@ async def cmd_guess(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    game["attempts"] -= 1
+    attempts_left = game["attempts"] - 1
 
-    if game["attempts"] <= 0:
-        del _hack_games[user.id]
-        _hack_cooldowns[user.id] = time.time()
+    if attempts_left <= 0:
+        await db.delete_hack_session(config.DB_PATH, user.id)
+        await db.set_hack_cooldown(config.DB_PATH, user.id, int(time.time()))
         await msg.reply_text(
             f"❌ *CONNECTION TERMINATED*\n\n"
             f"The word was `{word}`.\n"
@@ -842,14 +831,16 @@ async def cmd_guess(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Reveal another letter on wrong guess
-    unrevealed = [i for i in range(len(word)) if i not in game["revealed"]]
+    unrevealed = [i for i in range(len(word)) if i not in revealed]
     if unrevealed:
-        game["revealed"].add(random.choice(unrevealed))
+        revealed.add(random.choice(unrevealed))
 
-    display = _hack_display(word, game["revealed"])
+    new_revealed_str = ",".join(str(i) for i in sorted(revealed))
+    await db.update_hack_session(config.DB_PATH, user.id, attempts_left, new_revealed_str)
+
+    display = _hack_display(word, revealed)
     await msg.reply_text(
-        f"❌ Wrong. {game['attempts']} attempt(s) left.\n\n"
+        f"❌ Wrong. {attempts_left} attempt(s) left.\n\n"
         f"`{display}`\n_{game['clue']}_",
         parse_mode="Markdown"
     )
@@ -857,7 +848,34 @@ async def cmd_guess(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /rob ──────────────────────────────────────────────────────────────────────
 
-_rob_cooldowns: dict[int, float] = {}  # user_id -> timestamp
+def _roulette_result(slot: int, color: str) -> tuple[bool, int]:
+    """slot is 0-37: 0-1=green (2/38), 2-19=red (18/38), 20-37=black (18/38). Returns (won, payout_mult)."""
+    if slot <= 1:
+        won = color == "green"
+        return won, 14 if won else 0
+    elif slot <= 19:
+        won = color == "red"
+        return won, 2 if won else 0
+    else:
+        won = color == "black"
+        return won, 2 if won else 0
+
+
+def _craps_come_out(total: int) -> str:
+    """Returns 'win', 'lose', or 'point' for a come-out dice roll total."""
+    if total in (7, 11):
+        return "win"
+    if total in (2, 3, 12):
+        return "lose"
+    return "point"
+
+
+def _highlow_result(current: int, next_card: int, direction: str) -> str:
+    """Returns 'correct' or 'wrong'. Equal rank counts as wrong."""
+    if direction == "higher":
+        return "correct" if next_card > current else "wrong"
+    return "correct" if next_card < current else "wrong"
+
 
 _ROB_SUCCESS = [
     ("🔫", "{robber} robbed {target} at gunpoint and walked away with {amount} WRK$!"),
@@ -908,7 +926,7 @@ async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     robber_wallet = await _ensure_wallet(robber, config.DB_PATH)
 
     now = time.time()
-    last_rob = _rob_cooldowns.get(robber.id, 0)
+    last_rob = await db.get_rob_cooldown(config.DB_PATH, robber.id)
     if now - last_rob < 900:
         remaining = int(900 - (now - last_rob))
         m, s = divmod(remaining, 60)
@@ -937,7 +955,7 @@ async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(f"❌ {target_name} doesn't have enough WRK$ to rob (minimum 500).")
         return
 
-    _rob_cooldowns[robber.id] = now
+    await db.set_rob_cooldown(config.DB_PATH, robber.id, int(now))
     success = random.random() < 0.50
     result = _rob_outcome(success, robber_wallet["balance"], target_wallet["balance"])
 

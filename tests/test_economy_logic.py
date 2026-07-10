@@ -7,6 +7,9 @@ from handlers.economy import (
     _generate_crash_point,
     _crash_multiplier,
     _rob_outcome,
+    _roulette_result,
+    _craps_come_out,
+    _highlow_result,
 )
 
 
@@ -108,3 +111,86 @@ def test_rob_outcome_fail_variants():
     assert "fine" in outcomes
     assert "bail" in outcomes
     assert "getaway" in outcomes
+
+
+# ── Roulette ──────────────────────────────────────────────────────────────────
+
+def test_roulette_green_slot_wins_on_green():
+    won, mult = _roulette_result(0, "green")
+    assert won is True
+    assert mult == 14
+
+def test_roulette_green_slot_loses_on_red():
+    won, mult = _roulette_result(1, "red")
+    assert won is False
+    assert mult == 0
+
+def test_roulette_red_slot_wins_on_red():
+    won, mult = _roulette_result(2, "red")
+    assert won is True
+    assert mult == 2
+
+def test_roulette_red_slot_loses_on_black():
+    won, mult = _roulette_result(10, "black")
+    assert won is False
+    assert mult == 0
+
+def test_roulette_black_slot_wins_on_black():
+    won, mult = _roulette_result(20, "black")
+    assert won is True
+    assert mult == 2
+
+def test_roulette_black_boundary_slot_37():
+    won, mult = _roulette_result(37, "black")
+    assert won is True
+    assert mult == 2
+
+def test_roulette_red_boundary_slot_19():
+    won, mult = _roulette_result(19, "red")
+    assert won is True
+    assert mult == 2
+
+
+# ── Craps ─────────────────────────────────────────────────────────────────────
+
+def test_craps_come_out_7_wins():
+    assert _craps_come_out(7) == "win"
+
+def test_craps_come_out_11_wins():
+    assert _craps_come_out(11) == "win"
+
+def test_craps_come_out_2_loses():
+    assert _craps_come_out(2) == "lose"
+
+def test_craps_come_out_3_loses():
+    assert _craps_come_out(3) == "lose"
+
+def test_craps_come_out_12_loses():
+    assert _craps_come_out(12) == "lose"
+
+def test_craps_come_out_4_sets_point():
+    assert _craps_come_out(4) == "point"
+
+def test_craps_come_out_10_sets_point():
+    assert _craps_come_out(10) == "point"
+
+
+# ── High-Low ──────────────────────────────────────────────────────────────────
+
+def test_highlow_higher_correct():
+    assert _highlow_result(5, 8, "higher") == "correct"
+
+def test_highlow_higher_wrong():
+    assert _highlow_result(8, 5, "higher") == "wrong"
+
+def test_highlow_higher_equal_is_wrong():
+    assert _highlow_result(7, 7, "higher") == "wrong"
+
+def test_highlow_lower_correct():
+    assert _highlow_result(9, 3, "lower") == "correct"
+
+def test_highlow_lower_wrong():
+    assert _highlow_result(3, 9, "lower") == "wrong"
+
+def test_highlow_lower_equal_is_wrong():
+    assert _highlow_result(5, 5, "lower") == "wrong"
