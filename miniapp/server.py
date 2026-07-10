@@ -475,6 +475,33 @@ def _collect_shift(db, user_id: int, taps: int, earned: int) -> dict:
     }
 
 
+def _record_stats(db, user_id: int, *,
+                  slots_won=0, slots_lost=0,
+                  coinflip_won=0, coinflip_lost=0,
+                  blackjack_won=0, blackjack_lost=0,
+                  crash_won=0, crash_lost=0,
+                  crash_mult=0.0) -> None:
+    db.execute(
+        """INSERT INTO game_stats
+           (user_id, slots_won, slots_lost, coinflip_won, coinflip_lost,
+            blackjack_won, blackjack_lost, crash_won, crash_lost, crash_best_mult)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET
+               slots_won       = slots_won       + excluded.slots_won,
+               slots_lost      = slots_lost      + excluded.slots_lost,
+               coinflip_won    = coinflip_won    + excluded.coinflip_won,
+               coinflip_lost   = coinflip_lost   + excluded.coinflip_lost,
+               blackjack_won   = blackjack_won   + excluded.blackjack_won,
+               blackjack_lost  = blackjack_lost  + excluded.blackjack_lost,
+               crash_won       = crash_won       + excluded.crash_won,
+               crash_lost      = crash_lost      + excluded.crash_lost,
+               crash_best_mult = MAX(crash_best_mult, excluded.crash_best_mult)""",
+        (user_id, slots_won, slots_lost, coinflip_won, coinflip_lost,
+         blackjack_won, blackjack_lost, crash_won, crash_lost, crash_mult),
+    )
+    db.commit()
+
+
 def _slot_payout(reels: list[str]) -> tuple[str, int]:
     if reels == ["7️⃣", "7️⃣", "7️⃣"]:
         return "jackpot", 50
@@ -528,7 +555,10 @@ def play_slots(req: BetRequest):
         delta = req.bet * (mult - 1) if mult > 0 else -req.bet
         new_bal = bal + delta
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
-        db.commit()
+        if delta > 0:
+            _record_stats(db, req.user_id, slots_won=delta)
+        else:
+            _record_stats(db, req.user_id, slots_lost=req.bet)
         return {"reels": reels, "result": kind, "multiplier": mult,
                 "delta": delta, "new_balance": new_bal}
 
@@ -544,7 +574,10 @@ def play_coinflip(req: CoinflipRequest):
         delta = req.bet if won else -req.bet
         new_bal = bal + delta
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
-        db.commit()
+        if won:
+            _record_stats(db, req.user_id, coinflip_won=req.bet)
+        else:
+            _record_stats(db, req.user_id, coinflip_lost=req.bet)
         return {"result": result, "won": won, "delta": delta, "new_balance": new_bal}
 
 
@@ -854,7 +887,12 @@ def _bj_resolve_game(db, user_id: int, game: dict) -> dict:
     if total_delta != 0:
         db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (total_delta, user_id))
     row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (user_id,)).fetchone()
-    db.commit()
+    if total_delta > 0:
+        _record_stats(db, user_id, blackjack_won=total_delta)
+    elif total_delta < 0:
+        _record_stats(db, user_id, blackjack_lost=-total_delta)
+    else:
+        db.commit()
     new_balance = row["balance"] if row else 0
     del _bj_games[user_id]
 
@@ -1068,10 +1106,15 @@ async def _crash_loop():
                     _crash.multiplier = _crash.crash_point
                 await _crash_broadcast({"type": "state", **_crash_snapshot()})
 
-            # Crash
+            # Crash — record losses for players who didn't cash out
             _crash.phase = "crashed"
             _crash.history.append(_crash.crash_point)
             _crash.history = _crash.history[-10:]
+            losers = [(uid, info["bet"]) for uid, info in _crash.bets.items() if not info["cashed_out"]]
+            if losers:
+                with db_conn() as db:
+                    for uid, lost in losers:
+                        _record_stats(db, uid, crash_lost=lost)
             await _crash_broadcast({"type": "crashed", **_crash_snapshot()})
             await asyncio.sleep(3.0)
 
@@ -1151,13 +1194,14 @@ async def crash_ws(ws: WebSocket):
                     continue
                 mult = _crash.multiplier
                 payout = int(bet_info["bet"] * mult)
+                profit = payout - bet_info["bet"]
                 bet_info["cashed_out"] = True
                 with db_conn() as db:
                     db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (payout, uid))
                     new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
-                    db.commit()
+                    _record_stats(db, uid, crash_won=profit, crash_mult=mult)
                 await ws.send_json({"type": "cashed_out", "multiplier": mult, "payout": payout,
-                                    "profit": payout - bet_info["bet"], "new_balance": new_bal})
+                                    "profit": profit, "new_balance": new_bal})
 
     except WebSocketDisconnect:
         _crash.connections.discard(ws)
