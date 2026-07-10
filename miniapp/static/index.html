@@ -1868,6 +1868,9 @@ function _setupGiftsObserver() {
         grid.insertAdjacentHTML('beforeend',
           `<div id="giftSentinel" style="grid-column:1/-1;text-align:center;padding:12px;color:var(--muted);font-size:13px">Loading…</div>`);
         _setupGiftsObserver();
+      } else {
+        _giftsObserver.disconnect();
+        _giftsObserver = null;
       }
     } catch(e) {
       console.error('gift scroll error', e);
