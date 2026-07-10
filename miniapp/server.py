@@ -139,7 +139,7 @@ def leaderboard(tab: str = "balance", limit: int = 20):
 
 def _load_profile(db, user_id: int) -> dict:
     row = db.execute(
-        "SELECT user_id, username, full_name, balance, streak, last_daily "
+        "SELECT user_id, username, full_name, balance, streak, last_daily, pinned_gift_id "
         "FROM economy WHERE user_id = ?", (user_id,)
     ).fetchone()
     if not row:
@@ -167,6 +167,17 @@ def _load_profile(db, user_id: int) -> dict:
         "WHERE owner_id IS NOT NULL GROUP BY owner_id HAVING c > ?) ", (gift_count,)
     ).fetchone()[0]
 
+    pinned_gift = None
+    if row["pinned_gift_id"]:
+        pg = db.execute(
+            "SELECT gi.id, gi.gift_number, gi.background, "
+            "gm.model_name, gm.model_emoji, gm.custom_emoji_id "
+            "FROM gift_instances gi JOIN gift_models gm ON gm.id = gi.model_id "
+            "WHERE gi.id = ? AND gi.owner_id = ?",
+            (row["pinned_gift_id"], user_id),
+        ).fetchone()
+        pinned_gift = dict(pg) if pg else None
+
     return {
         "user_id": row["user_id"],
         "name": _display_name(row),
@@ -179,6 +190,8 @@ def _load_profile(db, user_id: int) -> dict:
         "gift_count": gift_count,
         "gift_rank": gift_rank,
         "gifts": [dict(g) for g in gifts],
+        "pinned_gift": pinned_gift,
+        "pinned_gift_id": row["pinned_gift_id"],
     }
 
 
@@ -198,6 +211,31 @@ def profile_by_username(username: str):
         if not row:
             raise HTTPException(404, "Username not found")
         return _load_profile(db, row["user_id"])
+
+
+# ── Pin gift ─────────────────────────────────────────────────────────────────
+
+class PinGiftRequest(BaseModel):
+    user_id: int
+    gift_id: int | None = None
+
+
+@app.post("/api/profile/pin")
+def pin_gift(req: PinGiftRequest):
+    with db_conn() as db:
+        if req.gift_id is not None:
+            row = db.execute(
+                "SELECT id FROM gift_instances WHERE id = ? AND owner_id = ?",
+                (req.gift_id, req.user_id),
+            ).fetchone()
+            if not row:
+                raise HTTPException(403, "You don't own this gift")
+        db.execute(
+            "UPDATE economy SET pinned_gift_id = ? WHERE user_id = ?",
+            (req.gift_id, req.user_id),
+        )
+        db.commit()
+    return {"ok": True}
 
 
 # ── Emoji image proxy ─────────────────────────────────────────────────────────
@@ -1026,6 +1064,12 @@ async def _crash_loop():
 @app.on_event("startup")
 async def _startup():
     asyncio.create_task(_crash_loop())
+    with db_conn() as db:
+        try:
+            db.execute("ALTER TABLE economy ADD COLUMN pinned_gift_id INTEGER")
+            db.commit()
+        except Exception:
+            pass  # column already exists
 
 
 @app.websocket("/ws/crash")

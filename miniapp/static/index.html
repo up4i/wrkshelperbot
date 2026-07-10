@@ -208,6 +208,27 @@
   .pstat .v { font-size: 18px; font-weight: 700; }
   .pstat .l { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
+  /* ── Profile name + pin badge ── */
+  .profile-name-wrap { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+  .pin-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 20px;
+    padding: 2px 8px 2px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255,255,255,.85);
+    cursor: default;
+    backdrop-filter: blur(4px);
+  }
+  .pin-badge img { width: 18px; height: 18px; object-fit: contain; }
+  .gift-card.own-gift { cursor: pointer; }
+  .gift-card.own-gift:active { opacity: .7; transform: scale(.95); transition: all .1s; }
+  .gift-card.pinned-gift { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+
   /* ── Gifts grid ── */
   .gifts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .gift-card {
@@ -973,19 +994,39 @@
 
     <!-- PROFILE -->
     <div class="page" id="page-profile">
-      <div>
-        <div class="section-title">Profile</div>
-        <div class="section-sub">Your stats and collection</div>
+      <!-- Own profile (shown when logged in) -->
+      <div id="ownProfileWrap" style="display:none;flex-direction:column;gap:12px">
+        <div id="ownProfileContent"><div class="loading">Loading…</div></div>
+        <button class="btn outline" style="width:100%" onclick="togglePlayerSearch()">🔍 Look up a player</button>
       </div>
-      <div class="card" id="profileSearch">
-        <div class="card-title">Look up a player</div>
-        <div class="search-row">
-          <input class="input" id="profileInput" placeholder="User ID or @username" onkeydown="if(event.key==='Enter')loadProfile()">
-          <button class="btn" onclick="loadProfile()">Search</button>
+      <!-- Not logged in -->
+      <div id="profileLoginPrompt" style="display:none;flex-direction:column;gap:12px">
+        <div>
+          <div class="section-title">Profile</div>
+          <div class="section-sub">Sign in to see your profile</div>
         </div>
-        <div class="error-msg" id="profileErr" style="margin-top:8px"></div>
+        <div class="card">
+          <div class="card-title">Enter your Telegram ID</div>
+          <div class="search-row">
+            <input class="input" id="profileLoginId" placeholder="Your Telegram user ID" type="number">
+            <button class="btn" onclick="loginFromProfile()">Go</button>
+          </div>
+          <div class="user-id-hint" style="margin-top:10px">Send <strong>/id</strong> in the bot to find it.</div>
+        </div>
+        <button class="btn outline" style="width:100%" onclick="togglePlayerSearch()">🔍 Look up a player</button>
       </div>
-      <div id="profileContent" style="display:none;display:flex;flex-direction:column;gap:12px"></div>
+      <!-- Search other players (collapsible) -->
+      <div id="profileSearchWrap" style="display:none;flex-direction:column;gap:12px">
+        <div class="card">
+          <div class="card-title">Look up a player</div>
+          <div class="search-row">
+            <input class="input" id="profileInput" placeholder="User ID or @username" onkeydown="if(event.key==='Enter')loadProfile()">
+            <button class="btn" onclick="loadProfile()">Search</button>
+          </div>
+          <div class="error-msg" id="profileErr" style="margin-top:8px"></div>
+        </div>
+        <div id="profileContent" style="display:none;flex-direction:column;gap:12px"></div>
+      </div>
     </div>
 
     <!-- WORK / JOBS -->
@@ -1194,10 +1235,6 @@ async function refreshBalance() {
 
 function goProfile() {
   showPage('profile', document.querySelector('[data-page="profile"]'));
-  if (state.userId) {
-    document.getElementById('profileInput').value = state.userId;
-    loadProfile();
-  }
 }
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
@@ -1209,6 +1246,7 @@ function showPage(id, btn) {
   if (id === 'lb') loadLeaderboard(state.lbTab);
   if (id === 'work') openWorkPage();
   if (id === 'market') { loadMarketCollections(); loadMarket(true); }
+  if (id === 'profile') openProfilePage();
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -1242,6 +1280,8 @@ function setUser(id) {
   document.getElementById('gamesLoginWall').style.display = 'none';
   prefillUserInputs();
   refreshBalance();
+  // Refresh profile tab if it's visible
+  if (document.getElementById('page-profile').classList.contains('active')) openProfilePage();
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────
@@ -1297,11 +1337,49 @@ function setLbTab(tab, btn) {
 
 function viewUser(id) {
   showPage('profile', document.querySelector('[data-page="profile"]'));
+  document.getElementById('profileSearchWrap').style.display = 'flex';
   document.getElementById('profileInput').value = id;
   loadProfile();
 }
 
 // ── Profile ───────────────────────────────────────────────────────────────────
+function openProfilePage() {
+  if (state.userId) {
+    document.getElementById('ownProfileWrap').style.display = 'flex';
+    document.getElementById('profileLoginPrompt').style.display = 'none';
+    loadOwnProfile();
+  } else {
+    document.getElementById('ownProfileWrap').style.display = 'none';
+    document.getElementById('profileLoginPrompt').style.display = 'flex';
+    document.getElementById('profileSearchWrap').style.display = 'none';
+  }
+}
+
+function loginFromProfile() {
+  const v = document.getElementById('profileLoginId').value.trim();
+  if (!v) return;
+  setUser(v);
+  openProfilePage();
+}
+
+function togglePlayerSearch() {
+  const wrap = document.getElementById('profileSearchWrap');
+  const visible = wrap.style.display === 'flex';
+  wrap.style.display = visible ? 'none' : 'flex';
+  if (!visible) document.getElementById('profileInput').focus();
+}
+
+async function loadOwnProfile() {
+  const el = document.getElementById('ownProfileContent');
+  el.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const d = await api(`/api/profile/${state.userId}`);
+    el.innerHTML = buildProfileHtml(d, true);
+  } catch(e) {
+    el.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+  }
+}
+
 async function loadProfile() {
   const raw = document.getElementById('profileInput').value.trim();
   if (!raw) return;
@@ -1309,25 +1387,25 @@ async function loadProfile() {
   const content = document.getElementById('profileContent');
   errEl.textContent = '';
   content.style.display = 'none';
-
-  let url;
-  if (/^\d+$/.test(raw)) {
-    url = `/api/profile/${raw}`;
-  } else {
-    url = `/api/profile/username/${raw.replace(/^@/,'')}`;
-  }
-
+  const url = /^\d+$/.test(raw) ? `/api/profile/${raw}` : `/api/profile/username/${raw.replace(/^@/,'')}`;
   try {
     const d = await api(url);
-    renderProfile(d);
+    content.innerHTML = buildProfileHtml(d, false);
     content.style.display = 'flex';
   } catch(e) {
     errEl.textContent = e.message;
   }
 }
 
-function renderProfile(d) {
-  const content = document.getElementById('profileContent');
+function _pinnedBadgeHtml(pg) {
+  if (!pg) return '';
+  const imgHtml = pg.custom_emoji_id
+    ? `<img src="/emoji/${pg.custom_emoji_id}" alt="" onerror="this.outerHTML='${esc(pg.model_emoji||'🎁')}'"><span>#${pg.gift_number}</span>`
+    : `<span>${esc(pg.model_emoji||'🎁')}</span><span>#${pg.gift_number}</span>`;
+  return `<span class="pin-badge" title="${esc(pg.model_name)} #${pg.gift_number}">📌 ${imgHtml}</span>`;
+}
+
+function buildProfileHtml(d, isOwn) {
   const initials = d.name.replace(/^@/,'').slice(0,2).toUpperCase();
   const tierColor = { common:'', uncommon:'', rare:'rare', epic:'epic', legendary:'legendary' };
 
@@ -1336,19 +1414,27 @@ function renderProfile(d) {
         const gemHtml = g.custom_emoji_id
           ? `<img class="gift-emoji-img" src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<div class=\\'gem\\'>🎁</div>'">`
           : `<div class="gem">${g.model_emoji || '🎁'}</div>`;
+        const isPinned = d.pinned_gift_id === g.id;
+        const ownCls = isOwn ? ' own-gift' : '';
+        const pinnedCls = isPinned ? ' pinned-gift' : '';
+        const tapAttr = isOwn ? `onclick="showPinSheet(${g.id},${isPinned})"` : '';
         return `
-        <div class="gift-card">
+        <div class="gift-card${ownCls}${pinnedCls}" ${tapAttr}>
           ${gemHtml}
           <div class="gname">${esc(g.model_name)}</div>
           <div class="gtier ${tierColor[g.tier]||''}">${g.tier} #${g.gift_number||g.id}</div>
+          ${isPinned ? '<div style="font-size:10px;color:var(--primary);margin-top:2px">📌 pinned</div>' : ''}
         </div>`;
       }).join('')
     : '<div class="empty" style="grid-column:1/-1">No gifts yet</div>';
 
-  content.innerHTML = `
+  return `
     <div class="profile-hero">
       <div class="avatar">${initials}</div>
-      <div class="profile-name">${esc(d.name)}</div>
+      <div class="profile-name-wrap">
+        <span class="profile-name">${esc(d.name)}</span>
+        ${_pinnedBadgeHtml(d.pinned_gift)}
+      </div>
       <div class="profile-id">ID: ${d.user_id}</div>
       <div class="rank-pills">
         <span class="rank-pill">💰 #${d.balance_rank} Balance</span>
@@ -1362,10 +1448,38 @@ function renderProfile(d) {
       </div>
     </div>
     <div>
-      <div class="card-title">Gift Collection (${d.gift_count})</div>
+      <div class="card-title">Gift Collection (${d.gift_count})${isOwn ? ' — tap to pin' : ''}</div>
       <div class="gifts-grid">${giftHtml}</div>
     </div>
   `;
+}
+
+function showPinSheet(instanceId, isCurrentlyPinned) {
+  document.getElementById('pinSheet')?.remove();
+  const sheet = document.createElement('div');
+  sheet.id = 'pinSheet';
+  sheet.style.cssText = 'position:fixed;bottom:calc(var(--nav-h)+12px);left:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;z-index:200;display:flex;flex-direction:column;gap:10px;box-shadow:0 -4px 24px rgba(0,0,0,.5)';
+  sheet.innerHTML = `
+    <div style="font-size:14px;font-weight:700">${isCurrentlyPinned ? '📌 Unpin this gift?' : '📌 Pin this gift to your profile?'}</div>
+    <div style="font-size:12px;color:var(--muted)">${isCurrentlyPinned ? 'Your profile badge will be removed.' : 'It will appear as a badge next to your name.'}</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn outline" style="flex:1" onclick="document.getElementById('pinSheet').remove()">Cancel</button>
+      <button class="btn" style="flex:1" onclick="setPinnedGift(${isCurrentlyPinned ? 'null' : instanceId})">
+        ${isCurrentlyPinned ? 'Unpin' : '📌 Pin it'}
+      </button>
+    </div>
+  `;
+  document.body.appendChild(sheet);
+}
+
+async function setPinnedGift(giftId) {
+  document.getElementById('pinSheet')?.remove();
+  try {
+    await api('/api/profile/pin', { method: 'POST', json: { user_id: +state.userId, gift_id: giftId } });
+    loadOwnProfile();
+  } catch(e) {
+    alert(e.message);
+  }
 }
 
 // ── Slots ─────────────────────────────────────────────────────────────────────

@@ -131,6 +131,7 @@ async def _migrate(db) -> None:
         "work_count":          "INTEGER NOT NULL DEFAULT 0",
         "work_reminder":       "INTEGER NOT NULL DEFAULT 0",
         "last_reminder_sent":  "INTEGER NOT NULL DEFAULT 0",
+        "pinned_gift_id":      "INTEGER",
     }
     for col, typedef in econ_new.items():
         if col not in econ_cols:
