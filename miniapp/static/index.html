@@ -875,6 +875,13 @@
   .duck-mult.high { color: var(--red); }
   .duck-runner { display: inline-block; }
 
+  /* ── Marbles ── */
+  .marble-board-wrap { width: 100%; position: relative; margin: 8px 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+  .marble-board-wrap svg { display: block; width: 100%; }
+  .marble-players { margin-top: 6px; display: flex; flex-direction: column; gap: 4px; max-height: 100px; overflow-y: auto; }
+  .marble-player-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .marble-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
   @keyframes bj-flip-reveal {
     from { transform: rotateY(90deg) scaleX(0.5); opacity: 0; }
     to   { transform: rotateY(0deg)  scaleX(1);   opacity: 1; }
@@ -1187,7 +1194,11 @@
             <div class="gname">Duck Race</div>
             <div class="gdesc">Pick your duck, ride the odds</div>
           </div>
-          <!-- Marbles card — added in Task 6 -->
+          <div class="game-card" onclick="openMarbles()">
+            <div class="gicon">🔮</div>
+            <div class="gname">Marbles</div>
+            <div class="gdesc">Bet your space, win the pot</div>
+          </div>
           <!-- Live Blackjack card — added in Task 8 -->
           <!-- Poker card — added in Task 10 -->
         </div>
@@ -1712,6 +1723,22 @@
     <div class="result-box" id="duckResult"></div>
     <div id="duckBetArea"></div>
     <div class="error-msg" id="duckErr"></div>
+  </div>
+</div>
+
+<!-- MARBLES MODAL -->
+<div class="modal-bg" id="marblesModal" onclick="closeModal('marblesModal',event)">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('marblesModal')">✕</button>
+    <div class="modal-title">🔮 Marbles</div>
+    <div class="marble-board-wrap">
+      <svg id="marbleBoardSvg" viewBox="0 0 280 80" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div class="marble-players" id="marblePlayers"></div>
+    <div class="crash-phase-txt" id="marblePhase">Connecting…</div>
+    <div class="result-box" id="marbleResult"></div>
+    <div id="marbleBetArea"></div>
+    <div class="error-msg" id="marbleErr"></div>
   </div>
 </div>
 
@@ -4329,6 +4356,142 @@ function _placeDuckBet() {
   if (!bet || bet < 10) { document.getElementById('duckErr').textContent = 'Min 10 WRK$'; return; }
   if (!duckWs || duckWs.readyState !== 1) return;
   duckWs.send(JSON.stringify({ type: 'bet', user_id: +state.userId, duck_idx: _duckSelected, amount: bet }));
+}
+
+// ── Marbles ───────────────────────────────────────────────────────────────────
+let marblesWs = null;
+let _marbleLastPhase = null;
+let _marbleMyColor = null;
+let _marbleBallX = 140;
+let _marbleBallY = 40;
+let _marbleBallDx = 3;
+let _marbleBallDy = 2;
+let _marbleAnimId = null;
+
+function openMarbles() {
+  if (!state.userId) return alert('Open in Telegram to play.');
+  document.getElementById('marblesModal').classList.add('open');
+  _connectMarblesWs();
+}
+
+function _connectMarblesWs() {
+  if (marblesWs && marblesWs.readyState <= 1) return;
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  marblesWs = new WebSocket(`${proto}//${location.host}/ws/marbles`);
+  marblesWs.onmessage = e => _handleMarbleMsg(JSON.parse(e.data));
+  marblesWs.onclose = () => {
+    setTimeout(() => {
+      if (document.getElementById('marblesModal').classList.contains('open')) _connectMarblesWs();
+    }, 2000);
+  };
+}
+
+function _handleMarbleMsg(msg) {
+  if (msg.type === 'state') _updateMarblesDisplay(msg);
+  else if (msg.type === 'bet_placed') {
+    _marbleMyColor = msg.color;
+    state.balance = msg.new_balance; refreshHeaderBal();
+    document.getElementById('marbleBetArea').innerHTML =
+      `<div class="crash-bet-info">✅ You're in! <span style="color:${msg.color}">●</span></div>`;
+  } else if (msg.type === 'refund') {
+    document.getElementById('marblePhase').textContent = msg.message;
+    document.getElementById('marbleBetArea').innerHTML = '';
+    _marbleMyColor = null;
+  } else if (msg.type === 'error') {
+    const el = document.getElementById('marbleErr');
+    if (el) { el.textContent = msg.message; setTimeout(() => el.textContent = '', 3000); }
+  }
+}
+
+function _updateMarblesDisplay(msg) {
+  const phaseChanged = msg.phase !== _marbleLastPhase;
+  _marbleLastPhase = msg.phase;
+
+  // Board
+  _buildMarbleBoard(msg.players, msg.phase === 'launching' || msg.phase === 'finished');
+
+  // Players list
+  const pl = document.getElementById('marblePlayers');
+  if (pl) {
+    pl.innerHTML = (msg.players || []).map(p =>
+      `<div class="marble-player-row">
+        <div class="marble-swatch" style="background:${p.color}"></div>
+        <span style="flex:1;font-weight:600">${esc(p.name)}</span>
+        <span style="color:var(--muted);font-size:11px">${p.pct}%</span>
+      </div>`
+    ).join('');
+  }
+
+  // Phase text
+  const phaseEl = document.getElementById('marblePhase');
+  if (phaseEl) {
+    if (msg.phase === 'open') phaseEl.textContent = `Betting open — ${msg.countdown.toFixed(1)}s`;
+    else if (msg.phase === 'launching') phaseEl.textContent = '🔮 Marble launched!';
+    else phaseEl.textContent = '🏆 Round complete!';
+  }
+
+  // Result
+  if (msg.phase === 'finished' && phaseChanged && msg.winner_id) {
+    const resEl = document.getElementById('marbleResult');
+    const iWon = _marbleMyColor && msg.players?.find(p => p.color === _marbleMyColor && msg.winner_id);
+    resEl.textContent = iWon ? `🏆 Your marble won!` : `The marble landed elsewhere.`;
+    resEl.className = `result-box show ${iWon ? 'win-box' : 'lose-box'}`;
+    _marbleMyColor = null;
+  }
+
+  if (msg.phase === 'open' && phaseChanged) {
+    document.getElementById('marbleResult').className = 'result-box';
+    _showMarbleBetArea();
+  }
+}
+
+function _buildMarbleBoard(players, animate) {
+  const svg = document.getElementById('marbleBoardSvg');
+  if (!svg) return;
+  const W = 280, H = 80;
+  let html = '';
+  // Zones
+  const total = (players || []).reduce((s, p) => s + p.total_value, 0) || 1;
+  let x = 0;
+  (players || []).forEach(p => {
+    const w = Math.round(p.total_value / total * W);
+    html += `<rect x="${x}" y="0" width="${w}" height="${H}" fill="${p.color}" opacity="0.7"/>`;
+    if (w > 30) html += `<text x="${x + w/2}" y="50" text-anchor="middle" font-size="9" fill="white" font-weight="700">${esc(p.name)}</text>`;
+    x += w;
+  });
+  // Ball
+  if (animate) {
+    _marbleBallX += _marbleBallDx;
+    _marbleBallY += _marbleBallDy;
+    if (_marbleBallX < 8 || _marbleBallX > W - 8) _marbleBallDx *= -1;
+    if (_marbleBallY < 8 || _marbleBallY > H - 8) _marbleBallDy *= -1;
+  }
+  html += `<circle cx="${_marbleBallX}" cy="${_marbleBallY}" r="8" fill="white" stroke="#111" stroke-width="1.5" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))"/>`;
+  svg.innerHTML = html;
+  if (animate && _marbleLastPhase === 'launching') {
+    if (_marbleAnimId) cancelAnimationFrame(_marbleAnimId);
+    _marbleAnimId = requestAnimationFrame(() => _buildMarbleBoard(players, true));
+  }
+}
+
+function _showMarbleBetArea() {
+  document.getElementById('marbleBetArea').innerHTML = `
+    <div class="card-title" style="margin-top:8px">Your bet (min 100 WRK$)</div>
+    <div class="bet-presets" id="marblePresets"></div>
+    <div class="bet-row">
+      <input class="input bet-input" id="marbleBetInput" type="number" value="100" min="100">
+      <button class="btn" onclick="_placeMarbleBet()">JOIN</button>
+    </div>
+    <div class="balance-display">Balance: <span class="b">${state.balance !== null ? fmt(state.balance) : '—'}</span> WRK$</div>
+  `;
+  buildPresets('marblePresets', 'marbleBetInput');
+}
+
+function _placeMarbleBet() {
+  const bet = parseInt(document.getElementById('marbleBetInput')?.value);
+  if (!bet || bet < 100) { document.getElementById('marbleErr').textContent = 'Min 100 WRK$'; return; }
+  if (!marblesWs || marblesWs.readyState !== 1) return;
+  marblesWs.send(JSON.stringify({ type: 'bet', user_id: +state.userId, amount: bet }));
 }
 
 // ── Blackjack ─────────────────────────────────────────────────────────────────
