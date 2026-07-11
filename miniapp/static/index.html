@@ -2260,6 +2260,112 @@ async function cancelTrade(id) {
   loadTrades();
 }
 
+// ── Trade offer modal (from other user's profile) ─────────────────────────────
+let _tradeTargetId = null;
+let _tradeOfferGiftId = null;
+let _tradeRequestGiftId = null;
+
+function openTradeModal(targetUserId) {
+  _tradeTargetId = targetUserId;
+  _tradeOfferGiftId = null;
+  _tradeRequestGiftId = null;
+  document.getElementById('tradeOfferGiftPick').textContent = '＋ Pick gift';
+  document.getElementById('tradeOfferGiftPick').classList.remove('selected');
+  document.getElementById('tradeRequestGiftPick').textContent = '＋ Pick gift';
+  document.getElementById('tradeRequestGiftPick').classList.remove('selected');
+  document.getElementById('tradeOfferWrk').value = '';
+  document.getElementById('tradeRequestWrk').value = '';
+  document.getElementById('tradeDonationWarn').style.display = 'none';
+  document.getElementById('tradeModal').style.display = 'flex';
+}
+
+function closeTradeModal() {
+  document.getElementById('tradeModal').style.display = 'none';
+  document.getElementById('tradeModalOverlay').style.display = 'none';
+}
+
+function checkDonation() {
+  const offerWrk = parseInt(document.getElementById('tradeOfferWrk').value) || 0;
+  const requestWrk = parseInt(document.getElementById('tradeRequestWrk').value) || 0;
+  const isDonation = !_tradeRequestGiftId && requestWrk === 0;
+  document.getElementById('tradeDonationWarn').style.display = isDonation && (_tradeOfferGiftId || offerWrk > 0) ? 'block' : 'none';
+}
+
+async function openOfferGiftPicker() {
+  const data = await api(`/api/profile/${state.userId}`);
+  const gifts = data.gifts || [];
+  const picked = await showGiftPickerModal(gifts, 'Pick a gift to offer');
+  if (picked) {
+    _tradeOfferGiftId = picked.id;
+    document.getElementById('tradeOfferGiftPick').textContent = `${picked.model_emoji} ${picked.model_name}`;
+    document.getElementById('tradeOfferGiftPick').classList.add('selected');
+    checkDonation();
+  }
+}
+
+async function openRequestGiftPicker() {
+  const data = await api(`/api/profile/${_tradeTargetId}`);
+  const gifts = data.gifts || [];
+  const picked = await showGiftPickerModal(gifts, "Pick a gift to request");
+  if (picked) {
+    _tradeRequestGiftId = picked.id;
+    document.getElementById('tradeRequestGiftPick').textContent = `${picked.model_emoji} ${picked.model_name}`;
+    document.getElementById('tradeRequestGiftPick').classList.add('selected');
+    checkDonation();
+  }
+}
+
+function showGiftPickerModal(gifts, title) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-bg';
+    overlay.style.cssText = 'display:flex;z-index:1100';
+    const inner = document.createElement('div');
+    inner.className = 'modal';
+    inner.style.cssText = 'max-height:70vh;overflow-y:auto;position:relative';
+    inner.innerHTML = `<button class="modal-close" id="_giftPickerClose">✕</button>
+      <div class="modal-title">${title}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        ${gifts.length === 0 ? '<p style="color:var(--muted);text-align:center;grid-column:1/-1">No gifts</p>' :
+          gifts.map(g => `<div class="gift-card" style="cursor:pointer" data-gift-id="${g.id}" data-gift-emoji="${g.model_emoji || '🎁'}" data-gift-name="${g.model_name}">
+            <div style="font-size:28px;text-align:center">${g.model_emoji || '🎁'}</div>
+            <div style="font-size:11px;text-align:center">${g.model_name} #${g.gift_number}</div>
+          </div>`).join('')}
+      </div>`;
+    overlay.appendChild(inner);
+    document.body.appendChild(overlay);
+    const cleanup = (result) => { overlay.remove(); resolve(result); };
+    inner.querySelector('#_giftPickerClose').onclick = () => cleanup(null);
+    overlay.onclick = (e) => { if (e.target === overlay) cleanup(null); };
+    inner.querySelectorAll('.gift-card').forEach(el => {
+      el.onclick = (e) => { e.stopPropagation(); cleanup({ id: +el.dataset.giftId, model_emoji: el.dataset.giftEmoji, model_name: el.dataset.giftName }); };
+    });
+  });
+}
+
+async function submitTradeOffer() {
+  const offerWrk = parseInt(document.getElementById('tradeOfferWrk').value) || 0;
+  const requestWrk = parseInt(document.getElementById('tradeRequestWrk').value) || 0;
+  if (!_tradeOfferGiftId && offerWrk <= 0 && !_tradeRequestGiftId && requestWrk <= 0) {
+    alert('Add at least one item to the trade.');
+    return;
+  }
+  try {
+    await api('/api/trades', { method: 'POST', json: {
+      from_user_id: +state.userId,
+      to_user_id: _tradeTargetId,
+      offer_gift_id: _tradeOfferGiftId || null,
+      offer_wrk: offerWrk,
+      request_gift_id: _tradeRequestGiftId || null,
+      request_wrk: requestWrk,
+    }});
+    closeTradeModal();
+    alert('Trade offer sent!');
+  } catch(e) {
+    alert(e.message);
+  }
+}
+
 function _pinnedBadgeHtml(pg) {
   if (!pg) return '';
   const imgHtml = pg.custom_emoji_id
@@ -2329,6 +2435,7 @@ function buildProfileHtml(d, isOwn) {
         <div class="pstat"><div class="v green">${d.streak}</div><div class="l">day streak</div></div>
         <div class="pstat"><div class="v purple">${d.gift_count}</div><div class="l">gifts</div></div>
       </div>
+      ${!isOwn && state.userId ? `<button class="btn" style="margin-top:10px;width:100%" onclick="openTradeModal(${d.user_id})">🔄 Trade</button>` : ''}
     </div>
     <div>
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
