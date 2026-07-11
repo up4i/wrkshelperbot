@@ -1977,6 +1977,28 @@ async function boot() {
     // Browser with no session — replace all login forms with "open in Telegram"
     _applyTgWalls();
   }
+
+  // ── Deep link handling ────────────────────────────────────────────────────
+  // Telegram passes startapp= via initDataUnsafe.start_param; fall back to URL ?startapp=
+  const tgStartParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param || '';
+  const _urlParams = new URLSearchParams(window.location.search);
+  const _startapp = tgStartParam || _urlParams.get('startapp') || '';
+
+  if (_startapp.startsWith('profile_')) {
+    const _deepProfileId = parseInt(_startapp.replace('profile_', ''), 10);
+    if (!isNaN(_deepProfileId)) {
+      setTimeout(() => viewUser(_deepProfileId), 300);
+    }
+  } else {
+    // Handle plain ?profile= param
+    const _profileParam = _urlParams.get('profile');
+    if (_profileParam) {
+      const _deepProfileId = parseInt(_profileParam, 10);
+      if (!isNaN(_deepProfileId)) {
+        setTimeout(() => viewUser(_deepProfileId), 300);
+      }
+    }
+  }
 }
 
 function prefillUserInputs() {
