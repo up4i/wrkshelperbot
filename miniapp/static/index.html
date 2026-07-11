@@ -278,6 +278,20 @@
   }
   .tab-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
+  /* ── Game category tabs ── */
+  .game-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .game-tab-btn {
+    flex: 1; padding: 8px 0; border-radius: 10px; font-size: 13px; font-weight: 700;
+    text-align: center; cursor: pointer;
+    background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--muted);
+    transition: all .15s;
+  }
+  .game-tab-btn.active {
+    background: rgba(139,92,246,.2); border-color: var(--primary); color: var(--primary);
+  }
+  .game-category { display: none; }
+  .game-category.active { display: contents; }
+
   .lb-list { display: flex; flex-direction: column; gap: 6px; }
   .lb-row {
     display: flex;
@@ -1133,71 +1147,89 @@
           Send <strong>/id</strong> in the bot to get your ID.
         </div>
       </div>
+      <div class="game-tabs">
+        <div class="game-tab-btn active" id="gtabLive" onclick="setGameTab('live')">🔴 Live</div>
+        <div class="game-tab-btn" id="gtabSolo" onclick="setGameTab('solo')">🎮 Solo</div>
+        <div class="game-tab-btn" id="gtabFun" onclick="setGameTab('fun')">😈 Rob & Hack</div>
+      </div>
       <div class="games-grid" id="gamesGrid">
-        <div class="game-card" onclick="openSlots()">
-          <div class="gicon">🎰</div>
-          <div class="gname">Slots</div>
-          <div class="gdesc">Spin to win up to 50×</div>
+        <!-- LIVE GAMES -->
+        <div class="game-category active" id="gcatLive">
+          <div class="game-card" onclick="openCrash()">
+            <div class="gicon">🚀</div>
+            <div class="gname">Crash</div>
+            <div class="gdesc">Cash out before it crashes</div>
+          </div>
+          <!-- Duck Racing card — added in Task 4 -->
+          <!-- Marbles card — added in Task 6 -->
+          <!-- Live Blackjack card — added in Task 8 -->
+          <!-- Poker card — added in Task 10 -->
         </div>
-        <div class="game-card" onclick="openCoinflip()">
-          <div class="gicon">🪙</div>
-          <div class="gname">Coinflip</div>
-          <div class="gdesc">50/50 double or nothing</div>
+        <!-- SOLO GAMES -->
+        <div class="game-category" id="gcatSolo">
+          <div class="game-card" onclick="openSlots()">
+            <div class="gicon">🎰</div>
+            <div class="gname">Slots</div>
+            <div class="gdesc">Spin to win up to 50×</div>
+          </div>
+          <div class="game-card" onclick="openCoinflip()">
+            <div class="gicon">🪙</div>
+            <div class="gname">Coinflip</div>
+            <div class="gdesc">50/50 double or nothing</div>
+          </div>
+          <div class="game-card" onclick="openBlackjack()">
+            <div class="gicon">🃏</div>
+            <div class="gname">Blackjack</div>
+            <div class="gdesc">Hit, stand, or bust</div>
+          </div>
+          <div class="game-card" onclick="openRoulette()">
+            <div class="gicon">🎡</div>
+            <div class="gname">Roulette</div>
+            <div class="gdesc">Red, Black, or Green — up to 14×</div>
+          </div>
+          <div class="game-card" onclick="openHighLow()">
+            <div class="gicon">🃏</div>
+            <div class="gname">High-Low</div>
+            <div class="gdesc">Chain multipliers by reading the cards</div>
+          </div>
+          <div class="game-card" onclick="openCraps()">
+            <div class="gicon">🎲</div>
+            <div class="gname">Street Craps</div>
+            <div class="gdesc">Roll your point, beat the seven</div>
+          </div>
+          <div class="game-card" onclick="openSlider()">
+            <div class="gicon">🎚️</div>
+            <div class="gname">Slider</div>
+            <div class="gdesc">Set your odds, watch the arrow drop</div>
+          </div>
+          <div class="game-card" onclick="openPlinko()">
+            <div class="gicon">🎯</div>
+            <div class="gname">Plinko</div>
+            <div class="gdesc">Drop the ball, ride the odds</div>
+          </div>
+          <div class="game-card" onclick="openWheel()">
+            <div class="gicon">🎡</div>
+            <div class="gname">Wheel</div>
+            <div class="gdesc">Spin your fate</div>
+          </div>
+          <div class="game-card" onclick="openCase()">
+            <div class="gicon">📦</div>
+            <div class="gname">Case</div>
+            <div class="gdesc">75,000 WRK$ — gifts inside</div>
+          </div>
         </div>
-        <div class="game-card" onclick="openBlackjack()">
-          <div class="gicon">🃏</div>
-          <div class="gname">Blackjack</div>
-          <div class="gdesc">Hit, stand, or bust</div>
-        </div>
-        <div class="game-card" onclick="openCrash()">
-          <div class="gicon">🚀</div>
-          <div class="gname">Crash</div>
-          <div class="gdesc">Cash out before it crashes</div>
-        </div>
-        <div class="game-card" onclick="openRoulette()">
-          <div class="gicon">🎡</div>
-          <div class="gname">Roulette</div>
-          <div class="gdesc">Red, Black, or Green — up to 14×</div>
-        </div>
-        <div class="game-card" onclick="openHighLow()">
-          <div class="gicon">🃏</div>
-          <div class="gname">High-Low</div>
-          <div class="gdesc">Chain multipliers by reading the cards</div>
-        </div>
-        <div class="game-card" onclick="openCraps()">
-          <div class="gicon">🎲</div>
-          <div class="gname">Street Craps</div>
-          <div class="gdesc">Roll your point, beat the seven</div>
-        </div>
-        <div class="game-card" onclick="openHack()">
-          <div class="gicon">🖥️</div>
-          <div class="gname">Hack</div>
-          <div class="gdesc">Crack the word, drain the wallet</div>
-        </div>
-        <div class="game-card" onclick="openRob()">
-          <div class="gicon">🔫</div>
-          <div class="gname">Rob</div>
-          <div class="gdesc">Pick a target and take the bag</div>
-        </div>
-        <div class="game-card" onclick="openSlider()">
-          <div class="gicon">🎚️</div>
-          <div class="gname">Slider</div>
-          <div class="gdesc">Set your odds, watch the arrow drop</div>
-        </div>
-        <div class="game-card" onclick="openPlinko()">
-          <div class="gicon">🎯</div>
-          <div class="gname">Plinko</div>
-          <div class="gdesc">Drop the ball, ride the odds</div>
-        </div>
-        <div class="game-card" onclick="openWheel()">
-          <div class="gicon">🎡</div>
-          <div class="gname">Wheel</div>
-          <div class="gdesc">Spin your fate</div>
-        </div>
-        <div class="game-card" onclick="openCase()">
-          <div class="gicon">📦</div>
-          <div class="gname">Case</div>
-          <div class="gdesc">75,000 WRK$ — gifts inside</div>
+        <!-- ROB & HACK -->
+        <div class="game-category" id="gcatFun">
+          <div class="game-card" onclick="openHack()">
+            <div class="gicon">🖥️</div>
+            <div class="gname">Hack</div>
+            <div class="gdesc">Crack the word, drain the wallet</div>
+          </div>
+          <div class="game-card" onclick="openRob()">
+            <div class="gicon">🔫</div>
+            <div class="gname">Rob</div>
+            <div class="gdesc">Pick a target and take the bag</div>
+          </div>
         </div>
       </div>
     </div>
@@ -1843,6 +1875,13 @@ async function loadLeaderboard(tab) {
   } catch(e) {
     list.innerHTML = `<div class="error-msg">${e.message}</div>`;
   }
+}
+
+function setGameTab(tab) {
+  ['live','solo','fun'].forEach(t => {
+    document.getElementById('gtab' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.toggle('active', t === tab);
+    document.getElementById('gcat' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.toggle('active', t === tab);
+  });
 }
 
 function setLbTab(tab, btn) {
