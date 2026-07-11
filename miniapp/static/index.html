@@ -2122,7 +2122,7 @@ async function _rlLand(slot) {
 function openRoulette() {
   if (!state.userId) return alert('Open in Telegram to play.');
   rouletteBetType = null;
-  _RL_ALL_BTN_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('selected'); });
+  _RL_COLOR_BTN_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('selected'); });
   document.getElementById('rouletteResult').className = 'result-box';
   document.getElementById('rouletteErr').textContent = '';
   document.getElementById('rouletteBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
