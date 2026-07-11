@@ -3773,6 +3773,7 @@ function renderBjPlaying(g) {
       ${g.can_split ? `<button class="btn bj-btn outline" onclick="bjAction('split')">✂️ Split</button>` : ''}
     </div>
   `;
+  _bjShowPP(g);
 }
 
 function renderBjFinished(data) {
@@ -3831,6 +3832,19 @@ function renderBjFinished(data) {
     <div class="balance-display" style="${fadeIn(resultDelay + 80)}">Balance: <span class="b">${fmt(data.new_balance)}</span> WRK$</div>
     <button class="btn" style="width:100%;${fadeIn(resultDelay + 160)}" onclick="renderBjBetting()">Play Again</button>
   `;
+  _bjShowPP(data);
+}
+
+function _bjShowPP(data) {
+  if (data.pp_result == null) return;
+  const labels = { perfect:'💎 Perfect Pair!', colored:'🟣 Colored Pair!', mixed:'🎭 Mixed Pair!', none:'No pair' };
+  const isWin = data.pp_result !== 'none';
+  const sign = data.pp_delta >= 0 ? '+' : '';
+  const ppEl = document.createElement('div');
+  ppEl.className = `result-box show ${isWin ? 'win-box' : 'lose-box'}`;
+  ppEl.style.marginBottom = '8px';
+  ppEl.textContent = `${labels[data.pp_result]} — side bet: ${sign}${fmt(data.pp_delta)} WRK$`;
+  document.getElementById('bjContent').prepend(ppEl);
 }
 
 boot();

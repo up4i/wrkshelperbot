@@ -1684,6 +1684,7 @@ def _bj_resolve_game(db, user_id: int, game: dict) -> dict:
 class BlackjackStartRequest(BaseModel):
     user_id: int
     bet: int
+    pp_bet: int = 0
 
 
 class BlackjackActionRequest(BaseModel):
@@ -1712,31 +1713,56 @@ def blackjack_start(req: BlackjackStartRequest):
             raise HTTPException(404, "User not found — use the bot first")
         if req.bet < 10:
             raise HTTPException(400, "Minimum bet is 10 WRK$")
-        if row["balance"] < req.bet:
+        total_cost = req.bet + max(0, req.pp_bet)
+        if row["balance"] < total_cost:
             raise HTTPException(400, f"Insufficient balance ({row['balance']:,} WRK$)")
-        balance = row["balance"]
+        balance = row["balance"] - total_cost
+        db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (balance, req.user_id))
 
-    deck = _bj_new_deck()
-    player = [deck.pop(), deck.pop()]
-    dealer = [deck.pop(), deck.pop()]
+        deck = _bj_new_deck()
+        player = [deck.pop(), deck.pop()]
+        dealer = [deck.pop(), deck.pop()]
 
-    if _bj_hand_val(player) == 21:
-        winnings = int(req.bet * 1.5)
-        with db_conn() as db:
-            db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (winnings, req.user_id))
-            row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+        # Perfect Pair side bet — resolves immediately after initial deal
+        pp_result, pp_delta = None, 0
+        if req.pp_bet and req.pp_bet > 0:
+            c1, c2 = player[0], player[1]
+            if c1["rank"] == c2["rank"]:
+                red = {"♥", "♦"}
+                if c1["suit"] == c2["suit"]:
+                    pp_result, pp_mult = "perfect", 6
+                elif (c1["suit"] in red) == (c2["suit"] in red):
+                    pp_result, pp_mult = "colored", 4
+                else:
+                    pp_result, pp_mult = "mixed", 3
+                pp_delta = req.pp_bet * (pp_mult - 1)
+            else:
+                pp_result, pp_delta = "none", -req.pp_bet
+            balance += pp_delta
+            db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (balance, req.user_id))
+
+        if _bj_hand_val(player) == 21:
+            winnings = int(req.bet * 1.5)
+            balance += winnings
+            db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (balance, req.user_id))
             db.commit()
-        return {
-            "status": "blackjack",
-            "bet": req.bet,
-            "hands": [_bj_fmt(player)],
-            "dealer_hand": _bj_fmt(dealer),
-            "player_values": [21],
-            "dealer_value": _bj_hand_val(dealer),
-            "results": [{"outcome": "blackjack", "delta": winnings, "player_value": 21, "hand_bet": req.bet}],
-            "total_delta": winnings,
-            "new_balance": row["balance"],
-        }
+            resp = {
+                "status": "blackjack",
+                "bet": req.bet,
+                "hands": [_bj_fmt(player)],
+                "dealer_hand": _bj_fmt(dealer),
+                "player_values": [21],
+                "dealer_value": _bj_hand_val(dealer),
+                "results": [{"outcome": "blackjack", "delta": winnings, "player_value": 21, "hand_bet": req.bet}],
+                "total_delta": winnings,
+                "new_balance": balance,
+            }
+            if pp_result is not None:
+                resp["pp_result"] = pp_result
+                resp["pp_delta"] = pp_delta
+            return resp
+
+        db.commit()
 
     _bj_games[req.user_id] = {
         "bet": req.bet,
@@ -1746,7 +1772,11 @@ def blackjack_start(req: BlackjackStartRequest):
         "doubled": [False],
         "dealer": dealer,
     }
-    return _bj_playing_state(_bj_games[req.user_id], balance)
+    resp = _bj_playing_state(_bj_games[req.user_id], balance)
+    if pp_result is not None:
+        resp["pp_result"] = pp_result
+        resp["pp_delta"] = pp_delta
+    return resp
 
 
 @app.post("/api/blackjack/action")
