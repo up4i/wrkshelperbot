@@ -888,13 +888,14 @@
 
   /* ── Blackjack ── */
   .bj-table {
-    background: rgba(13, 80, 40, 0.22);
-    border: 1px solid rgba(22, 163, 74, 0.2);
-    border-radius: 16px;
-    padding: 16px;
+    background: radial-gradient(ellipse at center, rgba(22,101,52,0.45) 0%, rgba(8,38,22,0.65) 100%);
+    border: 2px solid rgba(22,163,74,0.25);
+    border-radius: 20px;
+    padding: 18px 16px;
     display: flex;
     flex-direction: column;
     gap: 14px;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.25), 0 4px 24px rgba(0,0,0,0.4);
   }
   .bj-section-label {
     font-size: 11px;
@@ -962,6 +963,26 @@
     border: 2px solid #3b82f6;
   }
   .bj-bet-section { display: flex; flex-direction: column; gap: 12px; }
+  .bj-chip-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 6px; }
+  .bj-chip {
+    width: 52px; height: 52px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 800; cursor: pointer;
+    border: 3px dashed rgba(255,255,255,.35); color: #fff;
+    transition: transform .12s; line-height: 1.15; text-align: center;
+    user-select: none;
+  }
+  .bj-chip:active { transform: scale(0.88); }
+  .bj-chip.c100  { background: radial-gradient(circle, #ef4444, #b91c1c); }
+  .bj-chip.c500  { background: radial-gradient(circle, #3b82f6, #1d4ed8); }
+  .bj-chip.c1k   { background: radial-gradient(circle, #10b981, #065f46); }
+  .bj-chip.c5k   { background: radial-gradient(circle, #8b5cf6, #5b21b6); }
+  .bj-chip.c10k  { background: radial-gradient(circle, #f59e0b, #b45309); }
+  .bj-chip.c50k  { background: radial-gradient(circle, #ec4899, #9d174d); }
+  .bj-bet-display {
+    font-size: 26px; font-weight: 900; text-align: center; color: var(--gold);
+    min-height: 34px; letter-spacing: -0.5px; text-shadow: 0 2px 8px rgba(0,0,0,.4);
+  }
 
   /* ── High-Low Slider ── */
   .slider-bar-wrap {
@@ -3599,6 +3620,26 @@ function crashCashout() {
 
 // ── Blackjack ─────────────────────────────────────────────────────────────────
 let bjBusy = false;
+let bjCurrentBet = 0;
+let bjPPBet = 0;
+
+function bjAddChip(amount) {
+  bjCurrentBet += amount;
+  const el = document.getElementById('bjBetDisplay');
+  if (el) el.textContent = fmt(bjCurrentBet) + ' WRK$';
+}
+
+function bjClearBet() {
+  bjCurrentBet = 0; bjPPBet = 0;
+  const d1 = document.getElementById('bjBetDisplay'); if (d1) d1.textContent = 'Tap a chip';
+  const d2 = document.getElementById('bjPPDisplay'); if (d2) d2.textContent = 'No PP side bet';
+}
+
+function bjAddPP(amount) {
+  bjPPBet += amount;
+  const el = document.getElementById('bjPPDisplay');
+  if (el) el.textContent = `PP side bet: ${fmt(bjPPBet)} WRK$`;
+}
 
 function closeBjModal(evt) {
   if (evt && evt.target.id !== 'bjModal') return;
@@ -3620,31 +3661,52 @@ async function openBlackjack() {
 }
 
 function renderBjBetting() {
-  bjBusy = false;
+  bjBusy = false; bjCurrentBet = 0; bjPPBet = 0;
   document.getElementById('bjContent').innerHTML = `
     <div class="bj-bet-section">
-      <div class="bj-section-label">Your bet</div>
-      <div class="bet-row">
-        <input class="input bet-input" id="bjBetInput" type="number" min="10" placeholder="Min 10 WRK$">
-        <button class="btn" onclick="dealBlackjack()">Deal 🃏</button>
+      <div class="bj-section-label" style="text-align:center;margin-bottom:8px">Place your bet</div>
+      <div class="bj-chip-row">
+        <div class="bj-chip c100"  onclick="bjAddChip(100)">100</div>
+        <div class="bj-chip c500"  onclick="bjAddChip(500)">500</div>
+        <div class="bj-chip c1k"   onclick="bjAddChip(1000)">1K</div>
+        <div class="bj-chip c5k"   onclick="bjAddChip(5000)">5K</div>
+        <div class="bj-chip c10k"  onclick="bjAddChip(10000)">10K</div>
+        <div class="bj-chip c50k"  onclick="bjAddChip(50000)">50K</div>
       </div>
-      <div class="bet-presets" id="bjPresets"></div>
+      <div class="bj-bet-display" id="bjBetDisplay">Tap a chip</div>
+      <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+        <div class="bj-section-label" style="text-align:center">Perfect Pair side bet (optional)</div>
+        <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:6px">Both cards same rank? Perfect 6× / Colored 4× / Mixed 3×</div>
+        <div class="bj-chip-row">
+          <div class="bj-chip c100" onclick="bjAddPP(100)" style="width:46px;height:46px;font-size:10px">PP<br>100</div>
+          <div class="bj-chip c500" onclick="bjAddPP(500)" style="width:46px;height:46px;font-size:10px">PP<br>500</div>
+          <div class="bj-chip c1k"  onclick="bjAddPP(1000)" style="width:46px;height:46px;font-size:10px">PP<br>1K</div>
+        </div>
+        <div id="bjPPDisplay" style="text-align:center;font-size:12px;color:var(--muted)">No PP side bet</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn outline bj-btn" onclick="bjClearBet()" style="flex:1">Clear</button>
+        <button class="btn bj-btn" onclick="dealBlackjack()" style="flex:2">Deal 🃏</button>
+      </div>
+      <div class="balance-display">Balance: <span class="b" id="bjBetBal">${state.balance !== null ? fmt(state.balance) : '—'}</span> WRK$</div>
+      <div class="error-msg" id="bjErr"></div>
     </div>
-    <div class="balance-display">Balance: <span class="b" id="bjBetBal">${state.balance !== null ? fmt(state.balance) : '—'}</span> WRK$</div>
-    <div class="error-msg" id="bjErr"></div>
   `;
-  buildPresets('bjPresets', 'bjBetInput');
 }
 
 async function dealBlackjack() {
   if (bjBusy) return;
-  const bet = parseInt(document.getElementById('bjBetInput')?.value);
+  const bet = bjCurrentBet;
   const errEl = document.getElementById('bjErr');
-  if (!bet || bet < 10) { if (errEl) errEl.textContent = 'Minimum bet is 10 WRK$'; return; }
+  if (!bet || bet < 10) {
+    const errEl = document.getElementById('bjErr');
+    if (errEl) errEl.textContent = 'Minimum bet is 10 WRK$';
+    return;
+  }
   bjBusy = true;
   if (errEl) errEl.textContent = '';
   try {
-    const data = await api('/api/blackjack/start', { method: 'POST', json: { user_id: +state.userId, bet } });
+    const data = await api('/api/blackjack/start', { method: 'POST', json: { user_id: +state.userId, bet, pp_bet: bjPPBet } });
     if (data.status === 'playing') renderBjPlaying(data);
     else renderBjFinished(data);
   } catch(e) {
