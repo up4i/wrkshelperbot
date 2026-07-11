@@ -407,6 +407,26 @@
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
   }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 0;
+  }
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.7);
+    backdrop-filter: blur(4px);
+    z-index: 1100;
+  }
 
   /* ── Slot machine ── */
   .reels {
@@ -1486,6 +1506,9 @@
     <button class="nav-btn" onclick="showPage('profile',this)" data-page="profile">
       <span class="icon">👤</span>Profile
     </button>
+    <button class="nav-btn" onclick="openSendWrkWithPicker()" style="flex-basis:auto;padding:10px 12px;gap:2px">
+      <span class="icon">💸</span>Send
+    </button>
   </nav>
 </div>
 
@@ -2463,6 +2486,114 @@ async function sendFriendRequest(targetId) {
     const btn = document.getElementById('addFriendBtn');
     if (btn) { btn.textContent = '⏳ Pending'; btn.disabled = true; }
   } catch(e) { alert(e.message); }
+}
+
+// ── Send WRK$ with picker ─────────────────────────────────────────────────────
+async function openSendWrkWithPicker() {
+  if (!state.userId) return;
+  const [friendData, onlineData] = await Promise.all([
+    api(`/api/friends?user_id=${state.userId}`).catch(()=>({friends:[],incoming:[],outgoing:[]})),
+    api('/api/presence/online').catch(()=>({online:[]}))
+  ]);
+  const onlineSet = new Set(onlineData.online);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.style.cssText = 'display:block;z-index:1100';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.style.cssText = 'display:block;z-index:1101';
+  modal.innerHTML = `
+    <div class="modal-header"><span class="modal-title">Send WRK$ To</span>
+      <button class="modal-close" id="_swrPickerClose">✕</button></div>
+    <div class="modal-body">
+      ${friendData.friends.length ? `<p style="font-weight:700;margin-bottom:8px">Friends</p>
+        ${friendData.friends.map(f => {
+          const isOnline = onlineSet.has(f.other_user_id);
+          return `<div class="friend-card" style="cursor:pointer" data-uid="${f.other_user_id}" data-name="${esc(f.other_display)}">
+            ${isOnline ? '<div class="friend-online"></div>' : '<div style="width:8px"></div>'}
+            <div class="friend-card-name">${esc(f.other_display)}</div>
+          </div>`;
+        }).join('')}` : ''}
+      <p style="font-weight:700;margin:12px 0 8px">Search</p>
+      <input id="_swrSearch" class="input" placeholder="@username or name" oninput="_swrDoSearch(this.value)">
+      <div id="_swrResults"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.body.appendChild(modal);
+
+  const cleanup = () => { overlay.remove(); modal.remove(); };
+  document.getElementById('_swrPickerClose').onclick = cleanup;
+  overlay.onclick = cleanup;
+  modal.querySelectorAll('.friend-card[data-uid]').forEach(el => {
+    el.onclick = () => { cleanup(); openSendWrk(+el.dataset.uid, el.dataset.name); };
+  });
+
+  window._swrDoSearch = async (q) => {
+    if (q.length < 2) { const r = document.getElementById('_swrResults'); if(r) r.innerHTML = ''; return; }
+    const res = await api(`/api/profile/username/${encodeURIComponent(q.replace('@',''))}`).catch(()=>null);
+    const el = document.getElementById('_swrResults');
+    if (!el) return;
+    if (!res) { el.innerHTML = '<p style="color:var(--muted)">Not found</p>'; return; }
+    const name = res.username ? `@${res.username}` : res.full_name || `User ${res.user_id}`;
+    el.innerHTML = `<div class="friend-card" style="cursor:pointer" onclick="(function(){cleanup_swrPicker();openSendWrk(${res.user_id}, '${name.replace(/'/g,"\\'")}');})()">
+      <div class="friend-card-name">${esc(name)}</div>
+    </div>`;
+  };
+  window.cleanup_swrPicker = cleanup;
+}
+
+// ── Trade with picker ─────────────────────────────────────────────────────────
+async function openTradeWithPicker() {
+  if (!state.userId) return;
+  const [friendData, onlineData] = await Promise.all([
+    api(`/api/friends?user_id=${state.userId}`).catch(()=>({friends:[],incoming:[],outgoing:[]})),
+    api('/api/presence/online').catch(()=>({online:[]}))
+  ]);
+  const onlineSet = new Set(onlineData.online);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.style.cssText = 'display:block;z-index:1100';
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.style.cssText = 'display:block;z-index:1101';
+  modal.innerHTML = `
+    <div class="modal-header"><span class="modal-title">Trade With</span>
+      <button class="modal-close" id="_tradePickerClose">✕</button></div>
+    <div class="modal-body">
+      ${friendData.friends.length ? `<p style="font-weight:700;margin-bottom:8px">Friends</p>
+        ${friendData.friends.map(f => {
+          const isOnline = onlineSet.has(f.other_user_id);
+          return `<div class="friend-card" style="cursor:pointer" data-uid="${f.other_user_id}">
+            ${isOnline ? '<div class="friend-online"></div>' : '<div style="width:8px"></div>'}
+            <div class="friend-card-name">${esc(f.other_display)}</div>
+          </div>`;
+        }).join('')}` : ''}
+      <p style="font-weight:700;margin:12px 0 8px">Search</p>
+      <input id="_tradePSearch" class="input" placeholder="@username" oninput="_tradePSearch_fn(this.value)">
+      <div id="_tradePResults"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.body.appendChild(modal);
+
+  const cleanup = () => { overlay.remove(); modal.remove(); };
+  document.getElementById('_tradePickerClose').onclick = cleanup;
+  overlay.onclick = cleanup;
+  modal.querySelectorAll('.friend-card[data-uid]').forEach(el => {
+    el.onclick = () => { cleanup(); openTradeModal(+el.dataset.uid); };
+  });
+
+  window._tradePSearch_fn = async (q) => {
+    if (q.length < 2) { const r = document.getElementById('_tradePResults'); if(r) r.innerHTML = ''; return; }
+    const res = await api(`/api/profile/username/${encodeURIComponent(q.replace('@',''))}`).catch(()=>null);
+    const el = document.getElementById('_tradePResults');
+    if (!el) return;
+    if (!res) { el.innerHTML = '<p style="color:var(--muted)">Not found</p>'; return; }
+    el.innerHTML = `<div class="friend-card" style="cursor:pointer" onclick="(function(){cleanup();openTradeModal(${res.user_id});})()">
+      <div class="friend-card-name">${esc(res.username ? '@'+res.username : res.full_name || 'User '+res.user_id)}</div>
+    </div>`;
+  };
 }
 
 function openTradeModal(targetUserId) {
