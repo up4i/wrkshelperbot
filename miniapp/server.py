@@ -592,12 +592,18 @@ def _record_stats(db, user_id: int, *,
                   coinflip_won=0, coinflip_lost=0,
                   blackjack_won=0, blackjack_lost=0,
                   crash_won=0, crash_lost=0,
-                  crash_mult=0.0) -> None:
+                  crash_mult=0.0,
+                  duck_won=0, duck_lost=0,
+                  marbles_won=0, marbles_lost=0,
+                  livebj_won=0, livebj_lost=0,
+                  poker_won=0, poker_lost=0) -> None:
     db.execute(
         """INSERT INTO game_stats
            (user_id, slots_won, slots_lost, coinflip_won, coinflip_lost,
-            blackjack_won, blackjack_lost, crash_won, crash_lost, crash_best_mult)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            blackjack_won, blackjack_lost, crash_won, crash_lost, crash_best_mult,
+            duck_won, duck_lost, marbles_won, marbles_lost,
+            livebj_won, livebj_lost, poker_won, poker_lost)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(user_id) DO UPDATE SET
                slots_won       = slots_won       + excluded.slots_won,
                slots_lost      = slots_lost      + excluded.slots_lost,
@@ -607,9 +613,19 @@ def _record_stats(db, user_id: int, *,
                blackjack_lost  = blackjack_lost  + excluded.blackjack_lost,
                crash_won       = crash_won       + excluded.crash_won,
                crash_lost      = crash_lost      + excluded.crash_lost,
-               crash_best_mult = MAX(crash_best_mult, excluded.crash_best_mult)""",
+               crash_best_mult = MAX(crash_best_mult, excluded.crash_best_mult),
+               duck_won        = duck_won        + excluded.duck_won,
+               duck_lost       = duck_lost       + excluded.duck_lost,
+               marbles_won     = marbles_won     + excluded.marbles_won,
+               marbles_lost    = marbles_lost    + excluded.marbles_lost,
+               livebj_won      = livebj_won      + excluded.livebj_won,
+               livebj_lost     = livebj_lost     + excluded.livebj_lost,
+               poker_won       = poker_won       + excluded.poker_won,
+               poker_lost      = poker_lost      + excluded.poker_lost""",
         (user_id, slots_won, slots_lost, coinflip_won, coinflip_lost,
-         blackjack_won, blackjack_lost, crash_won, crash_lost, crash_mult),
+         blackjack_won, blackjack_lost, crash_won, crash_lost, crash_mult,
+         duck_won, duck_lost, marbles_won, marbles_lost,
+         livebj_won, livebj_lost, poker_won, poker_lost),
     )
     db.commit()
 
@@ -2082,6 +2098,7 @@ async def _crash_loop():
 @app.on_event("startup")
 async def _startup():
     asyncio.create_task(_crash_loop())
+    asyncio.create_task(_duck_loop())
     with db_conn() as db:
         for col in ("pinned_gift_id INTEGER", "photo_url TEXT"):
             try:
@@ -2151,6 +2168,15 @@ async def _startup():
     )
 """)
         db.commit()
+        for col in ("duck_won INTEGER DEFAULT 0", "duck_lost INTEGER DEFAULT 0",
+                    "marbles_won INTEGER DEFAULT 0", "marbles_lost INTEGER DEFAULT 0",
+                    "livebj_won INTEGER DEFAULT 0", "livebj_lost INTEGER DEFAULT 0",
+                    "poker_won INTEGER DEFAULT 0", "poker_lost INTEGER DEFAULT 0"):
+            try:
+                db.execute(f"ALTER TABLE game_stats ADD COLUMN {col}")
+                db.commit()
+            except Exception:
+                pass
 
 
 @app.websocket("/ws/crash")
@@ -2217,6 +2243,166 @@ async def crash_ws(ws: WebSocket):
         _crash.connections.discard(ws)
     except Exception:
         _crash.connections.discard(ws)
+
+
+# ── Duck Racing ───────────────────────────────────────────────────────────────
+
+_DUCK_WAITING_SECS = 15
+_DUCK_RACE_SECS = 8
+_DUCK_FINISHED_SECS = 5
+_DUCK_NAMES = ["Quackers", "Sir Ducks-a-Lot", "Donald", "Daffy"]
+_DUCK_EMOJIS = ["🦆", "🐤", "🐥", "🦅"]
+
+# Preset multiplier pools — each sums to ~4.255 in inverse (94% RTP)
+_DUCK_MULT_POOLS = [
+    [1.4, 2.2, 3.8, 7.5],
+    [1.5, 2.0, 3.5, 9.0],
+    [1.6, 2.4, 3.2, 6.5],
+    [1.3, 2.8, 4.0, 8.0],
+    [1.7, 2.1, 3.6, 8.5],
+]
+
+
+class _DuckState:
+    def __init__(self):
+        self.phase = "waiting"
+        self.ducks: list[dict] = []        # [{name, emoji, mult}]
+        self.bets: dict[int, dict] = {}    # uid -> {duck_idx, bet, name}
+        self.winner_idx: int | None = None
+        self.countdown: float = _DUCK_WAITING_SECS
+        self.connections: set[WebSocket] = set()
+
+
+_duck = _DuckState()
+
+
+async def _duck_broadcast(msg: dict):
+    dead = set()
+    for ws in list(_duck.connections):
+        try:
+            await ws.send_json(msg)
+        except Exception:
+            dead.add(ws)
+    _duck.connections -= dead
+
+
+def _duck_snapshot() -> dict:
+    return {
+        "phase": _duck.phase,
+        "ducks": _duck.ducks,
+        "bets": [
+            {"name": v["name"], "duck_idx": v["duck_idx"], "bet": v["bet"]}
+            for v in _duck.bets.values()
+        ],
+        "winner_idx": _duck.winner_idx,
+        "countdown": round(_duck.countdown, 1),
+    }
+
+
+async def _duck_loop():
+    while True:
+        try:
+            # Setup
+            _duck.phase = "waiting"
+            _duck.bets = {}
+            _duck.winner_idx = None
+            pool = random.choice(_DUCK_MULT_POOLS)
+            mults = pool[:]
+            random.shuffle(mults)
+            _duck.ducks = [
+                {"name": _DUCK_NAMES[i], "emoji": _DUCK_EMOJIS[i], "mult": mults[i]}
+                for i in range(4)
+            ]
+            deadline = asyncio.get_running_loop().time() + _DUCK_WAITING_SECS
+
+            while True:
+                _duck.countdown = max(0.0, deadline - asyncio.get_running_loop().time())
+                await _duck_broadcast({"type": "state", **_duck_snapshot()})
+                if _duck.countdown <= 0:
+                    break
+                await asyncio.sleep(0.5)
+
+            # Pick winner by weighted probability
+            inv = [1 / d["mult"] for d in _duck.ducks]
+            total_inv = sum(inv)
+            r = random.random() * total_inv
+            cumulative = 0.0
+            winner_idx = 0
+            for i, w in enumerate(inv):
+                cumulative += w
+                if r <= cumulative:
+                    winner_idx = i
+                    break
+            _duck.winner_idx = winner_idx
+            _duck.phase = "racing"
+            await _duck_broadcast({"type": "state", **_duck_snapshot()})
+            await asyncio.sleep(_DUCK_RACE_SECS)
+
+            # Payouts
+            _duck.phase = "finished"
+            if _duck.bets:
+                with db_conn() as db:
+                    for uid, info in _duck.bets.items():
+                        if info["duck_idx"] == winner_idx:
+                            payout = int(info["bet"] * _duck.ducks[winner_idx]["mult"])
+                            db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (payout, uid))
+                            _record_stats(db, uid, duck_won=payout - info["bet"])
+                        else:
+                            _record_stats(db, uid, duck_lost=info["bet"])
+                    db.commit()
+            await _duck_broadcast({"type": "state", **_duck_snapshot()})
+            await asyncio.sleep(_DUCK_FINISHED_SECS)
+
+        except Exception:
+            await asyncio.sleep(2.0)
+
+
+@app.websocket("/ws/duck")
+async def duck_ws(ws: WebSocket):
+    await ws.accept()
+    _duck.connections.add(ws)
+    await ws.send_json({"type": "state", **_duck_snapshot()})
+    try:
+        while True:
+            data = await ws.receive_json()
+            uid = data.get("user_id")
+            if not uid:
+                continue
+            uid = int(uid)
+
+            if data.get("type") == "bet":
+                duck_idx = int(data.get("duck_idx", 0))
+                amount = int(data.get("amount", 0))
+                if _duck.phase != "waiting":
+                    await ws.send_json({"type": "error", "message": "Betting phase has ended"})
+                    continue
+                if uid in _duck.bets:
+                    await ws.send_json({"type": "error", "message": "Already bet this round"})
+                    continue
+                if duck_idx not in range(4):
+                    await ws.send_json({"type": "error", "message": "Invalid duck"})
+                    continue
+                if amount < 10:
+                    await ws.send_json({"type": "error", "message": "Minimum bet is 10 WRK$"})
+                    continue
+                with db_conn() as db:
+                    row = db.execute("SELECT balance, name FROM economy WHERE user_id = ?", (uid,)).fetchone()
+                    if not row:
+                        await ws.send_json({"type": "error", "message": "User not found — use the bot first"})
+                        continue
+                    if row["balance"] < amount:
+                        await ws.send_json({"type": "error", "message": f"Insufficient balance"})
+                        continue
+                    db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (amount, uid))
+                    new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
+                    db.commit()
+                _duck.bets[uid] = {"duck_idx": duck_idx, "bet": amount, "name": row["name"] or f"Player {uid}"}
+                await ws.send_json({"type": "bet_placed", "duck_idx": duck_idx, "bet": amount, "new_balance": new_bal})
+
+    except WebSocketDisconnect:
+        _duck.connections.discard(ws)
+    except Exception:
+        _duck.connections.discard(ws)
 
 
 # ── Serve SPA ─────────────────────────────────────────────────────────────────
