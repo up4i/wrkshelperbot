@@ -975,6 +975,7 @@ class SliderRequest(BaseModel):
     user_id: int
     bet: int
     green_pct: int  # 5–95 inclusive; green zone width as percent
+    flipped: bool = False
 
 
 @app.post("/api/play/slider")
@@ -985,7 +986,10 @@ def play_slider(req: SliderRequest):
         bal = _deduct_and_check(db, req.user_id, req.bet)
         payout_mult = round(min(19.0, 0.95 / (req.green_pct / 100)), 2)
         landing = random.randint(1, 100)
-        won = landing <= req.green_pct
+        threshold = 100 - req.green_pct  # boundary: <= threshold means arrow in left zone
+        # NOT flipped: green on right, win = low landing (arrow flies right) = landing <= green_pct
+        # Flipped:     green on left,  win = high landing (arrow flies left) = landing > threshold
+        won = (landing > threshold) if req.flipped else (landing <= req.green_pct)
         delta = int(req.bet * (payout_mult - 1)) if won else -req.bet
         new_bal = bal + delta
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))

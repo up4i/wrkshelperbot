@@ -1732,6 +1732,9 @@
     <div class="modal-title">🎚️ Slider</div>
     <div style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:8px">Drag to set your win chance</div>
     <div class="slider-arrow-track"><div class="slider-arrow" id="sliderArrow">▼</div></div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
+      <button class="btn outline" style="padding:4px 12px;font-size:12px" onclick="flipSlider()">🔄 Flip</button>
+    </div>
     <div class="slider-bar-wrap" id="sliderBarWrap">
       <div class="slider-bar-red" id="sliderRed"></div>
       <div class="slider-handle" id="sliderHandle"></div>
@@ -3738,11 +3741,13 @@ function cfPlayAgain(bet) {
 
 // ── High-Low Slider ───────────────────────────────────────────────────────────
 let _sliderGreenPct = 50;
+let _sliderFlipped = false;
 let _sliderDragCleanup = null;
 
 function openSlider() {
   if (!state.userId) return alert('Open in Telegram to play.');
   _sliderGreenPct = 50;
+  _sliderFlipped = false;
   _updateSliderUI();
   document.getElementById('sliderResult').className = 'result-box';
   document.getElementById('sliderErr').textContent = '';
@@ -3755,12 +3760,25 @@ function openSlider() {
   _initSliderDrag();
 }
 
+function flipSlider() {
+  _sliderFlipped = !_sliderFlipped;
+  _updateSliderUI();
+}
+
 function _updateSliderUI() {
   const pct = _sliderGreenPct;
   const redPct = 100 - pct;
-  document.getElementById('sliderRed').style.width = redPct + '%';
-  document.getElementById('sliderGreen').style.width = pct + '%';
-  document.getElementById('sliderHandle').style.left = redPct + '%';
+  const handle = redPct; // handle position as % from left (boundary between zones)
+  document.getElementById('sliderHandle').style.left = handle + '%';
+  if (_sliderFlipped) {
+    // Green on left, red on right
+    document.getElementById('sliderGreen').style.cssText = 'position:absolute;top:0;left:0;height:100%;background:#10b981;width:' + handle + '%';
+    document.getElementById('sliderRed').style.cssText = 'position:absolute;top:0;right:0;height:100%;background:#dc2626;width:' + pct + '%';
+  } else {
+    // Red on left, green on right (default)
+    document.getElementById('sliderRed').style.cssText = 'position:absolute;top:0;left:0;height:100%;background:#dc2626;width:' + redPct + '%';
+    document.getElementById('sliderGreen').style.cssText = 'position:absolute;top:0;right:0;height:100%;background:#10b981;width:' + pct + '%';
+  }
   document.getElementById('sliderChanceLabel').textContent = pct + '% chance';
   const mult = Math.min(19.0, +(0.95 / (pct / 100)).toFixed(2));
   document.getElementById('sliderPayoutBadge').textContent = mult.toFixed(2) + '×';
@@ -3780,7 +3798,8 @@ function _initSliderDrag() {
     if (!dragging) return;
     e.preventDefault();
     const pos = getPos(e);
-    _sliderGreenPct = Math.max(5, Math.min(95, Math.round((1 - pos) * 100)));
+    const raw = _sliderFlipped ? Math.round(pos * 100) : Math.round((1 - pos) * 100);
+    _sliderGreenPct = Math.max(5, Math.min(95, raw));
     _updateSliderUI();
   }
   function onEnd() { dragging = false; }
@@ -3816,7 +3835,7 @@ async function playSlider() {
   arrowEl.style.left = '0%';
 
   try {
-    const data = await api('/api/play/slider', { method:'POST', json:{ user_id:+state.userId, bet, green_pct:_sliderGreenPct } });
+    const data = await api('/api/play/slider', { method:'POST', json:{ user_id:+state.userId, bet, green_pct:_sliderGreenPct, flipped:_sliderFlipped } });
     await sleep(50);
     arrowEl.classList.add('animating');
     arrowEl.style.left = (100 - data.landing_pct) + '%';
