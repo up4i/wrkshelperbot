@@ -2085,7 +2085,7 @@ def get_trades(user_id: int):
         def _offer_row(row) -> dict:
             d = dict(row)
             # instance_id is the offered gift column
-            offer_gift_col = d.get("instance_id") or d.get("offer_gift_id")
+            offer_gift_col = d.get("instance_id")
             if offer_gift_col:
                 og = db.execute(
                     "SELECT gi.id, gi.gift_number, gi.background, gm.model_name, gm.model_emoji, gm.custom_emoji_id, gm.collection "
@@ -2150,6 +2150,7 @@ def create_trade(req: TradeCreateRequest):
 @app.post("/api/trades/{offer_id}/accept")
 def accept_trade(offer_id: int, req: TradeActionRequest):
     with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
         offer = db.execute("SELECT * FROM gift_offers WHERE id=?", (offer_id,)).fetchone()
         if not offer:
             raise HTTPException(404, "Offer not found")
@@ -2160,7 +2161,7 @@ def accept_trade(offer_id: int, req: TradeActionRequest):
 
         from_id = offer["from_user_id"]
         to_id = offer["to_user_id"]
-        offered_gift = offer["instance_id"] if "instance_id" in offer.keys() else offer.get("offer_gift_id")
+        offered_gift = offer["instance_id"]
 
         if offered_gift:
             row = db.execute("SELECT owner_id FROM gift_instances WHERE id=?", (offered_gift,)).fetchone()
@@ -2170,7 +2171,7 @@ def accept_trade(offer_id: int, req: TradeActionRequest):
             row = db.execute("SELECT owner_id FROM gift_instances WHERE id=?", (offer["request_gift_id"],)).fetchone()
             if not row or row["owner_id"] != to_id:
                 raise HTTPException(400, "You no longer own the requested gift")
-        wrk_offered = offer["wrk_offered"] if "wrk_offered" in offer.keys() else offer.get("offer_wrk", 0)
+        wrk_offered = offer["wrk_offered"]
         if wrk_offered > 0:
             bal = db.execute("SELECT balance FROM economy WHERE user_id=?", (from_id,)).fetchone()
             if not bal or bal["balance"] < wrk_offered:
