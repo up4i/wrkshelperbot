@@ -2344,7 +2344,7 @@ async def _duck_loop():
                 with db_conn() as db:
                     for uid, info in _duck.bets.items():
                         if info["duck_idx"] == winner_idx:
-                            payout = int(info["bet"] * _duck.ducks[winner_idx]["mult"])
+                            payout = round(info["bet"] * _duck.ducks[winner_idx]["mult"])
                             db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (payout, uid))
                             _record_stats(db, uid, duck_won=payout - info["bet"])
                         else:
