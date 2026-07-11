@@ -2177,6 +2177,7 @@ function rlPlayAgain(bet) {
   document.getElementById('rouletteResult').className = 'result-box';
   const pa = document.getElementById('rouletteModal').querySelector('.btn.outline');
   if (pa) pa.remove();
+  spinRoulette();
 }
 
 // ── High-Low ──────────────────────────────────────────────────────────────────
@@ -2681,6 +2682,7 @@ function slotsPlayAgain(bet) {
   resetSlotsUI();
   const pa = document.getElementById('slotsModal').querySelector('.btn.outline');
   if (pa) pa.remove();
+  spinSlots();
 }
 
 // ── Coinflip ──────────────────────────────────────────────────────────────────
@@ -2751,6 +2753,7 @@ function cfPlayAgain(bet) {
   document.getElementById('cfResult').className = 'result-box';
   const pa = document.getElementById('cfModal').querySelector('.btn.outline');
   if (pa) pa.remove();
+  flipCoin();
 }
 
 // ── High-Low Slider ───────────────────────────────────────────────────────────
@@ -2863,6 +2866,7 @@ function sliderPlayAgain(bet) {
   document.getElementById('sliderResult').className = 'result-box';
   const pa = document.getElementById('sliderModal').querySelector('.btn.outline');
   if (pa) pa.remove();
+  playSlider();
 }
 
 // ── Modals ────────────────────────────────────────────────────────────────────
