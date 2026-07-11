@@ -881,6 +881,14 @@
   .rl-wheel { width:200px; height:200px; }
   .rl-wheel svg { display:block; width:100%; height:100%; transform-origin:center; }
   .crash-phase-txt { font-size: 13px; color: var(--muted); min-height: 20px; }
+  .crash-players { margin-top: 8px; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+  .crash-player-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,.04); }
+  .crash-player-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); flex-shrink: 0; }
+  .crash-player-dot.won { background: var(--green); }
+  .crash-player-dot.lost { background: var(--red); }
+  .crash-player-name { flex: 1; font-weight: 600; }
+  .crash-player-bet { color: var(--muted); }
+  .crash-player-status { font-size: 11px; font-weight: 700; }
   .crash-bet-info {
     background: rgba(139,92,246,.1); border: 1px solid var(--border);
     border-radius: 10px; padding: 10px 14px; font-size: 13px; text-align: center;
@@ -4031,10 +4039,28 @@ function initCrashUI() {
     <div class="crash-bet-info" id="crashBetInfo"></div>
     <div id="crashActionsArea"></div>
     <div class="error-msg" id="crashErr"></div>
+    <div class="crash-players" id="crashPlayers"></div>
   `;
 }
 
+function _updateCrashPlayers(players) {
+  const el = document.getElementById('crashPlayers');
+  if (!el || !players) return;
+  el.innerHTML = players.map(p => {
+    const dotCls = p.cashed_out ? 'won' : '';
+    const lostCls = !p.cashed_out && p.mult ? 'lost' : '';
+    const status = p.cashed_out ? `✅ ${p.mult?.toFixed(2)}×` : (p.mult ? `💀` : '🟡');
+    return `<div class="crash-player-row">
+      <div class="crash-player-dot ${dotCls}${lostCls}"></div>
+      <span class="crash-player-name">${p.name}</span>
+      <span class="crash-player-bet">${fmt(p.bet)}</span>
+      <span class="crash-player-status">${status}</span>
+    </div>`;
+  }).join('');
+}
+
 function updateCrashDisplay(msg) {
+  _updateCrashPlayers(msg.players);
   const phase = msg.phase;
   const mult = msg.multiplier || 1.0;
   const phaseChanged = phase !== crashLastPhase;
