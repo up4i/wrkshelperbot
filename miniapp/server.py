@@ -956,8 +956,9 @@ def craps_roll(req: CrapsRollRequest):
         if not sess:
             raise HTTPException(404, "No active craps session — start one first")
         sess = dict(sess)
-        roll_count = sess.get("roll_count", 0) + 1
-        db.execute("UPDATE craps_sessions SET roll_count = ? WHERE user_id = ?", (roll_count, req.user_id))
+        db.execute("UPDATE craps_sessions SET roll_count = roll_count + 1 WHERE user_id = ?", (req.user_id,))
+        row = db.execute("SELECT roll_count FROM craps_sessions WHERE user_id = ?", (req.user_id,)).fetchone()
+        roll_count = row["roll_count"] if row else 1
         d1 = random.randint(1, 6)
         d2 = random.randint(1, 6)
         total = d1 + d2
