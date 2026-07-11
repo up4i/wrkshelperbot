@@ -2740,7 +2740,8 @@ async def _livebj_loop():
                     db.commit()
                 await _livebj_broadcast({
                     "type": "solo_refund",
-                    "message": "Round cancelled — need at least 2 players. Bet refunded."
+                    "message": "Round cancelled — need at least 2 players. Bet refunded.",
+                    "bet": seat["bet"]
                 })
                 _livebj.seats = []
                 await asyncio.sleep(2.0)
