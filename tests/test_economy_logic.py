@@ -240,3 +240,22 @@ def test_cases_non_gift_payouts_are_meaningful():
         if gift_tier is None:
             assert wrk_min >= _CASE_PRICE * 0.2, f"{tier} min {wrk_min} is below 20% of case price"
             assert wrk_max >= wrk_min, f"{tier} max < min"
+
+
+def test_plinko_rtp_is_house_favorable():
+    """All three risk tiers must have RTP < 1.0 (house edge)."""
+    import math
+
+    rows = 8
+    coeffs = [math.comb(rows, k) for k in range(rows + 1)]
+    total = sum(coeffs)
+
+    mults = {
+        "low":    [2.2, 1.5, 1.2, 0.9, 0.65, 0.9, 1.2, 1.5, 2.2],
+        "medium": [7.0, 2.5, 1.4, 0.7, 0.50, 0.7, 1.4, 2.5, 7.0],
+        "high":   [17,  3.5, 1.5, 0.5, 0.20, 0.5, 1.5, 3.5, 17 ],
+    }
+    for risk, m in mults.items():
+        rtp = sum(coeffs[i] * m[i] for i in range(rows + 1)) / total
+        assert rtp < 1.0, f"{risk} RTP {rtp:.3f} is player-favorable (>= 1.0)"
+        assert rtp > 0.90, f"{risk} RTP {rtp:.3f} is too low (< 90%)"
