@@ -732,6 +732,37 @@ def play_roulette(req: RouletteRequest):
         }
 
 
+# ── High-Low Slider ───────────────────────────────────────────────────────────
+
+class SliderRequest(BaseModel):
+    user_id: int
+    bet: int
+    green_pct: int  # 5–95 inclusive; green zone width as percent
+
+
+@app.post("/api/play/slider")
+def play_slider(req: SliderRequest):
+    if not (5 <= req.green_pct <= 95):
+        raise HTTPException(400, "green_pct must be between 5 and 95")
+    with db_conn() as db:
+        bal = _deduct_and_check(db, req.user_id, req.bet)
+        payout_mult = round(min(19.0, 0.95 / (req.green_pct / 100)), 2)
+        landing = random.randint(1, 100)
+        won = landing <= req.green_pct
+        delta = int(req.bet * (payout_mult - 1)) if won else -req.bet
+        new_bal = bal + delta
+        db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+        db.commit()
+        return {
+            "won": won,
+            "landing_pct": landing,
+            "green_pct": req.green_pct,
+            "payout_mult": payout_mult,
+            "delta": delta,
+            "new_balance": new_bal,
+        }
+
+
 # ── High-Low ──────────────────────────────────────────────────────────────────
 
 class HighLowStartRequest(BaseModel):
