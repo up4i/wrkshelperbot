@@ -1989,6 +1989,7 @@ class _CrashState:
         self.countdown = _CRASH_BETTING_SECS
         self.history: list[float] = []
         self.bets: dict[int, dict] = {}  # user_id -> {bet, cashed_out}
+        self.names: dict[int, str] = {}      # user_id -> display name
         self.connections: set[WebSocket] = set()
 
 
@@ -2014,11 +2015,21 @@ async def _crash_broadcast(msg: dict):
 
 
 def _crash_snapshot() -> dict:
+    players = [
+        {
+            "name": _crash.names.get(uid, str(uid)),
+            "bet": info["bet"],
+            "cashed_out": info["cashed_out"],
+            "mult": info.get("mult"),   # None if still in, float if cashed out or crashed
+        }
+        for uid, info in _crash.bets.items()
+    ]
     return {
         "phase": _crash.phase,
         "multiplier": _crash.multiplier,
         "countdown": round(_crash.countdown, 1),
         "history": _crash.history[-10:],
+        "players": players,
     }
 
 
@@ -2028,6 +2039,7 @@ async def _crash_loop():
             # Betting phase
             _crash.phase = "waiting"
             _crash.bets = {}
+            _crash.names = {}
             _crash.multiplier = 1.0
             _crash.crash_point = _gen_crash_point()
             deadline = asyncio.get_running_loop().time() + _CRASH_BETTING_SECS
@@ -2175,6 +2187,8 @@ async def crash_ws(ws: WebSocket):
                         continue
                     db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (amount, uid))
                     new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
+                    name_row = db.execute("SELECT name FROM economy WHERE user_id = ?", (uid,)).fetchone()
+                    _crash.names[uid] = name_row["name"] if name_row and name_row["name"] else f"Player {uid}"
                     db.commit()
                 _crash.bets[uid] = {"bet": amount, "cashed_out": False}
                 await ws.send_json({"type": "bet_placed", "bet": amount, "new_balance": new_bal})
@@ -2191,6 +2205,7 @@ async def crash_ws(ws: WebSocket):
                 payout = int(bet_info["bet"] * mult)
                 profit = payout - bet_info["bet"]
                 bet_info["cashed_out"] = True
+                bet_info["mult"] = mult
                 with db_conn() as db:
                     db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (payout, uid))
                     new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
