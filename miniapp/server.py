@@ -2730,6 +2730,22 @@ async def _livebj_loop():
                 await asyncio.sleep(2.0)
                 continue
 
+            if len(_livebj.seats) == 1:
+                seat = _livebj.seats[0]
+                with db_conn() as db:
+                    db.execute(
+                        "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                        (seat["bet"], seat["user_id"])
+                    )
+                    db.commit()
+                await _livebj_broadcast({
+                    "type": "solo_refund",
+                    "message": "Round cancelled — need at least 2 players. Bet refunded."
+                })
+                _livebj.seats = []
+                await asyncio.sleep(2.0)
+                continue
+
             # Deal
             _livebj.phase = "dealing"
             _livebj.deck = _lbj_fresh_deck()

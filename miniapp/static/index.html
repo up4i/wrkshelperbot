@@ -4872,6 +4872,11 @@ function _handleLbjMsg(msg) {
     state.balance = msg.new_balance; refreshHeaderBal();
     document.getElementById('lbjBetArea').innerHTML =
       `<div class="crash-bet-info">✅ Seated — bet ${fmt(msg.bet)} WRK$</div>`;
+  } else if (msg.type === 'solo_refund') {
+    const el = document.getElementById('lbjPhase');
+    if (el) el.textContent = msg.message;
+    state.balance += msg.bet || 0;
+    refreshHeaderBal();
   } else if (msg.type === 'error') {
     const el = document.getElementById('lbjErr');
     if (el) { el.textContent = msg.message; setTimeout(() => el.textContent = '', 3000); }
