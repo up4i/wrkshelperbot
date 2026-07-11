@@ -856,6 +856,83 @@ def play_wheel(req: WheelRequest):
         }
 
 
+# ── CS Case Opening ───────────────────────────────────────────────────────────
+
+_CASE_PRICE = 75_000
+
+# Cumulative weights (roll 1-100). Each entry: (threshold, tier, wrk_min, wrk_max, gift_tier)
+_CASE_LOOT = [
+    (55,  "common",    100,    400,  None),
+    (80,  "uncommon",  500,   2000,  None),
+    (92,  "rare",     2000,  10000,  None),
+    (98,  "epic",        0,      0,  "mid"),
+    (100, "legendary",   0,      0,  "high"),
+]
+
+
+class CaseRequest(BaseModel):
+    user_id: int
+
+
+@app.post("/api/play/case")
+def play_case(req: CaseRequest):
+    import time as _time
+    with db_conn() as db:
+        row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "User not found — use the bot first")
+        if row["balance"] < _CASE_PRICE:
+            raise HTTPException(400, f"Need {_CASE_PRICE:,} WRK$ to open a case")
+        balance = row["balance"] - _CASE_PRICE
+        db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (balance, req.user_id))
+
+        roll = random.randint(1, 100)
+        tier_name = wrk_min = wrk_max = gift_tier = None
+        for threshold, t, mn, mx, gt in _CASE_LOOT:
+            if roll <= threshold:
+                tier_name, wrk_min, wrk_max, gift_tier = t, mn, mx, gt
+                break
+
+        gift_id = gift_name = gift_emoji = None
+        wrk_reward = 0
+
+        if gift_tier:
+            instance = db.execute(
+                "SELECT gi.id, gm.model_name, gm.model_emoji FROM gift_instances gi "
+                "JOIN gift_models gm ON gm.id = gi.model_id "
+                "WHERE gi.owner_id IS NULL AND gm.tier = ? ORDER BY RANDOM() LIMIT 1",
+                (gift_tier,)
+            ).fetchone()
+            if instance:
+                gift_id = instance["id"]
+                gift_name = instance["model_name"]
+                gift_emoji = instance["model_emoji"]
+                db.execute("UPDATE gift_instances SET owner_id = ? WHERE id = ?", (req.user_id, gift_id))
+            else:
+                # Fallback if no gifts of this tier are in stock
+                wrk_reward = 50_000 if gift_tier == "high" else 25_000
+                balance += wrk_reward
+                db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (balance, req.user_id))
+        else:
+            wrk_reward = random.randint(wrk_min, wrk_max)
+            balance += wrk_reward
+            db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (balance, req.user_id))
+
+        db.execute(
+            "INSERT INTO cases_opened (user_id, tier, wrk_reward, gift_id, opened_at) VALUES (?, ?, ?, ?, ?)",
+            (req.user_id, tier_name, wrk_reward, gift_id, int(_time.time()))
+        )
+        db.commit()
+        return {
+            "tier": tier_name,
+            "wrk_reward": wrk_reward,
+            "gift_id": gift_id,
+            "gift_name": gift_name,
+            "gift_emoji": gift_emoji,
+            "new_balance": balance,
+        }
+
+
 # ── High-Low ──────────────────────────────────────────────────────────────────
 
 class HighLowStartRequest(BaseModel):
@@ -2051,6 +2128,16 @@ async def _startup():
             multiplier   REAL    NOT NULL DEFAULT 1.0,
             started_at   INTEGER NOT NULL
         )""")
+        db.execute("""
+    CREATE TABLE IF NOT EXISTS cases_opened (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        tier TEXT NOT NULL,
+        wrk_reward INTEGER NOT NULL DEFAULT 0,
+        gift_id INTEGER,
+        opened_at INTEGER NOT NULL
+    )
+""")
         db.commit()
 
 
