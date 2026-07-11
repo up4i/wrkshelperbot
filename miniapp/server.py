@@ -676,11 +676,22 @@ def stats():
         gifts_owned = db.execute(
             "SELECT COUNT(*) FROM gift_instances WHERE owner_id IS NOT NULL"
         ).fetchone()[0]
+        bank_gifts = db.execute(
+            "SELECT COUNT(*) FROM gift_instances WHERE owner_id IS NULL"
+        ).fetchone()[0]
         top_balance = db.execute(
             "SELECT COALESCE(MAX(balance), 0) FROM economy"
         ).fetchone()[0]
-        return {"users": users, "total_wrk": total_wrk,
-                "gifts_owned": gifts_owned, "top_balance": top_balance}
+        games_played = db.execute(
+            "SELECT COALESCE(SUM(slots_won+slots_lost+coinflip_won+coinflip_lost+"
+            "blackjack_won+blackjack_lost+crash_won+crash_lost+duck_won+duck_lost+"
+            "marbles_won+marbles_lost+livebj_won+livebj_lost+poker_won+poker_lost+"
+            "roulette_won+roulette_lost+plinko_won+plinko_lost+wheel_won+wheel_lost+"
+            "slider_won+slider_lost+craps_won+craps_lost+highlow_won+highlow_lost+"
+            "cases_won+cases_lost),0) FROM game_stats"
+        ).fetchone()[0]
+        return {"users": users, "total_wrk": total_wrk, "gifts_owned": gifts_owned,
+                "bank_gifts": bank_gifts, "top_balance": top_balance, "games_played": games_played}
 
 
 # ── Games ─────────────────────────────────────────────────────────────────────

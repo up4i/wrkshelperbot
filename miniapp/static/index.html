@@ -1241,6 +1241,8 @@
         <div class="stat-card"><div class="label">WRK in Circulation</div><div class="value gold" id="statWrk">—</div></div>
         <div class="stat-card"><div class="label">Gifts Owned</div><div class="value green" id="statGifts">—</div></div>
         <div class="stat-card"><div class="label">Top Balance</div><div class="value gold" id="statTop">—</div></div>
+        <div class="stat-card"><div class="label">Games Played</div><div class="value purple" id="statGames">—</div></div>
+        <div class="stat-card"><div class="label">Gifts in Bank</div><div class="value green" id="statBank">—</div></div>
       </div>
       <div class="card" id="homeAccountCard">
         <div class="card-title">Your account</div>
@@ -2116,6 +2118,8 @@ async function loadStats() {
     document.getElementById('statWrk').textContent = fmtK(d.total_wrk);
     document.getElementById('statGifts').textContent = fmt(d.gifts_owned);
     document.getElementById('statTop').textContent = fmtK(d.top_balance);
+    document.getElementById('statGames').textContent = fmtK(d.games_played);
+    document.getElementById('statBank').textContent = fmt(d.bank_gifts);
   } catch {}
 }
 
@@ -4266,7 +4270,12 @@ async function api(url, opts = {}) {
 }
 
 function fmt(n) { return Number(n).toLocaleString('en-US'); }
-function fmtK(n) { if (n >= 1_000_000) return (n/1_000_000).toFixed(1)+'M'; if (n >= 1000) return (n/1000).toFixed(1)+'K'; return fmt(n); }
+function fmtK(n) {
+  if (n >= 1_000_000_000) return (n/1_000_000_000).toFixed(1)+'B';
+  if (n >= 1_000_000) return (n/1_000_000).toFixed(1)+'M';
+  if (n >= 1000) return (n/1000).toFixed(1)+'K';
+  return fmt(n);
+}
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
