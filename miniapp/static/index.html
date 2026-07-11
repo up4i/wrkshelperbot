@@ -861,6 +861,20 @@
     50% { transform: translateX(8px) scale(1.04); }
     75% { transform: translateX(-5px); }
   }
+  /* ── Duck Racing ── */
+  .duck-track { width: 100%; background: rgba(0,0,0,.2); border-radius: 10px; overflow: hidden; margin: 8px 0; }
+  .duck-lane { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,.05); cursor: pointer; transition: background .15s; }
+  .duck-lane:last-child { border-bottom: none; }
+  .duck-lane.selected { background: rgba(139,92,246,.15); }
+  .duck-lane.winner { background: rgba(245,158,11,.15); }
+  .duck-emoji { font-size: 22px; transition: transform .1s; }
+  .duck-name { flex: 1; font-weight: 600; font-size: 13px; }
+  .duck-mult { font-size: 13px; font-weight: 800; }
+  .duck-mult.low  { color: var(--green); }
+  .duck-mult.mid  { color: var(--gold); }
+  .duck-mult.high { color: var(--red); }
+  .duck-runner { display: inline-block; }
+
   @keyframes bj-flip-reveal {
     from { transform: rotateY(90deg) scaleX(0.5); opacity: 0; }
     to   { transform: rotateY(0deg)  scaleX(1);   opacity: 1; }
@@ -1168,7 +1182,11 @@
             <div class="gname">Crash</div>
             <div class="gdesc">Cash out before it crashes</div>
           </div>
-          <!-- Duck Racing card — added in Task 4 -->
+          <div class="game-card" onclick="openDuck()">
+            <div class="gicon">🦆</div>
+            <div class="gname">Duck Race</div>
+            <div class="gdesc">Pick your duck, ride the odds</div>
+          </div>
           <!-- Marbles card — added in Task 6 -->
           <!-- Live Blackjack card — added in Task 8 -->
           <!-- Poker card — added in Task 10 -->
@@ -1680,6 +1698,20 @@
     <button class="modal-close" onclick="document.getElementById('crashModal').classList.remove('open')">✕</button>
     <div class="modal-title">🚀 Crash</div>
     <div id="crashContent"><div class="loading">Connecting…</div></div>
+  </div>
+</div>
+
+<!-- DUCK RACING MODAL -->
+<div class="modal-bg" id="duckModal" onclick="closeModal('duckModal',event)">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('duckModal')">✕</button>
+    <div class="modal-title">🦆 Duck Race</div>
+    <div class="crash-history" id="duckHistory"></div>
+    <div class="duck-track" id="duckTrack"></div>
+    <div class="crash-phase-txt" id="duckPhase">Connecting…</div>
+    <div class="result-box" id="duckResult"></div>
+    <div id="duckBetArea"></div>
+    <div class="error-msg" id="duckErr"></div>
   </div>
 </div>
 
@@ -4178,6 +4210,125 @@ function _drawCrashChart() {
     rocket.style.left = (toX(lt) / W * 100).toFixed(1) + '%';
     rocket.style.top  = (toY(lm) / H * 100).toFixed(1) + '%';
   }
+}
+
+// ── Duck Racing ───────────────────────────────────────────────────────────────
+let duckWs = null;
+let _duckSelected = -1;
+let _duckLastPhase = null;
+let _duckMyBet = 0;
+let _duckMyDuck = -1;
+
+function openDuck() {
+  if (!state.userId) return alert('Open in Telegram to play.');
+  document.getElementById('duckModal').classList.add('open');
+  _connectDuckWs();
+}
+
+function _connectDuckWs() {
+  if (duckWs && duckWs.readyState <= 1) return;
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  duckWs = new WebSocket(`${proto}//${location.host}/ws/duck`);
+  duckWs.onmessage = e => _handleDuckMsg(JSON.parse(e.data));
+  duckWs.onclose = () => {
+    setTimeout(() => {
+      if (document.getElementById('duckModal').classList.contains('open')) _connectDuckWs();
+    }, 2000);
+  };
+}
+
+function _multClass(m) { return m <= 2 ? 'low' : m <= 4 ? 'mid' : 'high'; }
+
+function _handleDuckMsg(msg) {
+  if (msg.type === 'state') _updateDuckDisplay(msg);
+  else if (msg.type === 'bet_placed') {
+    _duckMyBet = msg.bet; _duckMyDuck = msg.duck_idx;
+    state.balance = msg.new_balance; refreshHeaderBal();
+    document.getElementById('duckBetArea').innerHTML =
+      `<div class="crash-bet-info">✅ Bet ${fmt(msg.bet)} on ${_duckLastState?.ducks?.[msg.duck_idx]?.emoji || '🦆'}</div>`;
+  } else if (msg.type === 'error') {
+    const el = document.getElementById('duckErr');
+    if (el) { el.textContent = msg.message; setTimeout(() => el.textContent = '', 3000); }
+  }
+}
+
+let _duckLastState = null;
+
+function _updateDuckDisplay(msg) {
+  _duckLastState = msg;
+  const phaseChanged = msg.phase !== _duckLastPhase;
+  _duckLastPhase = msg.phase;
+
+  // Track
+  const track = document.getElementById('duckTrack');
+  if (track && msg.ducks) {
+    track.innerHTML = msg.ducks.map((d, i) => {
+      const isWinner = msg.phase === 'finished' && msg.winner_idx === i;
+      const isSelected = _duckSelected === i || _duckMyDuck === i;
+      const progress = msg.phase === 'racing' ? Math.random() * 60 + 20 : (isWinner && msg.phase === 'finished' ? 85 : 5);
+      return `<div class="duck-lane${isSelected ? ' selected' : ''}${isWinner ? ' winner' : ''}" onclick="_selectDuck(${i})">
+        <span class="duck-runner" style="margin-left:${progress}%">${esc(d.emoji)}</span>
+        <span class="duck-name">${esc(d.name)}</span>
+        <span class="duck-mult ${_multClass(d.mult)}">${d.mult}×</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Phase text
+  const phaseEl = document.getElementById('duckPhase');
+  if (phaseEl) {
+    if (msg.phase === 'waiting') phaseEl.textContent = msg.countdown > 0 ? `Betting closes in ${msg.countdown.toFixed(1)}s` : 'Starting…';
+    else if (msg.phase === 'racing') phaseEl.textContent = '🏁 Race in progress…';
+    else phaseEl.textContent = `🏆 ${msg.ducks?.[msg.winner_idx]?.name || 'Winner'} wins!`;
+  }
+
+  // Result
+  if (msg.phase === 'finished' && phaseChanged) {
+    const resEl = document.getElementById('duckResult');
+    const won = _duckMyDuck === msg.winner_idx && _duckMyBet > 0;
+    const lost = _duckMyDuck >= 0 && _duckMyDuck !== msg.winner_idx && _duckMyBet > 0;
+    if (won) {
+      const payout = Math.round(_duckMyBet * msg.ducks[msg.winner_idx].mult);
+      resEl.textContent = `🏆 Your duck won! +${fmt(payout - _duckMyBet)} WRK$`;
+      resEl.className = 'result-box show win-box';
+    } else if (lost) {
+      resEl.textContent = `💀 Your duck lost. -${fmt(_duckMyBet)} WRK$`;
+      resEl.className = 'result-box show lose-box';
+    }
+    _duckMyBet = 0; _duckMyDuck = -1; _duckSelected = -1;
+  }
+
+  if (msg.phase === 'waiting' && phaseChanged) {
+    document.getElementById('duckResult').className = 'result-box';
+    if (_duckMyBet === 0) _showDuckBetArea();
+  }
+}
+
+function _showDuckBetArea() {
+  document.getElementById('duckBetArea').innerHTML = `
+    <div class="card-title" style="margin-top:8px">Bet amount</div>
+    <div class="bet-presets" id="duckPresets"></div>
+    <div class="bet-row">
+      <input class="input bet-input" id="duckBetInput" type="number" value="100" min="10">
+      <button class="btn" onclick="_placeDuckBet()">BET</button>
+    </div>
+    <div class="balance-display">Balance: <span class="b">${state.balance !== null ? fmt(state.balance) : '—'}</span> WRK$</div>
+  `;
+  buildPresets('duckPresets', 'duckBetInput');
+}
+
+function _selectDuck(idx) {
+  if (_duckLastPhase !== 'waiting' || _duckMyBet > 0) return;
+  _duckSelected = idx;
+  if (_duckLastState) _updateDuckDisplay(_duckLastState);
+}
+
+function _placeDuckBet() {
+  if (_duckSelected < 0) { document.getElementById('duckErr').textContent = 'Select a duck first'; return; }
+  const bet = parseInt(document.getElementById('duckBetInput')?.value);
+  if (!bet || bet < 10) { document.getElementById('duckErr').textContent = 'Min 10 WRK$'; return; }
+  if (!duckWs || duckWs.readyState !== 1) return;
+  duckWs.send(JSON.stringify({ type: 'bet', user_id: +state.userId, duck_idx: _duckSelected, amount: bet }));
 }
 
 // ── Blackjack ─────────────────────────────────────────────────────────────────
