@@ -2099,6 +2099,7 @@ async def _crash_loop():
 async def _startup():
     asyncio.create_task(_crash_loop())
     asyncio.create_task(_duck_loop())
+    asyncio.create_task(_marble_loop())
     with db_conn() as db:
         for col in ("pinned_gift_id INTEGER", "photo_url TEXT"):
             try:
@@ -2127,6 +2128,11 @@ async def _startup():
                 pass
         try:
             db.execute("ALTER TABLE gift_instances ADD COLUMN sort_index INTEGER")
+            db.commit()
+        except Exception:
+            pass
+        try:
+            db.execute("ALTER TABLE gift_instances ADD COLUMN staked INTEGER DEFAULT 0")
             db.commit()
         except Exception:
             pass
@@ -2403,6 +2409,214 @@ async def duck_ws(ws: WebSocket):
         _duck.connections.discard(ws)
     except Exception:
         _duck.connections.discard(ws)
+
+
+# ── Marbles ───────────────────────────────────────────────────────────────────
+
+_MARBLE_OPEN_SECS = 20
+_MARBLE_EXTEND_SECS = 10
+_MARBLE_LAUNCH_SECS = 6
+_MARBLE_FINISHED_SECS = 5
+_MARBLE_COLORS = [
+  "#ef4444","#3b82f6","#10b981","#f59e0b","#8b5cf6",
+  "#ec4899","#06b6d4","#84cc16","#f97316","#6366f1",
+  "#14b8a6","#e11d48","#7c3aed","#0284c7","#16a34a",
+  "#d97706","#db2777","#0891b2","#65a30d","#4f46e5",
+]
+
+
+class _MarbleState:
+    def __init__(self):
+        self.phase = "open"
+        self.bets: dict[int, dict] = {}   # uid -> {name, wrk, gift_id, gift_value, color, total_value}
+        self.pot_wrk: int = 0
+        self.pot_gifts: list[int] = []    # gift_instance IDs
+        self.winner_id: int | None = None
+        self.countdown: float = _MARBLE_OPEN_SECS
+        self.connections: set[WebSocket] = set()
+        self._color_idx: int = 0
+
+    def next_color(self) -> str:
+        c = _MARBLE_COLORS[self._color_idx % len(_MARBLE_COLORS)]
+        self._color_idx += 1
+        return c
+
+
+_marble = _MarbleState()
+
+
+async def _marble_broadcast(msg: dict):
+    dead = set()
+    for ws in list(_marble.connections):
+        try:
+            await ws.send_json(msg)
+        except Exception:
+            dead.add(ws)
+    _marble.connections -= dead
+
+
+def _marble_snapshot() -> dict:
+    total = sum(b["total_value"] for b in _marble.bets.values()) or 1
+    return {
+        "phase": _marble.phase,
+        "countdown": round(_marble.countdown, 1),
+        "pot_wrk": _marble.pot_wrk,
+        "winner_id": _marble.winner_id,
+        "players": [
+            {
+                "name": v["name"],
+                "color": v["color"],
+                "total_value": v["total_value"],
+                "pct": round(v["total_value"] / total * 100, 1),
+                "gift_id": v.get("gift_id"),
+            }
+            for v in _marble.bets.values()
+        ],
+    }
+
+
+async def _marble_loop():
+    while True:
+        try:
+            # Reset
+            _marble.phase = "open"
+            _marble.bets = {}
+            _marble.pot_wrk = 0
+            _marble.pot_gifts = []
+            _marble.winner_id = None
+            _marble._color_idx = 0
+            deadline = asyncio.get_running_loop().time() + _MARBLE_OPEN_SECS
+            extended = False
+
+            while True:
+                _marble.countdown = max(0.0, deadline - asyncio.get_running_loop().time())
+                await _marble_broadcast({"type": "state", **_marble_snapshot()})
+                if _marble.countdown <= 0:
+                    if len(_marble.bets) < 2 and not extended:
+                        # Extend once
+                        extended = True
+                        deadline = asyncio.get_running_loop().time() + _MARBLE_EXTEND_SECS
+                    elif len(_marble.bets) < 2:
+                        # Refund the lone player and restart
+                        if _marble.bets:
+                            uid, info = next(iter(_marble.bets.items()))
+                            with db_conn() as db:
+                                db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (info["wrk"], uid))
+                                if info.get("gift_id"):
+                                    db.execute("UPDATE gift_instances SET owner_id = ?, staked = 0 WHERE id = ?", (uid, info["gift_id"]))
+                                db.commit()
+                        await _marble_broadcast({"type": "refund", "message": "Not enough players — refunded"})
+                        await asyncio.sleep(3.0)
+                        break
+                    else:
+                        break
+                await asyncio.sleep(0.5)
+
+            if len(_marble.bets) < 2:
+                continue
+
+            # Pick winner proportionally
+            total = sum(b["total_value"] for b in _marble.bets.values())
+            roll = random.randint(0, total - 1)
+            cumulative = 0
+            winner_id = None
+            for uid, b in _marble.bets.items():
+                cumulative += b["total_value"]
+                if roll < cumulative:
+                    winner_id = uid
+                    break
+            _marble.winner_id = winner_id
+            _marble.phase = "launching"
+            await _marble_broadcast({"type": "state", **_marble_snapshot()})
+            await asyncio.sleep(_MARBLE_LAUNCH_SECS)
+
+            # Pay out
+            _marble.phase = "finished"
+            with db_conn() as db:
+                db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (_marble.pot_wrk, winner_id))
+                for gid in _marble.pot_gifts:
+                    db.execute("UPDATE gift_instances SET owner_id = ?, staked = 0 WHERE id = ?", (winner_id, gid))
+                db.commit()
+            await _marble_broadcast({"type": "state", **_marble_snapshot()})
+            await asyncio.sleep(_MARBLE_FINISHED_SECS)
+
+        except Exception:
+            await asyncio.sleep(2.0)
+
+
+@app.websocket("/ws/marbles")
+async def marbles_ws(ws: WebSocket):
+    await ws.accept()
+    _marble.connections.add(ws)
+    await ws.send_json({"type": "state", **_marble_snapshot()})
+    try:
+        while True:
+            data = await ws.receive_json()
+            uid = data.get("user_id")
+            if not uid:
+                continue
+            uid = int(uid)
+
+            if data.get("type") == "bet":
+                if _marble.phase != "open":
+                    await ws.send_json({"type": "error", "message": "Betting is closed"})
+                    continue
+                if uid in _marble.bets:
+                    await ws.send_json({"type": "error", "message": "Already in this round"})
+                    continue
+
+                gift_id = data.get("gift_id")
+                amount = int(data.get("amount", 0))
+
+                with db_conn() as db:
+                    row = db.execute("SELECT balance, name FROM economy WHERE user_id = ?", (uid,)).fetchone()
+                    if not row:
+                        await ws.send_json({"type": "error", "message": "User not found"})
+                        continue
+
+                    if gift_id:
+                        # Gift bet — get market value
+                        gift_row = db.execute(
+                            "SELECT gi.id, gm.tier FROM gift_instances gi "
+                            "JOIN gift_models gm ON gm.id = gi.model_id "
+                            "WHERE gi.id = ? AND gi.owner_id = ? AND gi.staked = 0",
+                            (gift_id, uid)
+                        ).fetchone()
+                        if not gift_row:
+                            await ws.send_json({"type": "error", "message": "Gift not found in your inventory"})
+                            continue
+                        price_row = db.execute(
+                            "SELECT price FROM gift_prices WHERE tier = ? ORDER BY updated_at DESC LIMIT 1",
+                            (gift_row["tier"],)
+                        ).fetchone()
+                        gift_value = price_row["price"] if price_row else 10000
+                        db.execute("UPDATE gift_instances SET owner_id = NULL, staked = 1 WHERE id = ?", (gift_id,))
+                        new_bal = row["balance"]
+                        total_value = gift_value
+                        _marble.pot_gifts.append(gift_id)
+                        bet_entry = {"name": row["name"] or f"Player {uid}", "wrk": 0, "gift_id": gift_id, "gift_value": gift_value, "color": _marble.next_color(), "total_value": total_value}
+                    else:
+                        if amount < 100:
+                            await ws.send_json({"type": "error", "message": "Minimum bet is 100 WRK$"})
+                            continue
+                        if row["balance"] < amount:
+                            await ws.send_json({"type": "error", "message": "Insufficient balance"})
+                            continue
+                        db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (amount, uid))
+                        new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
+                        _marble.pot_wrk += amount
+                        total_value = amount
+                        bet_entry = {"name": row["name"] or f"Player {uid}", "wrk": amount, "gift_id": None, "gift_value": 0, "color": _marble.next_color(), "total_value": total_value}
+                    db.commit()
+
+                _marble.bets[uid] = bet_entry
+                await ws.send_json({"type": "bet_placed", "new_balance": new_bal, "color": bet_entry["color"]})
+                await _marble_broadcast({"type": "state", **_marble_snapshot()})
+
+    except WebSocketDisconnect:
+        _marble.connections.discard(ws)
+    except Exception:
+        _marble.connections.discard(ws)
 
 
 # ── Serve SPA ─────────────────────────────────────────────────────────────────
