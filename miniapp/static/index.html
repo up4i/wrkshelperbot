@@ -2538,7 +2538,7 @@ async function openSendWrkWithPicker() {
   const cleanup = () => { bg.remove(); };
   document.getElementById('_swrPickerClose').onclick = cleanup;
   bg.onclick = e => { if (e.target === bg) cleanup(); };
-  modal.querySelectorAll('.friend-card[data-uid]').forEach(el => {
+  bg.querySelectorAll('.friend-card[data-uid]').forEach(el => {
     el.onclick = () => { cleanup(); openSendWrk(+el.dataset.uid, el.dataset.name); };
   });
 
