@@ -596,14 +596,26 @@ def _record_stats(db, user_id: int, *,
                   duck_won=0, duck_lost=0,
                   marbles_won=0, marbles_lost=0,
                   livebj_won=0, livebj_lost=0,
-                  poker_won=0, poker_lost=0) -> None:
+                  poker_won=0, poker_lost=0,
+                  roulette_won=0, roulette_lost=0,
+                  plinko_won=0, plinko_lost=0,
+                  wheel_won=0, wheel_lost=0,
+                  slider_won=0, slider_lost=0,
+                  craps_won=0, craps_lost=0,
+                  highlow_won=0, highlow_lost=0,
+                  cases_won=0, cases_lost=0) -> None:
     db.execute(
         """INSERT INTO game_stats
-           (user_id, slots_won, slots_lost, coinflip_won, coinflip_lost,
+           (user_id,
+            slots_won, slots_lost, coinflip_won, coinflip_lost,
             blackjack_won, blackjack_lost, crash_won, crash_lost, crash_best_mult,
             duck_won, duck_lost, marbles_won, marbles_lost,
-            livebj_won, livebj_lost, poker_won, poker_lost)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            livebj_won, livebj_lost, poker_won, poker_lost,
+            roulette_won, roulette_lost, plinko_won, plinko_lost,
+            wheel_won, wheel_lost, slider_won, slider_lost,
+            craps_won, craps_lost, highlow_won, highlow_lost,
+            cases_won, cases_lost)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
            ON CONFLICT(user_id) DO UPDATE SET
                slots_won       = slots_won       + excluded.slots_won,
                slots_lost      = slots_lost      + excluded.slots_lost,
@@ -621,11 +633,30 @@ def _record_stats(db, user_id: int, *,
                livebj_won      = livebj_won      + excluded.livebj_won,
                livebj_lost     = livebj_lost     + excluded.livebj_lost,
                poker_won       = poker_won       + excluded.poker_won,
-               poker_lost      = poker_lost      + excluded.poker_lost""",
-        (user_id, slots_won, slots_lost, coinflip_won, coinflip_lost,
+               poker_lost      = poker_lost      + excluded.poker_lost,
+               roulette_won    = roulette_won    + excluded.roulette_won,
+               roulette_lost   = roulette_lost   + excluded.roulette_lost,
+               plinko_won      = plinko_won      + excluded.plinko_won,
+               plinko_lost     = plinko_lost     + excluded.plinko_lost,
+               wheel_won       = wheel_won       + excluded.wheel_won,
+               wheel_lost      = wheel_lost      + excluded.wheel_lost,
+               slider_won      = slider_won      + excluded.slider_won,
+               slider_lost     = slider_lost     + excluded.slider_lost,
+               craps_won       = craps_won       + excluded.craps_won,
+               craps_lost      = craps_lost      + excluded.craps_lost,
+               highlow_won     = highlow_won     + excluded.highlow_won,
+               highlow_lost    = highlow_lost    + excluded.highlow_lost,
+               cases_won       = cases_won       + excluded.cases_won,
+               cases_lost      = cases_lost      + excluded.cases_lost""",
+        (user_id,
+         slots_won, slots_lost, coinflip_won, coinflip_lost,
          blackjack_won, blackjack_lost, crash_won, crash_lost, crash_mult,
          duck_won, duck_lost, marbles_won, marbles_lost,
-         livebj_won, livebj_lost, poker_won, poker_lost),
+         livebj_won, livebj_lost, poker_won, poker_lost,
+         roulette_won, roulette_lost, plinko_won, plinko_lost,
+         wheel_won, wheel_lost, slider_won, slider_lost,
+         craps_won, craps_lost, highlow_won, highlow_lost,
+         cases_won, cases_lost),
     )
     db.commit()
 
@@ -2180,6 +2211,20 @@ async def _startup():
                     "marbles_won INTEGER DEFAULT 0", "marbles_lost INTEGER DEFAULT 0",
                     "livebj_won INTEGER DEFAULT 0", "livebj_lost INTEGER DEFAULT 0",
                     "poker_won INTEGER DEFAULT 0", "poker_lost INTEGER DEFAULT 0"):
+            try:
+                db.execute(f"ALTER TABLE game_stats ADD COLUMN {col}")
+                db.commit()
+            except Exception:
+                pass
+        for col in (
+            "roulette_won INTEGER DEFAULT 0", "roulette_lost INTEGER DEFAULT 0",
+            "plinko_won INTEGER DEFAULT 0",   "plinko_lost INTEGER DEFAULT 0",
+            "wheel_won INTEGER DEFAULT 0",    "wheel_lost INTEGER DEFAULT 0",
+            "slider_won INTEGER DEFAULT 0",   "slider_lost INTEGER DEFAULT 0",
+            "craps_won INTEGER DEFAULT 0",    "craps_lost INTEGER DEFAULT 0",
+            "highlow_won INTEGER DEFAULT 0",  "highlow_lost INTEGER DEFAULT 0",
+            "cases_won INTEGER DEFAULT 0",    "cases_lost INTEGER DEFAULT 0",
+        ):
             try:
                 db.execute(f"ALTER TABLE game_stats ADD COLUMN {col}")
                 db.commit()
