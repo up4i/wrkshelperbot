@@ -2100,6 +2100,7 @@ async def _startup():
     asyncio.create_task(_crash_loop())
     asyncio.create_task(_duck_loop())
     asyncio.create_task(_marble_loop())
+    asyncio.create_task(_livebj_loop())
     with db_conn() as db:
         for col in ("pinned_gift_id INTEGER", "photo_url TEXT"):
             try:
@@ -2617,6 +2618,254 @@ async def marbles_ws(ws: WebSocket):
         _marble.connections.discard(ws)
     except Exception:
         _marble.connections.discard(ws)
+
+
+# ── Live Blackjack ────────────────────────────────────────────────────────────
+
+_LBJ_BETTING_SECS = 10
+_LBJ_TURN_SECS = 30
+_LBJ_RESULTS_SECS = 5
+
+def _lbj_fresh_deck() -> list[str]:
+    suits = ['♠','♥','♦','♣']
+    ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
+    deck = [r+s for s in suits for r in ranks]
+    random.shuffle(deck)
+    return deck
+
+def _lbj_card_value(card: str) -> int:
+    r = card[:-1]
+    if r in ('J','Q','K'): return 10
+    if r == 'A': return 11
+    return int(r)
+
+def _lbj_hand_value(hand: list[str]) -> int:
+    total = sum(_lbj_card_value(c) for c in hand)
+    aces = sum(1 for c in hand if c[:-1] == 'A')
+    while total > 21 and aces:
+        total -= 10; aces -= 1
+    return total
+
+def _lbj_is_blackjack(hand: list[str]) -> bool:
+    return len(hand) == 2 and _lbj_hand_value(hand) == 21
+
+
+class _LiveBJState:
+    def __init__(self):
+        self.phase = "waiting"
+        self.seats: list[dict] = []   # [{user_id, name, bet, hand, status, doubled}]
+        self.dealer_hand: list[str] = []
+        self.dealer_hole_shown: bool = False
+        self.deck: list[str] = []
+        self.current_seat: int = 0
+        self.turn_deadline: float = 0.0
+        self.connections: set[WebSocket] = set()
+        self.countdown: float = _LBJ_BETTING_SECS
+
+    def seat_for(self, uid: int) -> dict | None:
+        return next((s for s in self.seats if s["user_id"] == uid), None)
+
+
+_livebj = _LiveBJState()
+
+
+async def _livebj_broadcast(msg: dict):
+    dead = set()
+    for ws in list(_livebj.connections):
+        try:
+            await ws.send_json(msg)
+        except Exception:
+            dead.add(ws)
+    _livebj.connections -= dead
+
+
+def _livebj_snapshot(for_uid: int | None = None) -> dict:
+    seats_out = []
+    for i, s in enumerate(_livebj.seats):
+        seat_copy = {k: v for k, v in s.items() if k != "hand"}
+        # Only reveal hand to the owner, or at showdown
+        if s["user_id"] == for_uid or _livebj.dealer_hole_shown:
+            seat_copy["hand"] = s["hand"]
+        else:
+            seat_copy["hand"] = ["🂠"] * len(s["hand"])
+        seat_copy["value"] = _lbj_hand_value(s["hand"]) if (s["user_id"] == for_uid or _livebj.dealer_hole_shown) else None
+        seat_copy["is_turn"] = (i == _livebj.current_seat and _livebj.phase == "player_turns")
+        seats_out.append(seat_copy)
+    dealer_display = _livebj.dealer_hand if _livebj.dealer_hole_shown else ([_livebj.dealer_hand[0], "🂠"] if _livebj.dealer_hand else [])
+    return {
+        "phase": _livebj.phase,
+        "countdown": round(_livebj.countdown, 1),
+        "seats": seats_out,
+        "dealer_hand": dealer_display,
+        "dealer_value": _lbj_hand_value(_livebj.dealer_hand) if _livebj.dealer_hole_shown else None,
+        "current_seat": _livebj.current_seat,
+    }
+
+
+async def _livebj_loop():
+    while True:
+        try:
+            # Betting phase
+            _livebj.phase = "waiting"
+            _livebj.seats = []
+            _livebj.dealer_hand = []
+            _livebj.dealer_hole_shown = False
+            _livebj.current_seat = 0
+            deadline = asyncio.get_running_loop().time() + _LBJ_BETTING_SECS
+            while True:
+                _livebj.countdown = max(0.0, deadline - asyncio.get_running_loop().time())
+                await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+                if _livebj.countdown <= 0:
+                    break
+                await asyncio.sleep(0.5)
+
+            if not _livebj.seats:
+                await asyncio.sleep(2.0)
+                continue
+
+            # Deal
+            _livebj.phase = "dealing"
+            _livebj.deck = _lbj_fresh_deck()
+            for seat in _livebj.seats:
+                seat["hand"] = [_livebj.deck.pop(), _livebj.deck.pop()]
+                seat["status"] = "playing"
+                seat["doubled"] = False
+            _livebj.dealer_hand = [_livebj.deck.pop(), _livebj.deck.pop()]
+            await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+            await asyncio.sleep(1.0)
+
+            # Player turns
+            _livebj.phase = "player_turns"
+            for i, seat in enumerate(_livebj.seats):
+                _livebj.current_seat = i
+                if _lbj_is_blackjack(seat["hand"]):
+                    seat["status"] = "blackjack"
+                    await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+                    await asyncio.sleep(1.0)
+                    continue
+                turn_deadline = asyncio.get_running_loop().time() + _LBJ_TURN_SECS
+                while seat["status"] == "playing":
+                    remaining = turn_deadline - asyncio.get_running_loop().time()
+                    if remaining <= 0:
+                        seat["status"] = "stood"
+                        break
+                    _livebj.countdown = remaining
+                    await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+                    await asyncio.sleep(0.5)
+
+            # Dealer
+            _livebj.phase = "dealer"
+            _livebj.dealer_hole_shown = True
+            while _lbj_hand_value(_livebj.dealer_hand) < 17:
+                _livebj.dealer_hand.append(_livebj.deck.pop())
+            await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+            await asyncio.sleep(1.5)
+
+            # Results
+            _livebj.phase = "results"
+            dealer_val = _lbj_hand_value(_livebj.dealer_hand)
+            dealer_bust = dealer_val > 21
+            with db_conn() as db:
+                for seat in _livebj.seats:
+                    pval = _lbj_hand_value(seat["hand"])
+                    bet = seat["bet"]
+                    if seat["status"] == "blackjack":
+                        payout = int(bet * 2.5)
+                        seat["result"] = "blackjack"
+                    elif seat["status"] == "bust":
+                        payout = 0
+                        seat["result"] = "bust"
+                    elif dealer_bust or pval > dealer_val:
+                        payout = bet * 2
+                        seat["result"] = "win"
+                    elif pval == dealer_val:
+                        payout = bet
+                        seat["result"] = "push"
+                    else:
+                        payout = 0
+                        seat["result"] = "lose"
+                    if payout:
+                        db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (payout, seat["user_id"]))
+                    _record_stats(db, seat["user_id"], livebj_won=max(0, payout - bet), livebj_lost=bet if payout == 0 else 0)
+                db.commit()
+            await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+            await asyncio.sleep(_LBJ_RESULTS_SECS)
+
+        except Exception:
+            await asyncio.sleep(2.0)
+
+
+@app.websocket("/ws/livebj")
+async def livebj_ws(ws: WebSocket):
+    await ws.accept()
+    _livebj.connections.add(ws)
+    uid_ref = [None]
+    await ws.send_json({"type": "state", **_livebj_snapshot()})
+    try:
+        while True:
+            data = await ws.receive_json()
+            uid = data.get("user_id")
+            if not uid:
+                continue
+            uid = int(uid)
+            uid_ref[0] = uid
+
+            if data.get("type") == "join":
+                if _livebj.phase != "waiting":
+                    await ws.send_json({"type": "error", "message": "Round in progress"})
+                    continue
+                if len(_livebj.seats) >= 6:
+                    await ws.send_json({"type": "error", "message": "Table full (6 players max)"})
+                    continue
+                if _livebj.seat_for(uid):
+                    await ws.send_json({"type": "error", "message": "Already seated"})
+                    continue
+                bet = int(data.get("bet", 0))
+                if bet < 10:
+                    await ws.send_json({"type": "error", "message": "Minimum bet is 10 WRK$"})
+                    continue
+                with db_conn() as db:
+                    row = db.execute("SELECT balance, name FROM economy WHERE user_id = ?", (uid,)).fetchone()
+                    if not row or row["balance"] < bet:
+                        await ws.send_json({"type": "error", "message": "Insufficient balance"})
+                        continue
+                    db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (bet, uid))
+                    new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
+                    db.commit()
+                _livebj.seats.append({"user_id": uid, "name": row["name"] or f"Player {uid}", "bet": bet, "hand": [], "status": "waiting", "doubled": False})
+                await ws.send_json({"type": "joined", "bet": bet, "new_balance": new_bal})
+                await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+
+            elif data.get("type") in ("hit", "stand", "double"):
+                seat = _livebj.seat_for(uid)
+                if not seat or seat["status"] != "playing" or _livebj.phase != "player_turns":
+                    await ws.send_json({"type": "error", "message": "Not your turn"})
+                    continue
+                if _livebj.seats[_livebj.current_seat]["user_id"] != uid:
+                    await ws.send_json({"type": "error", "message": "Not your turn"})
+                    continue
+                action = data["type"]
+                if action in ("hit", "double"):
+                    seat["hand"].append(_livebj.deck.pop())
+                    if action == "double":
+                        # Deduct extra bet
+                        with db_conn() as db:
+                            db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (seat["bet"], uid))
+                            db.commit()
+                        seat["bet"] *= 2
+                        seat["doubled"] = True
+                    if _lbj_hand_value(seat["hand"]) > 21:
+                        seat["status"] = "bust"
+                    elif action == "double":
+                        seat["status"] = "stood"
+                if action == "stand":
+                    seat["status"] = "stood"
+                await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+
+    except WebSocketDisconnect:
+        _livebj.connections.discard(ws)
+    except Exception:
+        _livebj.connections.discard(ws)
 
 
 # ── Serve SPA ─────────────────────────────────────────────────────────────────
