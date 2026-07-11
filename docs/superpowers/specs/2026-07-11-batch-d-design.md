@@ -188,7 +188,23 @@ New handler in `handlers/economy.py`. DB queries go directly to `wrkshelperbot.d
 ### Net worth
 Computed at profile load time: `balance + SUM(gift_prices.current_price) WHERE gift_instances.owner_id = user_id`. Shown on profile page hero section alongside balance. Used in leaderboard (new `networth` tab) and `/profile` bot reply.
 
-New leaderboard tab `networth` added to `_STAT_COLS` (or equivalent in the server leaderboard endpoint) and exposed in the frontend leaderboard tabs.
+New `networth` leaderboard tab added directly to the `leaderboard()` endpoint as a special case (not via `_STAT_COLS` — it requires a subquery joining `gift_prices`):
+
+```sql
+SELECT e.user_id,
+       e.balance + COALESCE(SUM(gp.current_price), 0) AS net_worth,
+       ...
+FROM economy e
+LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id
+LEFT JOIN gift_prices gp ON gp.collection = (
+    SELECT gm.collection FROM gift_models gm WHERE gm.id = gi.model_id
+) AND gp.background = gi.background
+GROUP BY e.user_id
+ORDER BY net_worth DESC
+LIMIT ?
+```
+
+Exposed as a new tab in the frontend leaderboard tabs (`setLbTab('networth', this)`).
 
 ### Profile tags
 Computed at profile load from rank queries. Max 3 tags shown. Examples:
@@ -208,7 +224,7 @@ Own profile page shows a picker (dropdown or segmented control) to change the pi
 ### Animated gifts
 Gift cards on the profile grid animate their Telegram lottie sticker as they scroll into view using `IntersectionObserver`. The existing `/emoji-anim/{emoji_id}` endpoint already serves lottie JSON and `emoji_anim_cache/` already caches the files.
 
-Each gift card checks `gm.custom_emoji_id` — if set, loads the lottie via `<dotlottie-player>` or a lightweight lottie player (lottie-web CDN). Falls back to static emoji rendering if no animated version exists. Animation plays once on scroll-in, loops on hover.
+Each gift card checks `gm.custom_emoji_id` — if set, loads the lottie JSON from `/emoji-anim/{emoji_id}` and plays it via **lottie-web** (CDN: `https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js`). Falls back to static emoji rendering if no animated version exists. Animation plays once on scroll-in, loops on hover.
 
 ### "View Profile in App" button
 Already covered in Section 3 — the mini-app `?profile=` param navigates to the profile on load.
