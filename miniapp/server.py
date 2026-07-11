@@ -2101,6 +2101,7 @@ async def _startup():
     asyncio.create_task(_duck_loop())
     asyncio.create_task(_marble_loop())
     asyncio.create_task(_livebj_loop())
+    asyncio.create_task(_poker_loop())
     with db_conn() as db:
         for col in ("pinned_gift_id INTEGER", "photo_url TEXT"):
             try:
@@ -2866,6 +2867,362 @@ async def livebj_ws(ws: WebSocket):
         _livebj.connections.discard(ws)
     except Exception:
         _livebj.connections.discard(ws)
+
+
+# ── Texas Hold'Em Poker ───────────────────────────────────────────────────────
+
+_POKER_BUYIN = 10_000
+_POKER_SMALL_BLIND = 500
+_POKER_BIG_BLIND = 1_000
+_POKER_TURN_SECS = 30
+_POKER_RESULTS_SECS = 8
+
+def _poker_fresh_deck() -> list[str]:
+    suits = ['♠','♥','♦','♣']
+    ranks = ['2','3','4','5','6','7','8','9','10','J','Q','K','A']
+    deck = [r+s for s in suits for r in ranks]
+    random.shuffle(deck)
+    return deck
+
+def _card_rank_val(card: str) -> int:
+    r = card[:-1]
+    order = {'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,'J':11,'Q':12,'K':13,'A':14}
+    return order.get(r, 0)
+
+def _evaluate_hand(cards: list[str]) -> tuple:
+    """Return a comparable tuple (rank, tiebreakers) for best 5 from 7 cards. Higher = better."""
+    from itertools import combinations
+    best = None
+    for combo in combinations(cards, 5):
+        score = _score_5(list(combo))
+        if best is None or score > best:
+            best = score
+    return best
+
+def _score_5(cards: list[str]) -> tuple:
+    ranks = sorted([_card_rank_val(c) for c in cards], reverse=True)
+    suits = [c[-1] for c in cards]
+    is_flush = len(set(suits)) == 1
+    is_straight = (ranks == list(range(ranks[0], ranks[0]-5, -1))) or ranks == [14,5,4,3,2]
+    if is_straight and ranks[0] == 5: ranks = [5,4,3,2,1]  # wheel
+    from collections import Counter
+    cnt = Counter(ranks)
+    freq = sorted(cnt.values(), reverse=True)
+    uniq = sorted(cnt.keys(), key=lambda r: (cnt[r], r), reverse=True)
+
+    if is_straight and is_flush: return (8, ranks)
+    if freq == [4,1]:            return (7, uniq)
+    if freq == [3,2]:            return (6, uniq)
+    if is_flush:                 return (5, ranks)
+    if is_straight:              return (4, ranks)
+    if freq[0] == 3:             return (3, uniq)
+    if freq[:2] == [2,2]:        return (2, uniq)
+    if freq[0] == 2:             return (1, uniq)
+    return (0, ranks)
+
+
+class _PokerState:
+    def __init__(self):
+        self.phase = "lobby"
+        self.seats: list[dict] = []  # [{user_id, name, chips, hole_cards, status, current_bet}]
+        self.community: list[str] = []
+        self.pot: int = 0
+        self.deck: list[str] = []
+        self.current_seat: int = 0
+        self.dealer_btn: int = 0
+        self.min_raise: int = _POKER_BIG_BLIND
+        self.current_bet: int = 0
+        self.turn_deadline: float = 0.0
+        self.connections: dict[int, WebSocket] = {}  # uid -> ws
+        self.countdown: float = 0.0
+
+    def active_seats(self) -> list[dict]:
+        return [s for s in self.seats if s["status"] not in ("folded","out")]
+
+    def seat_for(self, uid: int) -> dict | None:
+        return next((s for s in self.seats if s["user_id"] == uid), None)
+
+
+_poker = _PokerState()
+
+
+async def _poker_broadcast(msg: dict, exclude_uid: int | None = None):
+    dead = []
+    for uid, ws in list(_poker.connections.items()):
+        if uid == exclude_uid:
+            continue
+        try:
+            await ws.send_json(msg)
+        except Exception:
+            dead.append(uid)
+    for uid in dead:
+        _poker.connections.pop(uid, None)
+
+
+async def _poker_send(uid: int, msg: dict):
+    ws = _poker.connections.get(uid)
+    if ws:
+        try:
+            await ws.send_json(msg)
+        except Exception:
+            _poker.connections.pop(uid, None)
+
+
+def _poker_snapshot(for_uid: int | None = None) -> dict:
+    seats_out = []
+    for i, s in enumerate(_poker.seats):
+        sc = {k: v for k, v in s.items() if k != "hole_cards"}
+        sc["hole_cards"] = s["hole_cards"] if (s["user_id"] == for_uid or _poker.phase == "showdown") else ["🂠","🂠"]
+        sc["is_turn"] = (i == _poker.current_seat and _poker.phase in ("pre_flop","flop","turn","river"))
+        seats_out.append(sc)
+    return {
+        "phase": _poker.phase,
+        "seats": seats_out,
+        "community": _poker.community,
+        "pot": _poker.pot,
+        "current_bet": _poker.current_bet,
+        "min_raise": _poker.min_raise,
+        "current_seat": _poker.current_seat,
+        "countdown": round(_poker.countdown, 1),
+    }
+
+
+async def _poker_betting_round():
+    """Run one betting round, cycling through active players until action closes."""
+    active = _poker.active_seats()
+    if len(active) <= 1:
+        return
+    acted = set()
+    last_raiser = None
+    while True:
+        active = _poker.active_seats()
+        if len(active) <= 1:
+            break
+        seat = _poker.seats[_poker.current_seat]
+        if seat["status"] in ("folded","out","all_in"):
+            _poker.current_seat = (_poker.current_seat + 1) % len(_poker.seats)
+            continue
+        uid = seat["user_id"]
+        # Round complete if everyone who can act has acted and no pending raises
+        if uid in acted and uid != last_raiser:
+            break
+        turn_deadline = asyncio.get_running_loop().time() + _POKER_TURN_SECS
+        while True:
+            _poker.countdown = max(0.0, turn_deadline - asyncio.get_running_loop().time())
+            await _poker_send(uid, {"type": "state", **_poker_snapshot(uid)})
+            await _poker_broadcast({"type": "state", **_poker_snapshot()}, exclude_uid=uid)
+            if _poker.countdown <= 0:
+                # Auto-fold
+                seat["status"] = "folded"
+                acted.add(uid)
+                break
+            await asyncio.sleep(0.5)
+            # Check if seat acted (status changed or bet changed)
+            if seat.get("_acted"):
+                seat.pop("_acted", None)
+                acted.add(uid)
+                if seat.get("_raised"):
+                    last_raiser = uid
+                    seat.pop("_raised", None)
+                    acted = {uid}  # reset — others need to respond
+                break
+        _poker.current_seat = (_poker.current_seat + 1) % len(_poker.seats)
+
+
+async def _poker_loop():
+    while True:
+        try:
+            if len(_poker.seats) < 2:
+                await asyncio.sleep(2.0)
+                continue
+
+            # Post blinds
+            _poker.community = []
+            _poker.pot = 0
+            _poker.deck = _poker_fresh_deck()
+            _poker.current_bet = _POKER_BIG_BLIND
+            _poker.min_raise = _POKER_BIG_BLIND
+            for seat in _poker.seats:
+                seat["hole_cards"] = []
+                seat["current_bet"] = 0
+                seat["status"] = "active"
+
+            sb_idx = (_poker.dealer_btn + 1) % len(_poker.seats)
+            bb_idx = (_poker.dealer_btn + 2) % len(_poker.seats)
+            for idx, blind in [(sb_idx, _POKER_SMALL_BLIND), (bb_idx, _POKER_BIG_BLIND)]:
+                seat = _poker.seats[idx]
+                paid = min(blind, seat["chips"])
+                seat["chips"] -= paid
+                seat["current_bet"] = paid
+                _poker.pot += paid
+
+            # Deal hole cards
+            _poker.phase = "pre_flop"
+            for seat in _poker.seats:
+                seat["hole_cards"] = [_poker.deck.pop(), _poker.deck.pop()]
+            for seat in _poker.seats:
+                await _poker_send(seat["user_id"], {"type": "state", **_poker_snapshot(seat["user_id"])})
+
+            _poker.current_seat = (bb_idx + 1) % len(_poker.seats)
+            await _poker_betting_round()
+
+            # Flop
+            _poker.phase = "flop"
+            _poker.community = [_poker.deck.pop() for _ in range(3)]
+            _poker.current_bet = 0
+            for seat in _poker.seats: seat["current_bet"] = 0
+            _poker.current_seat = sb_idx
+            await _poker_broadcast({"type": "state", **_poker_snapshot()})
+            await _poker_betting_round()
+
+            # Turn
+            _poker.phase = "turn"
+            _poker.community.append(_poker.deck.pop())
+            _poker.current_bet = 0
+            for seat in _poker.seats: seat["current_bet"] = 0
+            _poker.current_seat = sb_idx
+            await _poker_broadcast({"type": "state", **_poker_snapshot()})
+            await _poker_betting_round()
+
+            # River
+            _poker.phase = "river"
+            _poker.community.append(_poker.deck.pop())
+            _poker.current_bet = 0
+            for seat in _poker.seats: seat["current_bet"] = 0
+            _poker.current_seat = sb_idx
+            await _poker_broadcast({"type": "state", **_poker_snapshot()})
+            await _poker_betting_round()
+
+            # Showdown
+            _poker.phase = "showdown"
+            active = _poker.active_seats()
+            winner = None
+            if len(active) == 1:
+                winner = active[0]
+            else:
+                best_score = None
+                for seat in active:
+                    score = _evaluate_hand(seat["hole_cards"] + _poker.community)
+                    if best_score is None or score > best_score:
+                        best_score = score
+                        winner = seat
+            if winner:
+                winner["chips"] += _poker.pot
+                with db_conn() as db:
+                    for seat in _poker.seats:
+                        profit = seat["chips"] - _POKER_BUYIN
+                        if profit > 0:
+                            _record_stats(db, seat["user_id"], poker_won=profit)
+                        else:
+                            _record_stats(db, seat["user_id"], poker_lost=abs(profit))
+                    db.commit()
+            await _poker_broadcast({"type": "state", **_poker_snapshot()})
+            await asyncio.sleep(_POKER_RESULTS_SECS)
+
+            # Remove busted players
+            _poker.seats = [s for s in _poker.seats if s["chips"] > 0]
+            _poker.dealer_btn = (_poker.dealer_btn + 1) % max(len(_poker.seats), 1)
+            _poker.phase = "lobby" if len(_poker.seats) < 2 else "pre_flop"
+
+        except Exception:
+            await asyncio.sleep(2.0)
+
+
+@app.websocket("/ws/poker")
+async def poker_ws(ws: WebSocket):
+    await ws.accept()
+    uid_ref = [None]
+    await ws.send_json({"type": "state", **_poker_snapshot()})
+    try:
+        while True:
+            data = await ws.receive_json()
+            uid = data.get("user_id")
+            if not uid:
+                continue
+            uid = int(uid)
+            uid_ref[0] = uid
+
+            if data.get("type") == "join":
+                if len(_poker.seats) >= 6:
+                    await ws.send_json({"type": "error", "message": "Table full"})
+                    continue
+                if _poker.seat_for(uid):
+                    # Reconnect — update ws
+                    _poker.connections[uid] = ws
+                    await ws.send_json({"type": "state", **_poker_snapshot(uid)})
+                    continue
+                if _poker.phase not in ("lobby",):
+                    await ws.send_json({"type": "error", "message": "Hand in progress — wait for next hand"})
+                    continue
+                with db_conn() as db:
+                    row = db.execute("SELECT balance, username, full_name FROM economy WHERE user_id = ?", (uid,)).fetchone()
+                    if not row or row["balance"] < _POKER_BUYIN:
+                        await ws.send_json({"type": "error", "message": f"Need {_POKER_BUYIN:,} WRK$ to buy in"})
+                        continue
+                    db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (_POKER_BUYIN, uid))
+                    new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
+                    db.commit()
+                _poker.connections[uid] = ws
+                _poker.seats.append({"user_id": uid, "name": row["username"] or row["full_name"] or f"Player {uid}", "chips": _POKER_BUYIN, "hole_cards": [], "status": "waiting", "current_bet": 0})
+                await ws.send_json({"type": "joined", "chips": _POKER_BUYIN, "new_balance": new_bal})
+                await _poker_broadcast({"type": "state", **_poker_snapshot()})
+
+            elif data.get("type") == "leave":
+                seat = _poker.seat_for(uid)
+                if seat and _poker.phase == "lobby":
+                    with db_conn() as db:
+                        db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (seat["chips"], uid))
+                        db.commit()
+                    _poker.seats = [s for s in _poker.seats if s["user_id"] != uid]
+                    _poker.connections.pop(uid, None)
+                    await ws.send_json({"type": "left", "chips_returned": seat["chips"]})
+                    await _poker_broadcast({"type": "state", **_poker_snapshot()})
+
+            elif data.get("type") in ("fold","check","call","raise"):
+                seat = _poker.seat_for(uid)
+                if not seat or seat.get("_acted"):
+                    continue
+                if _poker.seats[_poker.current_seat]["user_id"] != uid:
+                    await ws.send_json({"type": "error", "message": "Not your turn"})
+                    continue
+                action = data["type"]
+                if action == "fold":
+                    seat["status"] = "folded"
+                    seat["_acted"] = True
+                elif action == "check":
+                    if _poker.current_bet > seat["current_bet"]:
+                        await ws.send_json({"type": "error", "message": "Cannot check — must call or raise"})
+                        continue
+                    seat["_acted"] = True
+                elif action == "call":
+                    amount = min(_poker.current_bet - seat["current_bet"], seat["chips"])
+                    seat["chips"] -= amount
+                    seat["current_bet"] += amount
+                    _poker.pot += amount
+                    seat["_acted"] = True
+                elif action == "raise":
+                    amount = int(data.get("amount", _poker.min_raise))
+                    if amount < _poker.min_raise:
+                        await ws.send_json({"type": "error", "message": f"Min raise is {_poker.min_raise}"})
+                        continue
+                    total = _poker.current_bet + amount
+                    paid = min(total - seat["current_bet"], seat["chips"])
+                    seat["chips"] -= paid
+                    _poker.pot += paid
+                    seat["current_bet"] += paid
+                    _poker.current_bet = seat["current_bet"]
+                    _poker.min_raise = amount
+                    seat["_acted"] = True
+                    seat["_raised"] = True
+
+    except WebSocketDisconnect:
+        uid = uid_ref[0]
+        if uid:
+            _poker.connections.pop(uid, None)
+    except Exception:
+        uid = uid_ref[0]
+        if uid:
+            _poker.connections.pop(uid, None)
 
 
 # ── Serve SPA ─────────────────────────────────────────────────────────────────
