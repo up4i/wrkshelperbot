@@ -2023,24 +2023,29 @@ def _bj_resolve_game(db, user_id: int, game: dict) -> dict:
             dealer_hand.append(deck.pop())
     dealer_val = _bj_hand_val(dealer_hand)
 
+    # Bet is already deducted at game start, so:
+    #   payout = what gets added back to balance (0 for loss, hand_bet for push, 2*hand_bet for win)
+    #   delta  = profit/loss shown to player (-hand_bet loss, 0 push, +hand_bet win)
+    total_payout = 0
     total_delta = 0
     results = []
     for i, hand in enumerate(game["hands"]):
         hand_bet = game["bet"] * (2 if game["doubled"][i] else 1)
         pv = _bj_hand_val(hand)
         if pv > 21:
-            outcome, delta = "bust", -hand_bet
+            outcome, delta, payout = "bust", -hand_bet, 0
         elif dealer_val > 21 or pv > dealer_val:
-            outcome, delta = "win", hand_bet
+            outcome, delta, payout = "win", hand_bet, 2 * hand_bet
         elif pv == dealer_val:
-            outcome, delta = "push", 0
+            outcome, delta, payout = "push", 0, hand_bet
         else:
-            outcome, delta = "lose", -hand_bet
+            outcome, delta, payout = "lose", -hand_bet, 0
         results.append({"outcome": outcome, "delta": delta, "player_value": pv, "hand_bet": hand_bet})
         total_delta += delta
+        total_payout += payout
 
-    if total_delta != 0:
-        db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (total_delta, user_id))
+    if total_payout > 0:
+        db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (total_payout, user_id))
     row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (user_id,)).fetchone()
     if total_delta > 0:
         _record_stats(db, user_id, blackjack_won=total_delta)
@@ -2982,7 +2987,8 @@ async def _duck_loop():
             await _duck_broadcast({"type": "state", **_duck_snapshot()})
             await asyncio.sleep(_DUCK_FINISHED_SECS)
 
-        except Exception:
+        except Exception as _e:
+            print(f"[duck_loop] error: {_e}", flush=True)
             await asyncio.sleep(2.0)
 
 
