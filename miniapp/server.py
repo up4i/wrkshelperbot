@@ -2485,6 +2485,32 @@ async def _crash_loop():
             await asyncio.sleep(2.0)
 
 
+# ── Presence ─────────────────────────────────────────────────────────────────
+
+class PresencePingRequest(BaseModel):
+    user_id: int
+
+@app.post("/api/presence/ping")
+def presence_ping(req: PresencePingRequest):
+    with db_conn() as db:
+        db.execute(
+            "INSERT INTO online_sessions (user_id, last_ping) VALUES (?,?) "
+            "ON CONFLICT(user_id) DO UPDATE SET last_ping=excluded.last_ping",
+            (req.user_id, int(time.time()))
+        )
+        db.commit()
+    return {"ok": True}
+
+@app.get("/api/presence/online")
+def presence_online():
+    threshold = int(time.time()) - 60
+    with db_conn() as db:
+        rows = db.execute(
+            "SELECT user_id FROM online_sessions WHERE last_ping > ?", (threshold,)
+        ).fetchall()
+    return {"online": [r["user_id"] for r in rows]}
+
+
 @app.on_event("startup")
 async def _startup():
     asyncio.create_task(_crash_loop())
@@ -2565,6 +2591,10 @@ async def _startup():
         opened_at INTEGER NOT NULL
     )
 """)
+        db.execute("""CREATE TABLE IF NOT EXISTS online_sessions (
+    user_id   INTEGER PRIMARY KEY,
+    last_ping INTEGER NOT NULL
+)""")
         db.commit()
         for col in ("duck_won INTEGER DEFAULT 0", "duck_lost INTEGER DEFAULT 0",
                     "marbles_won INTEGER DEFAULT 0", "marbles_lost INTEGER DEFAULT 0",
