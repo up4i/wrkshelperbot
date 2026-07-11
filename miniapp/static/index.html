@@ -2652,6 +2652,7 @@ async function flipCoin() {
 
 // ── High-Low Slider ───────────────────────────────────────────────────────────
 let _sliderGreenPct = 50;
+let _sliderDragCleanup = null;
 
 function openSlider() {
   if (!state.userId) return alert('Open in Telegram to play.');
@@ -2680,6 +2681,7 @@ function _updateSliderUI() {
 }
 
 function _initSliderDrag() {
+  if (_sliderDragCleanup) { _sliderDragCleanup(); _sliderDragCleanup = null; }
   const wrap = document.getElementById('sliderBarWrap');
   const handle = document.getElementById('sliderHandle');
   let dragging = false;
@@ -2703,13 +2705,23 @@ function _initSliderDrag() {
   document.addEventListener('touchmove', onMove, { passive: false });
   document.addEventListener('mouseup', onEnd);
   document.addEventListener('touchend', onEnd);
+  document.addEventListener('touchcancel', onEnd);
+  _sliderDragCleanup = () => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('mouseup', onEnd);
+    document.removeEventListener('touchend', onEnd);
+    document.removeEventListener('touchcancel', onEnd);
+  };
 }
 
 async function playSlider() {
   const bet = parseInt(document.getElementById('sliderBet').value);
   const errEl = document.getElementById('sliderErr');
   errEl.textContent = '';
+  if (!bet || bet < 10) { errEl.textContent = 'Minimum bet is 10 WRK$'; return; }
   document.getElementById('sliderPlayBtn').disabled = true;
+  document.getElementById('sliderBarWrap').style.pointerEvents = 'none';
   document.getElementById('sliderResult').className = 'result-box';
 
   const arrowEl = document.getElementById('sliderArrow');
@@ -2720,7 +2732,7 @@ async function playSlider() {
     const data = await api('/api/play/slider', { method:'POST', json:{ user_id:+state.userId, bet, green_pct:_sliderGreenPct } });
     await sleep(50);
     arrowEl.classList.add('animating');
-    arrowEl.style.left = data.landing_pct + '%';
+    arrowEl.style.left = (100 - data.landing_pct) + '%';
     await sleep(1900);
     arrowEl.classList.remove('animating');
 
@@ -2737,8 +2749,10 @@ async function playSlider() {
     refreshHeaderBal();
   } catch(e) {
     errEl.textContent = e.message;
+    document.getElementById('sliderBarWrap').style.pointerEvents = '';
   }
   document.getElementById('sliderPlayBtn').disabled = false;
+  document.getElementById('sliderBarWrap').style.pointerEvents = '';
 }
 
 function sliderPlayAgain(bet) {
