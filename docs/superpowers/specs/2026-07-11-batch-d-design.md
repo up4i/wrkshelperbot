@@ -1,8 +1,65 @@
 # Batch D Design — Profile & Social Layer
 
 **Date:** 2026-07-11  
-**Scope:** Stats expansion, gift P2P trading, `/profile` bot command, profile enhancements, and a full social layer.  
-**Implementation order:** Stats/Leaderboard → Gift P2P Trading → `/profile` bot command → Profile Enhancements → Social Layer
+**Scope:** Stats expansion, gift P2P trading, `/profile` bot command, profile enhancements, social layer, and priority bug fixes.  
+**Implementation order:** Priority Fixes → Stats/Leaderboard → Gift P2P Trading → `/profile` bot command → Profile Enhancements → Social Layer
+
+---
+
+## 0. Priority Bug Fixes
+
+These ship first — they're blocking user experience on existing features.
+
+### 0a. Slots / Coinflip — Duplicate Play-Again Button
+
+**Bug:** Using the main Spin / Flip button after a result appends another "Spin Again" / "Flip Again" button each time instead of reusing the existing one.
+
+**Fix:** Before injecting a play-again button, call `document.querySelectorAll('.slots-again-btn')` (and `.coinflip-again-btn`) and remove any existing matches. Same pattern as the C2 T0 fix already applied to other games. Apply to both `initSlotsUI()` and `initCoinflipUI()`.
+
+### 0b. Cases — WRK$ Payout Buff
+
+**Bug:** Non-gift rolls pay 100–10,000 WRK$ on a 75,000 WRK$ case — effectively nothing. Players feel ripped off unless they hit a gift.
+
+**Fix:** Buff `_CASE_LOOT` WRK$ ranges so non-gift outcomes are meaningful:
+
+```python
+_CASE_LOOT = [
+    (55,  "common",    15_000,  40_000,  None),   # was 100–400
+    (80,  "uncommon",  40_000,  80_000,  None),   # was 500–2,000
+    (92,  "rare",      80_000, 200_000,  None),   # was 2,000–10,000
+    (98,  "epic",           0,       0,  "mid"),
+    (100, "legendary",      0,       0,  "high"),
+]
+```
+
+Expected WRK$ return from non-gift rolls ≈ 46,900 WRK$ vs 75,000 cost. Gifts cover the upside.
+
+### 0c. Plinko — Physics Fix + RTP Rebalance
+
+**Bug:** Current multipliers are center-high (edges lose, center wins), which is backwards from real Plinko physics AND results in heavily player-favorable RTP: low=103%, medium=163%, high=373%. Plinko should pay the edges, not the center.
+
+**Fix:** Replace `_PLINKO_MULTS` with edge-high, center-low values targeting ~95% RTP:
+
+```python
+_PLINKO_MULTS = {
+    "low":    [2.2, 1.5, 1.2, 0.9, 0.65, 0.9, 1.2, 1.5, 2.2],   # 94.5% RTP
+    "medium": [7.0, 2.5, 1.4, 0.7, 0.50, 0.7, 1.4, 2.5, 7.0],   # 96.0% RTP
+    "high":   [17,  3.5, 1.5, 0.5, 0.20, 0.5, 1.5, 3.5, 17 ],   # 95.3% RTP
+}
+```
+
+RTP verified: Σ P(k) * m(k) for binomial(n=8, p=0.5). No frontend changes needed — the existing ball path animation already maps slot index correctly.
+
+### 0d. Live Game Buy-In Refunds (Solo Player)
+
+**Bug:** If a player buys into Live Blackjack or Poker and no other players join, the game eventually resolves solo (auto-stand / fold) and the player loses their buy-in with no real game having occurred.
+
+**Fix:**
+- **Live Blackjack**: if a seat is the only occupied seat when the round timer fires, refund the bet to that user and skip the round (don't deal cards). Log as "round skipped — no opponent".
+- **Poker**: if only 1 player is seated when the pre-flop timer fires, refund the buy-in chips to their wallet and reset the table. Add a "Leave Table" button visible when seated but no hand is in progress — clicking it refunds the buy-in immediately.
+- **Duck Racing**: already partially handled by Marbles solo pattern. If only 1 player has bet when the race fires, refund that bet and cancel the race rather than racing a single duck.
+- **Crash**: single-player compatible, no refund needed.
+- **Marbles**: solo refund already implemented — no change.
 
 ---
 
