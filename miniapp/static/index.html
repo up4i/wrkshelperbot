@@ -1545,7 +1545,7 @@
     <div class="card-title" style="margin-top:4px">Bet amount</div>
     <div class="bet-presets" id="roulettePresets"></div>
     <div class="bet-row">
-      <input class="input bet-input" id="rouletteBet" type="number" value="100" min="10">
+      <input class="input bet-input" id="rouletteBet" type="text" inputmode="numeric" value="100">
       <button class="btn" id="rouletteSpinBtn" onclick="spinRoulette()">SPIN</button>
     </div>
     <div class="balance-display">Balance: <span class="b" id="rouletteBal">—</span> WRK$</div>
@@ -1563,7 +1563,7 @@
       <div class="card-title">Bet amount</div>
       <div class="bet-presets" id="hlPresets"></div>
       <div class="bet-row">
-        <input class="input bet-input" id="hlBet" type="number" value="100" min="10">
+        <input class="input bet-input" id="hlBet" type="text" inputmode="numeric" value="100">
         <button class="btn" id="hlStartBtn" onclick="startHighLow()">DEAL</button>
       </div>
     </div>
@@ -1595,7 +1595,7 @@
       <div class="card-title">Bet amount</div>
       <div class="bet-presets" id="crapsPresets"></div>
       <div class="bet-row">
-        <input class="input bet-input" id="crapsBet" type="number" value="100" min="10">
+        <input class="input bet-input" id="crapsBet" type="text" inputmode="numeric" value="100">
         <button class="btn" id="crapsStartBtn" onclick="startCraps()">ROLL</button>
       </div>
     </div>
@@ -1697,7 +1697,7 @@
     <div class="card-title" style="margin-top:4px">Bet amount</div>
     <div class="bet-presets" id="slotPresets"></div>
     <div class="bet-row">
-      <input class="input bet-input" id="slotBet" type="number" value="100" min="10">
+      <input class="input bet-input" id="slotBet" type="text" inputmode="numeric" value="100">
       <button class="btn" id="spinBtn" onclick="spinSlots()">SPIN</button>
     </div>
     <div class="balance-display">Balance: <span class="b" id="slotsBal">—</span> WRK$</div>
@@ -1719,7 +1719,7 @@
     <div class="card-title" style="margin-top:4px">Bet amount</div>
     <div class="bet-presets" id="cfPresets"></div>
     <div class="bet-row">
-      <input class="input bet-input" id="cfBet" type="number" value="100" min="10">
+      <input class="input bet-input" id="cfBet" type="text" inputmode="numeric" value="100">
       <button class="btn" id="cfFlipBtn" onclick="flipCoin()">FLIP</button>
     </div>
     <div class="balance-display">Balance: <span class="b" id="cfBal">—</span> WRK$</div>
@@ -1754,7 +1754,7 @@
     <div class="card-title" style="margin-top:8px">Bet amount</div>
     <div class="bet-presets" id="sliderPresets"></div>
     <div class="bet-row">
-      <input class="input bet-input" id="sliderBet" type="number" value="100" min="10">
+      <input class="input bet-input" id="sliderBet" type="text" inputmode="numeric" value="100">
       <button class="btn" id="sliderPlayBtn" onclick="playSlider()">PLAY</button>
     </div>
     <div class="balance-display">Balance: <span class="b" id="sliderBal">—</span> WRK$</div>
@@ -1779,7 +1779,7 @@
     <div class="card-title" style="margin-top:8px">Bet amount</div>
     <div class="bet-presets" id="plinkoPresets"></div>
     <div class="bet-row">
-      <input class="input bet-input" id="plinkoBet" type="number" value="100" min="10">
+      <input class="input bet-input" id="plinkoBet" type="text" inputmode="numeric" value="100">
       <button class="btn" id="plinkoPlayBtn" onclick="playPlinko()">DROP</button>
     </div>
     <div class="balance-display">Balance: <span class="b" id="plinkoBal">—</span> WRK$</div>
@@ -1800,7 +1800,7 @@
     <div class="card-title" style="margin-top:8px">Bet amount</div>
     <div class="bet-presets" id="wheelPresets"></div>
     <div class="bet-row">
-      <input class="input bet-input" id="wheelBet" type="number" value="100" min="10">
+      <input class="input bet-input" id="wheelBet" type="text" inputmode="numeric" value="100">
       <button class="btn" id="wheelSpinBtn" onclick="spinWheel()">SPIN</button>
     </div>
     <div class="balance-display">Balance: <span class="b" id="wheelBal">—</span> WRK$</div>
@@ -3122,7 +3122,7 @@ function setRouletteBet(type) {
 
 async function spinRoulette() {
   if (!rouletteBetType) return alert('Pick a bet type first.');
-  const bet = parseInt(document.getElementById('rouletteBet').value);
+  const bet = _parseBet('rouletteBet');
   const errEl = document.getElementById('rouletteErr');
   errEl.textContent = '';
   document.getElementById('rouletteModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
@@ -3196,7 +3196,7 @@ function _hlEnterGame(cardLabel, mult, potential) {
 }
 
 async function startHighLow() {
-  const bet = parseInt(document.getElementById('hlBet').value);
+  const bet = _parseBet('hlBet');
   document.getElementById('hlErr').textContent = '';
   document.getElementById('hlStartBtn').disabled = true;
   try {
@@ -3308,7 +3308,7 @@ function _crapsEnterGame(point) {
 }
 
 async function startCraps() {
-  const bet = parseInt(document.getElementById('crapsBet').value);
+  const bet = _parseBet('crapsBet');
   document.getElementById('crapsErr').textContent = '';
   document.getElementById('crapsStartBtn').disabled = true;
   try {
@@ -3602,7 +3602,7 @@ function fireFireworks() {
 
 async function spinSlots() {
   if (slotsSpinning) return;
-  const bet = parseInt(document.getElementById('slotBet').value);
+  const bet = _parseBet('slotBet');
   const errEl = document.getElementById('slotsErr');
   errEl.textContent = '';
   document.getElementById('slotsModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
@@ -3693,7 +3693,7 @@ function setCfChoice(c) {
 
 async function flipCoin() {
   if (!state.cfChoice) return alert('Pick heads or tails first.');
-  const bet = parseInt(document.getElementById('cfBet').value);
+  const bet = _parseBet('cfBet');
   const errEl = document.getElementById('cfErr');
   errEl.textContent = '';
   document.getElementById('cfModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
@@ -3825,7 +3825,7 @@ function _initSliderDrag() {
 }
 
 async function playSlider() {
-  const bet = parseInt(document.getElementById('sliderBet').value);
+  const bet = _parseBet('sliderBet');
   const errEl = document.getElementById('sliderErr');
   errEl.textContent = '';
   if (!bet || bet < 10) { errEl.textContent = 'Minimum bet is 10 WRK$'; return; }
@@ -3866,7 +3866,7 @@ async function playSlider() {
 }
 
 function sliderPlayAgain(bet) {
-  document.getElementById('sliderBet').value = bet;
+  document.getElementById('sliderBet').value = Number(bet).toLocaleString('en-US');
   document.getElementById('sliderResult').className = 'result-box';
   const pa = document.getElementById('sliderModal').querySelector('.btn.outline');
   if (pa) pa.remove();
@@ -4002,7 +4002,7 @@ function setPlinkoRisk(risk) {
 }
 
 async function playPlinko() {
-  const bet = parseInt(document.getElementById('plinkoBet').value);
+  const bet = _parseBet('plinkoBet');
   const errEl = document.getElementById('plinkoErr');
   errEl.textContent = '';
   document.getElementById('plinkoModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
@@ -4097,7 +4097,7 @@ async function _wheelLand(segment) {
 }
 
 async function spinWheel() {
-  const bet = parseInt(document.getElementById('wheelBet').value);
+  const bet = _parseBet('wheelBet');
   const errEl = document.getElementById('wheelErr');
   errEl.textContent = '';
   document.getElementById('wheelModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
@@ -4237,13 +4237,26 @@ function closeModal(id, evt) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function _formatBetInput(el) {
+  const raw = el.value.replace(/,/g, '');
+  if (!/^\d*$/.test(raw)) { el.value = el.value.slice(0, -1); return; }
+  if (raw) el.value = Number(raw).toLocaleString('en-US');
+}
+function _parseBet(id) {
+  return parseInt((document.getElementById(id)?.value || '').replace(/,/g, ''), 10);
+}
+
 function buildPresets(containerId, inputId) {
   const bal = state.balance || 1000;
   const presets = [100, 500, 1000, Math.floor(bal * 0.1), Math.floor(bal * 0.5)].filter((v,i,a) => v >= 10 && a.indexOf(v) === i).sort((a,b)=>a-b).slice(0,5);
   document.getElementById(containerId).innerHTML = presets.map(v =>
-    `<span class="preset-btn" onclick="document.getElementById('${inputId}').value=${v}">${fmt(v)}</span>`
+    `<span class="preset-btn" onclick="(function(){var el=document.getElementById('${inputId}');el.value='${fmt(v)}';})()">${fmt(v)}</span>`
   ).join('');
 }
+
+document.addEventListener('input', e => {
+  if (e.target.classList.contains('bet-input')) _formatBetInput(e.target);
+});
 
 function refreshHeaderBal() {
   if (state.balance === null) return;
@@ -4998,7 +5011,7 @@ function updateCrashDisplay(msg) {
     if (phaseChanged && crashMyBet === 0) {
       actEl.innerHTML = `
         <div class="bet-row" style="margin-bottom:8px">
-          <input class="input bet-input" id="crashBetInput" type="number" min="10" placeholder="Min 10 WRK$">
+          <input class="input bet-input" id="crashBetInput" type="text" inputmode="numeric" placeholder="Min 10 WRK$">
           <button class="btn" onclick="crashPlaceBet()">Bet 🎯</button>
         </div>
         <div class="bet-presets" id="crashPresets"></div>
@@ -5011,7 +5024,7 @@ function updateCrashDisplay(msg) {
 }
 
 function crashPlaceBet() {
-  const bet = parseInt(document.getElementById('crashBetInput')?.value);
+  const bet = _parseBet('crashBetInput');
   const errEl = document.getElementById('crashErr');
   if (!bet || bet < 10) { if(errEl) errEl.textContent='Min 10 WRK$'; return; }
   if (!crashWs || crashWs.readyState !== 1) { if(errEl) errEl.textContent='Not connected'; return; }
@@ -5171,7 +5184,7 @@ function _showDuckBetArea() {
     <div class="card-title" style="margin-top:8px">Bet amount</div>
     <div class="bet-presets" id="duckPresets"></div>
     <div class="bet-row">
-      <input class="input bet-input" id="duckBetInput" type="number" value="100" min="10">
+      <input class="input bet-input" id="duckBetInput" type="text" inputmode="numeric" value="100">
       <button class="btn" onclick="_placeDuckBet()">BET</button>
     </div>
     <div class="balance-display">Balance: <span class="b">${state.balance !== null ? fmt(state.balance) : '—'}</span> WRK$</div>
@@ -5187,7 +5200,7 @@ function _selectDuck(idx) {
 
 function _placeDuckBet() {
   if (_duckSelected < 0) { document.getElementById('duckErr').textContent = 'Select a duck first'; return; }
-  const bet = parseInt(document.getElementById('duckBetInput')?.value);
+  const bet = _parseBet('duckBetInput');
   if (!bet || bet < 10) { document.getElementById('duckErr').textContent = 'Min 10 WRK$'; return; }
   if (!duckWs || duckWs.readyState !== 1) return;
   duckWs.send(JSON.stringify({ type: 'bet', user_id: +state.userId, duck_idx: _duckSelected, amount: bet }));
@@ -5314,7 +5327,7 @@ function _showMarbleBetArea() {
     <div class="card-title" style="margin-top:8px">Your bet (min 100 WRK$)</div>
     <div class="bet-presets" id="marblePresets"></div>
     <div class="bet-row">
-      <input class="input bet-input" id="marbleBetInput" type="number" value="100" min="100">
+      <input class="input bet-input" id="marbleBetInput" type="text" inputmode="numeric" value="100">
       <button class="btn" onclick="_placeMarbleBet()">JOIN</button>
     </div>
     <div class="balance-display">Balance: <span class="b">${state.balance !== null ? fmt(state.balance) : '—'}</span> WRK$</div>
@@ -5323,7 +5336,7 @@ function _showMarbleBetArea() {
 }
 
 function _placeMarbleBet() {
-  const bet = parseInt(document.getElementById('marbleBetInput')?.value);
+  const bet = _parseBet('marbleBetInput');
   if (!bet || bet < 100) { document.getElementById('marbleErr').textContent = 'Min 100 WRK$'; return; }
   if (!marblesWs || marblesWs.readyState !== 1) return;
   marblesWs.send(JSON.stringify({ type: 'bet', user_id: +state.userId, amount: bet }));
@@ -5665,7 +5678,7 @@ function _updateLbjDisplay(msg) {
       <div class="card-title" style="margin-top:8px">Bet to join</div>
       <div class="bet-presets" id="lbjPresets"></div>
       <div class="bet-row">
-        <input class="input bet-input" id="lbjBetInput" type="number" value="100" min="10">
+        <input class="input bet-input" id="lbjBetInput" type="text" inputmode="numeric" value="100">
         <button class="btn" onclick="_lbjJoin()">JOIN</button>
       </div>
       <div class="balance-display">Balance: <span class="b">${state.balance !== null ? fmt(state.balance) : '—'}</span> WRK$</div>
@@ -5696,7 +5709,7 @@ function _lbjAction(action) {
 }
 
 function _lbjJoin() {
-  const bet = parseInt(document.getElementById('lbjBetInput')?.value);
+  const bet = _parseBet('lbjBetInput');
   if (!bet || bet < 10) { document.getElementById('lbjErr').textContent = 'Min 10 WRK$'; return; }
   if (!liveBjWs || liveBjWs.readyState !== 1) return;
   liveBjWs.send(JSON.stringify({ type: 'join', user_id: _lbjMyUid, bet }));
@@ -5810,7 +5823,7 @@ function _updatePokerDisplay(msg) {
       <button class="btn" onclick="_pokerRaise()">Raise</button>
     </div>
     <div class="bet-row" style="margin-top:6px">
-      <input class="input bet-input" id="pokerRaiseInput" type="number" min="${msg.min_raise}" value="${msg.min_raise}" placeholder="Raise amount">
+      <input class="input bet-input" id="pokerRaiseInput" type="text" inputmode="numeric" value="${msg.min_raise}" placeholder="Raise amount">
     </div>`;
   } else if ((msg.phase === 'lobby' || msg.phase === 'waiting') && !_pokerSeated) {
     actEl.innerHTML = `<button class="btn" style="width:100%;margin-top:8px" onclick="_pokerJoin()">Buy In — 10,000 WRK$</button>`;
@@ -5843,7 +5856,7 @@ function _pokerAction(action) {
 }
 
 function _pokerRaise() {
-  const amount = parseInt(document.getElementById('pokerRaiseInput')?.value);
+  const amount = _parseBet('pokerRaiseInput');
   if (!amount) return;
   if (!pokerWs || pokerWs.readyState !== 1) return;
   pokerWs.send(JSON.stringify({ type: 'raise', user_id: _pokerMyUid, amount }));
