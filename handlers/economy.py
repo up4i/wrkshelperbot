@@ -576,22 +576,34 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     work_count = p.get("work_count") or 0
     job_title = _get_job(work_count)[1]
 
+    net_worth = p.get("net_worth", p["balance"])
+    nw_rank = p.get("networth_rank", "?")
+    stat_label = p.get("stat_highlight_label", "Best crash mult")
+    stat_value = p.get("stat_highlight_value", "—")
+
     net = p["total_won"] - p["total_lost"]
     net_str = f"+{net:,}" if net >= 0 else f"{net:,}"
-    mult_str = f"{p['best_mult']:.2f}×" if p["best_mult"] else "—"
 
     text = (
         f'<b>{name_html}</b>'
         f'{pinned_line}\n'
         f'{escape(job_title)}\n\n'
         f'💰 <b>{p["balance"]:,} WRK$</b> — rank #{p["balance_rank"]}\n'
+        f'💎 <b>Net Worth: {net_worth:,} WRK$</b> — rank #{nw_rank}\n'
         f'🔥 <b>{p["streak"]} day streak</b> — rank #{p["streak_rank"]}\n'
         f'🎁 <b>{p["gift_count"]} gifts</b> — rank #{p["gift_rank"]}\n\n'
         f'🎰 Gambling: +{p["total_won"]:,} won · -{p["total_lost"]:,} lost · net {net_str}\n'
-        f'🚀 Best crash mult: {mult_str}'
+        f'⭐ {escape(stat_label)}: {escape(str(stat_value))}'
     )
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton(
+            "View Profile in App",
+            url=f"https://t.me/wrkshelperbot/app?startapp=profile_{target_id}"
+        )
+    ]])
     await msg.reply_text(text, parse_mode="HTML",
-                         link_preview_options=LinkPreviewOptions(is_disabled=True))
+                         link_preview_options=LinkPreviewOptions(is_disabled=True),
+                         reply_markup=keyboard)
 
 
 # ── /workreminder ─────────────────────────────────────────────────────────────
