@@ -1213,12 +1213,15 @@ def highlow_start(req: HighLowStartRequest):
         bal = _deduct_and_check(db, req.user_id, req.bet)
         new_bal = bal - req.bet
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
-        card = random.randint(1, 13)
+        deck = list(range(1, 14))
+        random.shuffle(deck)
+        card = deck.pop(0)
+        deck_str = ' '.join(map(str, deck))
         now = int(time.time())
         db.execute(
-            "INSERT INTO highlow_sessions (user_id, bet, current_card, multiplier, started_at) "
-            "VALUES (?, ?, ?, 1.0, ?)",
-            (req.user_id, req.bet, card, now),
+            "INSERT INTO highlow_sessions (user_id, bet, current_card, multiplier, started_at, deck) "
+            "VALUES (?, ?, ?, 1.0, ?, ?)",
+            (req.user_id, req.bet, card, now, deck_str),
         )
         db.commit()
         return {
@@ -1240,14 +1243,21 @@ def highlow_guess(req: HighLowGuessRequest):
         if not sess:
             raise HTTPException(404, "No active High-Low session — start one first")
         sess = dict(sess)
-        next_card = random.randint(1, 13)
+        raw_deck = sess.get("deck") or ""
+        deck = list(map(int, raw_deck.split())) if raw_deck.strip() else []
+        if not deck:
+            # Reshuffle excluding current card
+            deck = [c for c in range(1, 14) if c != sess["current_card"]]
+            random.shuffle(deck)
+        next_card = deck.pop(0)
+        deck_str = ' '.join(map(str, deck))
         correct = next_card > sess["current_card"] if req.direction == "higher" else next_card < sess["current_card"]
 
         if correct:
             new_mult = round(sess["multiplier"] * 1.5, 4)
             db.execute(
-                "UPDATE highlow_sessions SET current_card = ?, multiplier = ? WHERE user_id = ?",
-                (next_card, new_mult, req.user_id),
+                "UPDATE highlow_sessions SET current_card = ?, multiplier = ?, deck = ? WHERE user_id = ?",
+                (next_card, new_mult, deck_str, req.user_id),
             )
             db.commit()
             return {
@@ -1256,6 +1266,7 @@ def highlow_guess(req: HighLowGuessRequest):
                 "next_card_label": _card_label(next_card),
                 "multiplier": new_mult,
                 "potential_win": int(sess["bet"] * new_mult),
+                "cards_left": len(deck),
             }
         else:
             db.execute("DELETE FROM highlow_sessions WHERE user_id = ?", (req.user_id,))
@@ -2762,6 +2773,11 @@ async def _startup():
             multiplier   REAL    NOT NULL DEFAULT 1.0,
             started_at   INTEGER NOT NULL
         )""")
+        try:
+            db.execute("ALTER TABLE highlow_sessions ADD COLUMN deck TEXT")
+            db.commit()
+        except Exception:
+            pass
         db.execute("""
     CREATE TABLE IF NOT EXISTS cases_opened (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

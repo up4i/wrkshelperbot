@@ -3220,7 +3220,7 @@ async function guessHighLow(direction) {
     const data = await api('/api/play/highlow/guess', { method:'POST', json:{ user_id:+state.userId, direction } });
     if (data.result === 'correct') {
       _hlEnterGame(data.next_card_label, data.multiplier, data.potential_win);
-      document.getElementById('hlStatus').textContent = `✅ Correct! Card was ${data.next_card_label}`;
+      document.getElementById('hlStatus').textContent = `✅ Correct! Card was ${data.next_card_label}` + (data.cards_left !== undefined ? ` — ${data.cards_left} left` : '');
     } else {
       state.balance = data.new_balance;
       document.getElementById('hlBal').textContent = fmt(state.balance);
