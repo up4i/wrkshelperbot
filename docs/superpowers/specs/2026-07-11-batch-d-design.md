@@ -57,8 +57,8 @@ RTP verified: Σ P(k) * m(k) for binomial(n=8, p=0.5). No frontend changes neede
 **Fix:**
 - **Live Blackjack**: if a seat is the only occupied seat when the round timer fires, refund the bet to that user and skip the round (don't deal cards). Log as "round skipped — no opponent".
 - **Poker**: if only 1 player is seated when the pre-flop timer fires, refund the buy-in chips to their wallet and reset the table. Add a "Leave Table" button visible when seated but no hand is in progress — clicking it refunds the buy-in immediately.
-- **Duck Racing**: already partially handled by Marbles solo pattern. If only 1 player has bet when the race fires, refund that bet and cancel the race rather than racing a single duck.
 - **Crash**: single-player compatible, no refund needed.
+- **Duck Racing**: single-player compatible, no refund needed.
 - **Marbles**: solo refund already implemented — no change.
 
 ---
