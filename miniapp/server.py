@@ -108,8 +108,18 @@ def leaderboard(tab: str = "balance", limit: int = 20):
 
         # ── Game stat tabs ────────────────────────────────────────────────────
         _gs_col = {
-            "gamble_won":  "gs.slots_won + gs.coinflip_won + gs.blackjack_won + gs.crash_won",
-            "gamble_lost": "gs.slots_lost + gs.coinflip_lost + gs.blackjack_lost + gs.crash_lost",
+            "gamble_won":  (
+                "gs.slots_won+gs.coinflip_won+gs.blackjack_won+gs.crash_won"
+                "+gs.duck_won+gs.marbles_won+gs.livebj_won+gs.poker_won"
+                "+gs.roulette_won+gs.plinko_won+gs.wheel_won+gs.slider_won"
+                "+gs.craps_won+gs.highlow_won+gs.cases_won"
+            ),
+            "gamble_lost": (
+                "gs.slots_lost+gs.coinflip_lost+gs.blackjack_lost+gs.crash_lost"
+                "+gs.duck_lost+gs.marbles_lost+gs.livebj_lost+gs.poker_lost"
+                "+gs.roulette_lost+gs.plinko_lost+gs.wheel_lost+gs.slider_lost"
+                "+gs.craps_lost+gs.highlow_lost+gs.cases_lost"
+            ),
             "slots":       "gs.slots_won",
             "coinflip":    "gs.coinflip_won",
             "blackjack":   "gs.blackjack_won",
