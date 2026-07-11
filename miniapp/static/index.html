@@ -3961,8 +3961,12 @@ function openPlinko() {
   document.getElementById('plinkoErr').textContent = '';
   document.getElementById('plinkoBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
   buildPresets('plinkoPresets', 'plinkoBet');
-  setPlinkoRisk('medium');
+  _plinkoRisk = 'medium';
+  ['low','medium','high'].forEach(r =>
+    document.getElementById('plinko' + r.charAt(0).toUpperCase() + r.slice(1))
+      .classList.toggle('selected', r === 'medium'));
   document.getElementById('plinkoModal').classList.add('open');
+  requestAnimationFrame(_buildPlinkoBoard);
 }
 
 function setPlinkoRisk(risk) {
