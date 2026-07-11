@@ -276,10 +276,10 @@
   .friend-card-actions .btn { font-size: 12px; padding: 6px 10px; }
   .friend-online { width: 8px; height: 8px; border-radius: 50%; background: #2ecc71; flex-shrink: 0; }
   /* ── Trade modal ── */
-  .trade-modal-sides { display: flex; gap: 10px; margin-bottom: 12px; }
+  .trade-modal-sides { display: flex; gap: 8px; margin-bottom: 8px; }
   .trade-panel { flex: 1; background: rgba(255,255,255,.04); border-radius: 10px; padding: 10px; }
   .trade-panel-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
-  .trade-gift-pick { border: 1px solid rgba(255,255,255,.1); border-radius: 8px; padding: 8px; cursor: pointer; text-align: center; font-size: 20px; min-height: 60px; display: flex; align-items: center; justify-content: center; }
+  .trade-gift-pick { border: 1px solid rgba(255,255,255,.1); border-radius: 8px; padding: 8px; cursor: pointer; text-align: center; font-size: 12px; min-height: 60px; display: flex; align-items: center; justify-content: center; }
   .trade-gift-pick.selected { border-color: var(--primary); }
   .trade-donation-warning { background: rgba(255,200,0,.12); border: 1px solid rgba(255,200,0,.3); border-radius: 8px; padding: 10px; font-size: 13px; margin-bottom: 10px; display: none; }
 
@@ -1948,21 +1948,21 @@
 </div>
 <div class="modal-overlay" id="tradeModalOverlay" onclick="closeTradeModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:99"></div>
 <div class="modal-bg" id="tradeModal" onclick="if(event.target.id==='tradeModal')closeTradeModal()" style="position:fixed;inset:0;z-index:100;display:none;align-items:flex-end;justify-content:center">
-  <div class="modal" style="position:relative">
+  <div class="modal" style="position:relative;padding:16px 16px 20px;gap:10px">
     <button class="modal-close" onclick="closeTradeModal()">✕</button>
-    <div class="modal-title">Trade Offer</div>
+    <div class="modal-title" style="font-size:17px">Trade Offer</div>
     <div>
       <div class="trade-modal-sides">
         <div class="trade-panel">
           <div class="trade-panel-label">Your offer</div>
           <div id="tradeOfferGiftPick" class="trade-gift-pick" onclick="openOfferGiftPicker()">＋ Pick gift</div>
-          <input id="tradeOfferWrk" type="number" class="input" placeholder="WRK$ to add" min="0" style="margin-top:8px" oninput="checkDonation()">
+          <input id="tradeOfferWrk" type="number" class="input" placeholder="WRK$ to add" min="0" style="margin-top:4px;padding:8px 10px;font-size:13px" oninput="checkDonation()">
         </div>
         <div style="display:flex;align-items:center;font-size:20px;color:var(--muted)">⇄</div>
         <div class="trade-panel">
           <div class="trade-panel-label">You want</div>
           <div id="tradeRequestGiftPick" class="trade-gift-pick" onclick="openRequestGiftPicker()">＋ Pick gift</div>
-          <input id="tradeRequestWrk" type="number" class="input" placeholder="WRK$ to request" min="0" style="margin-top:8px" oninput="checkDonation()">
+          <input id="tradeRequestWrk" type="number" class="input" placeholder="WRK$ to request" min="0" style="margin-top:4px;padding:8px 10px;font-size:13px" oninput="checkDonation()">
         </div>
       </div>
       <div class="trade-donation-warning" id="tradeDonationWarn">
