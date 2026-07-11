@@ -269,6 +269,12 @@
   .trade-arrow { color: var(--muted); font-size: 18px; flex-shrink: 0; }
   .trade-actions { display: flex; gap: 8px; margin-top: 10px; }
   .trade-actions .btn { flex: 1; font-size: 13px; padding: 8px; }
+  /* ── Friends / Social ── */
+  .friend-card { background: var(--card); border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .friend-card-name { flex: 1; font-weight: 600; font-size: 14px; }
+  .friend-card-actions { display: flex; gap: 6px; }
+  .friend-card-actions .btn { font-size: 12px; padding: 6px 10px; }
+  .friend-online { width: 8px; height: 8px; border-radius: 50%; background: #2ecc71; flex-shrink: 0; }
   /* ── Trade modal ── */
   .trade-modal-sides { display: flex; gap: 10px; margin-bottom: 12px; }
   .trade-panel { flex: 1; background: rgba(255,255,255,.04); border-radius: 10px; padding: 10px; }
@@ -1363,11 +1369,16 @@
         <div class="tab-row" id="profileTabRow">
           <button class="tab-btn active" id="overviewTabBtn" onclick="setProfileTab('overview',this)">👤 Overview</button>
           <button class="tab-btn" id="tradesTabBtn" onclick="setProfileTab('trades',this)" style="display:none">🔄 Trades</button>
+          <button class="tab-btn" id="socialTabBtn" onclick="setProfileTab('social',this)" style="display:none">👥 Social</button>
         </div>
         <div id="ownProfileContent"><div class="loading">Loading…</div></div>
         <div id="tradesSection" style="display:none">
           <div id="tradesIncoming"></div>
           <div id="tradesOutgoing"></div>
+        </div>
+        <div id="socialSection" style="display:none">
+          <div id="friendsList"></div>
+          <div id="friendRequests"></div>
         </div>
         <button class="btn outline" style="width:100%" onclick="togglePlayerSearch()">🔍 Look up a player</button>
       </div>
@@ -2158,6 +2169,12 @@ function setProfileTab(tab, btn) {
   } else {
     document.getElementById('tradesSection').style.display = 'none';
   }
+  if (tab === 'social') {
+    document.getElementById('socialSection').style.display = 'block';
+    loadSocial();
+  } else {
+    document.getElementById('socialSection').style.display = 'none';
+  }
 }
 
 function viewUser(id) {
@@ -2202,9 +2219,11 @@ async function loadOwnProfile() {
   clearTimeout(_reorderDebounce);
   _reorderDebounce = null;
   el.innerHTML = '<div class="loading">Loading…</div>';
-  // Show trades tab button for own profile
+  // Show trades tab button and social tab button for own profile
   const tradesBtn = document.getElementById('tradesTabBtn');
   if (tradesBtn) tradesBtn.style.display = 'block';
+  const socialBtn = document.getElementById('socialTabBtn');
+  if (socialBtn) socialBtn.style.display = 'block';
   try {
     const d = await api(`/api/profile/${state.userId}`);
     el.innerHTML = buildProfileHtml(d, true);
@@ -2307,6 +2326,79 @@ async function rejectTrade(id) {
 async function cancelTrade(id) {
   await api(`/api/trades/${id}/cancel`, { method: 'POST', json: { user_id: +state.userId } });
   loadTrades();
+}
+
+// ── Social tab (friends list + requests) ──────────────────────────────────────
+async function loadSocial() {
+  if (!state.userId) return;
+  const [friendData, onlineData] = await Promise.all([
+    api(`/api/friends?user_id=${state.userId}`),
+    api('/api/presence/online').catch(()=>({online:[]}))
+  ]);
+  const onlineSet = new Set(onlineData.online);
+
+  const friendsEl = document.getElementById('friendsList');
+  const reqEl = document.getElementById('friendRequests');
+
+  if (friendData.friends.length === 0 && friendData.incoming.length === 0 && friendData.outgoing.length === 0) {
+    friendsEl.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px">No friends yet — add one from any user\'s profile.</p>';
+    reqEl.innerHTML = '';
+    return;
+  }
+
+  friendsEl.innerHTML = friendData.friends.length
+    ? `<p style="font-weight:700;margin-bottom:8px">Friends (${friendData.friends.length})</p>` +
+      friendData.friends.map(f => {
+        const isOnline = onlineSet.has(f.other_user_id);
+        return `<div class="friend-card">
+          ${isOnline ? '<div class="friend-online"></div>' : '<div style="width:8px"></div>'}
+          <div class="friend-card-name" onclick="viewUser(${f.other_user_id})" style="cursor:pointer">${esc(f.other_display)}</div>
+          <div class="friend-card-actions">
+            <button class="btn" onclick="openTradeModal(${f.other_user_id})">Trade</button>
+            <button class="btn outline" style="color:var(--red)" onclick="removeFriend(${f.id})">Remove</button>
+          </div>
+        </div>`;
+      }).join('')
+    : '';
+
+  const incomingHtml = friendData.incoming.map(f => `
+    <div class="friend-card">
+      <div class="friend-card-name">${esc(f.other_display)} wants to be friends</div>
+      <div class="friend-card-actions">
+        <button class="btn" onclick="acceptFriend(${f.id})">Accept</button>
+        <button class="btn outline" onclick="declineFriend(${f.id})">Decline</button>
+      </div>
+    </div>`).join('');
+
+  const outgoingHtml = friendData.outgoing.map(f => `
+    <div class="friend-card">
+      <div class="friend-card-name">Pending: ${esc(f.other_display)}</div>
+      <div class="friend-card-actions">
+        <button class="btn outline" onclick="cancelFriendRequest(${f.id})">Cancel</button>
+      </div>
+    </div>`).join('');
+
+  reqEl.innerHTML = (friendData.incoming.length || friendData.outgoing.length)
+    ? `<p style="font-weight:700;margin:12px 0 8px">Requests</p>${incomingHtml}${outgoingHtml}`
+    : '';
+}
+
+async function acceptFriend(id) {
+  await api(`/api/friends/${id}/accept`, { method: 'POST', json: { user_id: +state.userId } });
+  loadSocial();
+}
+async function declineFriend(id) {
+  await api(`/api/friends/${id}/decline`, { method: 'POST', json: { user_id: +state.userId } });
+  loadSocial();
+}
+async function cancelFriendRequest(id) {
+  await api(`/api/friends/${id}`, { method: 'DELETE' });
+  loadSocial();
+}
+async function removeFriend(id) {
+  if (!confirm('Remove this friend?')) return;
+  await api(`/api/friends/${id}?user_id=${state.userId}`, { method: 'DELETE' });
+  loadSocial();
 }
 
 // ── Trade offer modal (from other user's profile) ─────────────────────────────
