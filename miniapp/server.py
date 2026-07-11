@@ -2220,8 +2220,8 @@ async def crash_ws(ws: WebSocket):
                         continue
                     db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (amount, uid))
                     new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
-                    name_row = db.execute("SELECT name FROM economy WHERE user_id = ?", (uid,)).fetchone()
-                    _crash.names[uid] = name_row["name"] if name_row and name_row["name"] else f"Player {uid}"
+                    name_row = db.execute("SELECT username, full_name FROM economy WHERE user_id = ?", (uid,)).fetchone()
+                    _crash.names[uid] = (name_row["username"] or name_row["full_name"] or f"Player {uid}") if name_row else f"Player {uid}"
                     db.commit()
                 _crash.bets[uid] = {"bet": amount, "cashed_out": False}
                 await ws.send_json({"type": "bet_placed", "bet": amount, "new_balance": new_bal})
@@ -2393,7 +2393,7 @@ async def duck_ws(ws: WebSocket):
                     await ws.send_json({"type": "error", "message": "Minimum bet is 10 WRK$"})
                     continue
                 with db_conn() as db:
-                    row = db.execute("SELECT balance, name FROM economy WHERE user_id = ?", (uid,)).fetchone()
+                    row = db.execute("SELECT balance, username, full_name FROM economy WHERE user_id = ?", (uid,)).fetchone()
                     if not row:
                         await ws.send_json({"type": "error", "message": "User not found — use the bot first"})
                         continue
@@ -2403,7 +2403,7 @@ async def duck_ws(ws: WebSocket):
                     db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (amount, uid))
                     new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
                     db.commit()
-                _duck.bets[uid] = {"duck_idx": duck_idx, "bet": amount, "name": row["name"] or f"Player {uid}"}
+                _duck.bets[uid] = {"duck_idx": duck_idx, "bet": amount, "name": row["username"] or row["full_name"] or f"Player {uid}"}
                 await ws.send_json({"type": "bet_placed", "duck_idx": duck_idx, "bet": amount, "new_balance": new_bal})
 
     except WebSocketDisconnect:
@@ -2570,7 +2570,7 @@ async def marbles_ws(ws: WebSocket):
                 amount = int(data.get("amount", 0))
 
                 with db_conn() as db:
-                    row = db.execute("SELECT balance, name FROM economy WHERE user_id = ?", (uid,)).fetchone()
+                    row = db.execute("SELECT balance, username, full_name FROM economy WHERE user_id = ?", (uid,)).fetchone()
                     if not row:
                         await ws.send_json({"type": "error", "message": "User not found"})
                         continue
@@ -2595,7 +2595,7 @@ async def marbles_ws(ws: WebSocket):
                         new_bal = row["balance"]
                         total_value = gift_value
                         _marble.pot_gifts.append(gift_id)
-                        bet_entry = {"name": row["name"] or f"Player {uid}", "wrk": 0, "gift_id": gift_id, "gift_value": gift_value, "color": _marble.next_color(), "total_value": total_value}
+                        bet_entry = {"name": row["username"] or row["full_name"] or f"Player {uid}", "wrk": 0, "gift_id": gift_id, "gift_value": gift_value, "color": _marble.next_color(), "total_value": total_value}
                     else:
                         if amount < 100:
                             await ws.send_json({"type": "error", "message": "Minimum bet is 100 WRK$"})
@@ -2607,7 +2607,7 @@ async def marbles_ws(ws: WebSocket):
                         new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
                         _marble.pot_wrk += amount
                         total_value = amount
-                        bet_entry = {"name": row["name"] or f"Player {uid}", "wrk": amount, "gift_id": None, "gift_value": 0, "color": _marble.next_color(), "total_value": total_value}
+                        bet_entry = {"name": row["username"] or row["full_name"] or f"Player {uid}", "wrk": amount, "gift_id": None, "gift_value": 0, "color": _marble.next_color(), "total_value": total_value}
                     db.commit()
 
                 _marble.bets[uid] = bet_entry
@@ -2825,14 +2825,14 @@ async def livebj_ws(ws: WebSocket):
                     await ws.send_json({"type": "error", "message": "Minimum bet is 10 WRK$"})
                     continue
                 with db_conn() as db:
-                    row = db.execute("SELECT balance, name FROM economy WHERE user_id = ?", (uid,)).fetchone()
+                    row = db.execute("SELECT balance, username, full_name FROM economy WHERE user_id = ?", (uid,)).fetchone()
                     if not row or row["balance"] < bet:
                         await ws.send_json({"type": "error", "message": "Insufficient balance"})
                         continue
                     db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (bet, uid))
                     new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
                     db.commit()
-                _livebj.seats.append({"user_id": uid, "name": row["name"] or f"Player {uid}", "bet": bet, "hand": [], "status": "waiting", "doubled": False})
+                _livebj.seats.append({"user_id": uid, "name": row["username"] or row["full_name"] or f"Player {uid}", "bet": bet, "hand": [], "status": "waiting", "doubled": False})
                 await ws.send_json({"type": "joined", "bet": bet, "new_balance": new_bal})
                 await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
 
