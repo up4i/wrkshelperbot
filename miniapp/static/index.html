@@ -1204,6 +1204,19 @@
     30%  { opacity: 1; transform: translateY(-20px) scale(1.1); }
     100% { opacity: 0; transform: translateY(-70px) scale(.9); }
   }
+  .lobby-toast {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-80px);
+    background: var(--card); border: 1px solid rgba(255,255,255,.12); border-radius: 14px;
+    padding: 12px 16px; z-index: 2000; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+    transition: transform .3s cubic-bezier(.34,1.56,.64,1);
+    max-width: 320px; width: 90%;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .lobby-toast.show { transform: translateX(-50%) translateY(0); }
+  .lobby-toast-icon { font-size: 22px; flex-shrink: 0; }
+  .lobby-toast-text { flex: 1; font-size: 13px; }
+  .lobby-toast-text strong { display: block; margin-bottom: 2px; }
 </style>
 </head>
 <body>
@@ -2024,6 +2037,7 @@ async function boot() {
     document.getElementById('gamesLoginWall').style.display = 'none';
     prefillUserInputs();
     startPresencePing();
+    connectLobbyWs();
   } else {
     // Browser with no session — replace all login forms with "open in Telegram"
     _applyTgWalls();
@@ -2131,6 +2145,7 @@ function setUser(id) {
   prefillUserInputs();
   refreshBalance();
   startPresencePing();
+  connectLobbyWs();
   // Refresh profile tab if it's visible
   if (document.getElementById('page-profile').classList.contains('active')) openProfilePage();
 }
@@ -5758,6 +5773,63 @@ function _pokerLeave() {
 function pokerLeave() { _pokerLeave(); }
 
 boot();
+
+// ── Lobby WebSocket toast ─────────────────────────────────────────────────────
+const _GAME_ICONS = { crash: '🚀', duck: '🦆', marbles: '🔮', livebj: '🃏', poker: '♠️' };
+let _lobbyWs = null;
+let _lobbyToastTimer = null;
+
+function connectLobbyWs() {
+  if (!state.userId) return;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  _lobbyWs = new WebSocket(`${proto}://${location.host}/ws/lobby`);
+  _lobbyWs.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.type === 'player_joined') showLobbyToast(data);
+    } catch {}
+  };
+  _lobbyWs.onclose = () => setTimeout(connectLobbyWs, 5000);
+}
+
+function showLobbyToast(data) {
+  const toast = document.getElementById('lobbyToast');
+  document.getElementById('lobbyToastIcon').textContent = _GAME_ICONS[data.game] || '🎮';
+  document.getElementById('lobbyToastTitle').textContent = `${data.user} joined ${data.game_label}`;
+  document.getElementById('lobbyToastSub').textContent = 'Tap to join';
+  toast.style.display = 'flex';
+  requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('show')));
+  toast.onclick = () => { hideLobbyToast(); navigateToGame(data.game); };
+  clearTimeout(_lobbyToastTimer);
+  _lobbyToastTimer = setTimeout(hideLobbyToast, 2500);
+}
+
+function hideLobbyToast() {
+  const toast = document.getElementById('lobbyToast');
+  toast.classList.remove('show');
+  setTimeout(() => { toast.style.display = 'none'; }, 300);
+}
+
+function navigateToGame(game) {
+  const openers = {
+    crash:   () => openCrash(),
+    duck:    () => openDuck(),
+    marbles: () => openMarbles(),
+    livebj:  () => openLiveBJ(),
+    poker:   () => openPoker(),
+  };
+  showPage('games', document.querySelector('[data-page="games"]'));
+  setGameTab('live');
+  setTimeout(() => openers[game]?.(), 200);
+}
 </script>
+
+<div class="lobby-toast" id="lobbyToast" style="display:none">
+  <div class="lobby-toast-icon" id="lobbyToastIcon">🎮</div>
+  <div class="lobby-toast-text">
+    <strong id="lobbyToastTitle"></strong>
+    <span id="lobbyToastSub"></span>
+  </div>
+</div>
 </body>
 </html>
