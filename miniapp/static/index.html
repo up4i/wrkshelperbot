@@ -882,6 +882,23 @@
   .marble-player-row { display: flex; align-items: center; gap: 6px; font-size: 12px; }
   .marble-swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
+  /* ── Live Blackjack ── */
+  .lbj-table { width: 100%; background: radial-gradient(ellipse at center, #166534 0%, #14532d 100%); border-radius: 12px; padding: 12px 8px; margin: 8px 0; }
+  .lbj-dealer { text-align: center; margin-bottom: 8px; }
+  .lbj-dealer-label { font-size: 11px; color: rgba(255,255,255,.6); margin-bottom: 4px; }
+  .lbj-cards { display: flex; gap: 4px; justify-content: center; flex-wrap: wrap; }
+  .lbj-card { width: 32px; height: 44px; background: white; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #111; box-shadow: 0 2px 4px rgba(0,0,0,.3); }
+  .lbj-card.red { color: #dc2626; }
+  .lbj-card.back { background: #1e40af; }
+  .lbj-seats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .lbj-seat { background: rgba(0,0,0,.2); border-radius: 8px; padding: 6px; text-align: center; border: 1px solid rgba(255,255,255,.1); }
+  .lbj-seat.active-turn { border-color: #f59e0b; background: rgba(245,158,11,.1); }
+  .lbj-seat.mine { border-color: var(--primary); }
+  .lbj-seat-name { font-size: 10px; color: rgba(255,255,255,.7); margin-bottom: 4px; }
+  .lbj-seat-bet { font-size: 10px; color: var(--gold); margin-top: 2px; }
+  .lbj-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .lbj-actions .btn { flex: 1; padding: 10px 0; font-size: 13px; }
+
   @keyframes bj-flip-reveal {
     from { transform: rotateY(90deg) scaleX(0.5); opacity: 0; }
     to   { transform: rotateY(0deg)  scaleX(1);   opacity: 1; }
@@ -1199,7 +1216,11 @@
             <div class="gname">Marbles</div>
             <div class="gdesc">Bet your space, win the pot</div>
           </div>
-          <!-- Live Blackjack card — added in Task 8 -->
+          <div class="game-card" onclick="openLiveBJ()">
+            <div class="gicon">🃏</div>
+            <div class="gname">Live Blackjack</div>
+            <div class="gdesc">Up to 6 players vs the dealer</div>
+          </div>
           <!-- Poker card — added in Task 10 -->
         </div>
         <!-- SOLO GAMES -->
@@ -1739,6 +1760,35 @@
     <div class="result-box" id="marbleResult"></div>
     <div id="marbleBetArea"></div>
     <div class="error-msg" id="marbleErr"></div>
+  </div>
+</div>
+
+<!-- LIVE BLACKJACK MODAL -->
+<div class="modal-bg" id="liveBjModal" onclick="closeModal('liveBjModal',event)">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('liveBjModal')">✕</button>
+    <div class="modal-title">🃏 Live Blackjack
+      <button onclick="toggleLbjLegend()" style="float:right;background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px;color:var(--muted);cursor:pointer">?</button>
+    </div>
+    <div id="lbjLegend" style="display:none;background:rgba(0,0,0,.2);border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px;line-height:1.8">
+      <b>Card Values</b><br>
+      A = 1 or 11 &nbsp;·&nbsp; 2–10 = face value &nbsp;·&nbsp; J/Q/K = 10<br>
+      <b>Goal:</b> Beat the dealer without going over 21<br>
+      <b>Blackjack</b> (A + 10/J/Q/K on deal) = 2.5× payout<br>
+      <b>Win</b> = 2× · <b>Push</b> (tie) = bet back · <b>Bust</b> = lose
+    </div>
+    <div class="lbj-table" id="lbjTable">
+      <div class="lbj-dealer">
+        <div class="lbj-dealer-label">DEALER</div>
+        <div class="lbj-cards" id="lbjDealerCards"></div>
+        <div id="lbjDealerVal" style="font-size:11px;color:rgba(255,255,255,.6);margin-top:2px"></div>
+      </div>
+      <div class="lbj-seats" id="lbjSeats"></div>
+    </div>
+    <div class="crash-phase-txt" id="lbjPhase">Connecting…</div>
+    <div class="result-box" id="lbjResult"></div>
+    <div id="lbjBetArea"></div>
+    <div class="error-msg" id="lbjErr"></div>
   </div>
 </div>
 
@@ -4721,6 +4771,145 @@ function _bjShowPP(data) {
   ppEl.style.marginBottom = '8px';
   ppEl.textContent = `${labels[data.pp_result]} — side bet: ${sign}${fmt(data.pp_delta)} WRK$`;
   document.getElementById('bjContent').prepend(ppEl);
+}
+
+// ── Live Blackjack ────────────────────────────────────────────────────────────
+let liveBjWs = null;
+let _lbjLastPhase = null;
+let _lbjMyUid = null;
+let _lbjSeated = false;
+
+function openLiveBJ() {
+  if (!state.userId) return alert('Open in Telegram to play.');
+  _lbjMyUid = +state.userId;
+  document.getElementById('liveBjModal').classList.add('open');
+  _connectLiveBjWs();
+}
+
+function toggleLbjLegend() {
+  const el = document.getElementById('lbjLegend');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function _connectLiveBjWs() {
+  if (liveBjWs && liveBjWs.readyState <= 1) return;
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  liveBjWs = new WebSocket(`${proto}//${location.host}/ws/livebj`);
+  liveBjWs.onmessage = e => _handleLbjMsg(JSON.parse(e.data));
+  liveBjWs.onclose = () => {
+    setTimeout(() => {
+      if (document.getElementById('liveBjModal').classList.contains('open')) _connectLiveBjWs();
+    }, 2000);
+  };
+}
+
+function _lbjCardHtml(card) {
+  if (card === '🂠') return `<div class="lbj-card back">🂠</div>`;
+  const suit = card.slice(-1);
+  const red = suit === '♥' || suit === '♦';
+  return `<div class="lbj-card${red?' red':''}">${esc(card)}</div>`;
+}
+
+function _handleLbjMsg(msg) {
+  if (msg.type === 'state') _updateLbjDisplay(msg);
+  else if (msg.type === 'joined') {
+    _lbjSeated = true;
+    state.balance = msg.new_balance; refreshHeaderBal();
+    document.getElementById('lbjBetArea').innerHTML =
+      `<div class="crash-bet-info">✅ Seated — bet ${fmt(msg.bet)} WRK$</div>`;
+  } else if (msg.type === 'error') {
+    const el = document.getElementById('lbjErr');
+    if (el) { el.textContent = msg.message; setTimeout(() => el.textContent = '', 3000); }
+  }
+}
+
+function _updateLbjDisplay(msg) {
+  const phaseChanged = msg.phase !== _lbjLastPhase;
+  _lbjLastPhase = msg.phase;
+
+  // Dealer
+  document.getElementById('lbjDealerCards').innerHTML = (msg.dealer_hand || []).map(_lbjCardHtml).join('');
+  document.getElementById('lbjDealerVal').textContent = msg.dealer_value ? `Value: ${msg.dealer_value}` : '';
+
+  // Seats
+  const seatsEl = document.getElementById('lbjSeats');
+  if (seatsEl) {
+    seatsEl.innerHTML = (msg.seats || []).map(s => {
+      const isMine = s.user_id === _lbjMyUid;
+      const cls = `lbj-seat${s.is_turn ? ' active-turn' : ''}${isMine ? ' mine' : ''}`;
+      const result = s.result ? ` · ${s.result.toUpperCase()}` : '';
+      return `<div class="${cls}">
+        <div class="lbj-seat-name">${esc(s.name)}</div>
+        <div class="lbj-cards">${(s.hand||[]).map(_lbjCardHtml).join('')}</div>
+        ${s.value ? `<div style="font-size:10px;color:rgba(255,255,255,.6)">${s.value}${esc(result)}</div>` : ''}
+        <div class="lbj-seat-bet">${fmt(s.bet)} WRK$</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Phase
+  const phaseEl = document.getElementById('lbjPhase');
+  if (phaseEl) {
+    if (msg.phase === 'waiting') phaseEl.textContent = `Betting open — ${msg.countdown.toFixed(1)}s`;
+    else if (msg.phase === 'dealing') phaseEl.textContent = 'Dealing cards…';
+    else if (msg.phase === 'player_turns') {
+      const activeSeat = msg.seats?.[msg.current_seat];
+      phaseEl.textContent = activeSeat ? `${activeSeat.user_id === _lbjMyUid ? 'Your turn' : esc(activeSeat.name) + "'s turn"} — ${msg.countdown.toFixed(0)}s` : '';
+    }
+    else if (msg.phase === 'dealer') phaseEl.textContent = "Dealer's turn…";
+    else phaseEl.textContent = 'Round over';
+  }
+
+  // My turn actions
+  const myTurnSeat = msg.phase === 'player_turns' && msg.seats?.[msg.current_seat];
+  const isMyTurn = myTurnSeat && myTurnSeat.user_id === _lbjMyUid && myTurnSeat.status === 'playing';
+  const actEl = document.getElementById('lbjBetArea');
+  if (isMyTurn && _lbjSeated) {
+    actEl.innerHTML = `<div class="lbj-actions">
+      <button class="btn outline" onclick="_lbjAction('hit')">Hit</button>
+      <button class="btn outline" onclick="_lbjAction('stand')">Stand</button>
+      <button class="btn outline" onclick="_lbjAction('double')">Double</button>
+    </div>`;
+  } else if (msg.phase === 'waiting' && phaseChanged && !_lbjSeated) {
+    actEl.innerHTML = `
+      <div class="card-title" style="margin-top:8px">Bet to join</div>
+      <div class="bet-presets" id="lbjPresets"></div>
+      <div class="bet-row">
+        <input class="input bet-input" id="lbjBetInput" type="number" value="100" min="10">
+        <button class="btn" onclick="_lbjJoin()">JOIN</button>
+      </div>
+      <div class="balance-display">Balance: <span class="b">${state.balance !== null ? fmt(state.balance) : '—'}</span> WRK$</div>
+    `;
+    buildPresets('lbjPresets', 'lbjBetInput');
+  }
+
+  if (msg.phase === 'results' && phaseChanged) {
+    _lbjSeated = false;
+    const mySeat = msg.seats?.find(s => s.user_id === _lbjMyUid);
+    if (mySeat?.result) {
+      const resEl = document.getElementById('lbjResult');
+      const win = ['win','blackjack'].includes(mySeat.result);
+      resEl.textContent = `${mySeat.result.toUpperCase()} ${win ? '🏆' : mySeat.result === 'push' ? '🤝' : '💀'}`;
+      resEl.className = `result-box show ${win ? 'win-box' : mySeat.result === 'push' ? '' : 'lose-box'}`;
+    }
+  }
+
+  if (msg.phase === 'waiting' && phaseChanged) {
+    document.getElementById('lbjResult').className = 'result-box';
+    _lbjSeated = false;
+  }
+}
+
+function _lbjAction(action) {
+  if (!liveBjWs || liveBjWs.readyState !== 1) return;
+  liveBjWs.send(JSON.stringify({ type: action, user_id: _lbjMyUid }));
+}
+
+function _lbjJoin() {
+  const bet = parseInt(document.getElementById('lbjBetInput')?.value);
+  if (!bet || bet < 10) { document.getElementById('lbjErr').textContent = 'Min 10 WRK$'; return; }
+  if (!liveBjWs || liveBjWs.readyState !== 1) return;
+  liveBjWs.send(JSON.stringify({ type: 'join', user_id: _lbjMyUid, bet }));
 }
 
 boot();
