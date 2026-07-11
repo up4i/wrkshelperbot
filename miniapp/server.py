@@ -2904,7 +2904,7 @@ def _score_5(cards: list[str]) -> tuple:
     suits = [c[-1] for c in cards]
     is_flush = len(set(suits)) == 1
     is_straight = (ranks == list(range(ranks[0], ranks[0]-5, -1))) or ranks == [14,5,4,3,2]
-    if is_straight and ranks[0] == 5: ranks = [5,4,3,2,1]  # wheel
+    if is_straight and ranks == [14,5,4,3,2]: ranks = [5,4,3,2,1]  # wheel: A acts as 1
     from collections import Counter
     cnt = Counter(ranks)
     freq = sorted(cnt.values(), reverse=True)
@@ -3115,6 +3115,10 @@ async def _poker_loop():
                             _record_stats(db, seat["user_id"], poker_won=profit)
                         else:
                             _record_stats(db, seat["user_id"], poker_lost=abs(profit))
+                        # Return chips to wallet (buy-in already deducted at join)
+                        if seat["chips"] > 0:
+                            db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                                       (seat["chips"], seat["user_id"]))
                     db.commit()
             await _poker_broadcast({"type": "state", **_poker_snapshot()})
             await asyncio.sleep(_POKER_RESULTS_SECS)
