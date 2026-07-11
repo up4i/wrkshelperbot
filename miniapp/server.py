@@ -2546,6 +2546,31 @@ def get_friends(user_id: int):
         ).fetchall()]
         return {"friends": friends, "incoming": incoming, "outgoing": outgoing}
 
+class SendWrkRequest(BaseModel):
+    from_user_id: int
+    to_user_id: int
+    amount: int
+
+@app.post("/api/send-wrk")
+def send_wrk(req: SendWrkRequest):
+    if req.from_user_id == req.to_user_id:
+        raise HTTPException(400, "Cannot send to yourself")
+    if req.amount <= 0:
+        raise HTTPException(400, "Amount must be positive")
+    with db_conn() as db:
+        sender = db.execute("SELECT balance FROM economy WHERE user_id=?", (req.from_user_id,)).fetchone()
+        if not sender or sender["balance"] < req.amount:
+            raise HTTPException(400, "Insufficient balance")
+        target = db.execute("SELECT user_id FROM economy WHERE user_id=?", (req.to_user_id,)).fetchone()
+        if not target:
+            raise HTTPException(404, "Recipient not found")
+        db.execute("UPDATE economy SET balance=balance-? WHERE user_id=?", (req.amount, req.from_user_id))
+        db.execute("UPDATE economy SET balance=balance+? WHERE user_id=?", (req.amount, req.to_user_id))
+        new_bal = db.execute("SELECT balance FROM economy WHERE user_id=?", (req.from_user_id,)).fetchone()["balance"]
+        db.commit()
+    return {"ok": True, "new_balance": new_bal}
+
+
 @app.post("/api/friends/request")
 def send_friend_request(req: FriendRequestCreate):
     import time as _time

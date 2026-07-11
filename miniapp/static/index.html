@@ -1895,6 +1895,18 @@
 </div>
 
 <!-- GIFT DETAIL MODAL -->
+<div class="modal-overlay" id="sendWrkOverlay" onclick="closeSendWrk()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:99"></div>
+<div class="modal-bg" id="sendWrkModal" onclick="if(event.target.id==='sendWrkModal')closeSendWrk()" style="position:fixed;inset:0;z-index:100;display:none;align-items:flex-end;justify-content:center">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeSendWrk()">✕</button>
+    <div class="modal-title">💸 Send WRK$</div>
+    <div>
+      <p id="sendWrkTarget" style="margin-bottom:12px;color:var(--muted);text-align:center"></p>
+      <input id="sendWrkAmount" type="number" class="input" placeholder="Amount" min="1">
+      <button class="btn" style="width:100%;margin-top:10px" onclick="submitSendWrk()">Send</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="tradeModalOverlay" onclick="closeTradeModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:99"></div>
 <div class="modal-bg" id="tradeModal" onclick="if(event.target.id==='tradeModal')closeTradeModal()" style="position:fixed;inset:0;z-index:100;display:none;align-items:flex-end;justify-content:center">
   <div class="modal" style="position:relative">
@@ -2248,7 +2260,8 @@ async function loadProfile() {
   const url = /^\d+$/.test(raw) ? `/api/profile/${raw}` : `/api/profile/username/${raw.replace(/^@/,'')}`;
   try {
     const d = await api(url);
-    content.innerHTML = buildProfileHtml(d, false);
+    const isOwnProfile = state.userId && +state.userId === +d.user_id;
+    content.innerHTML = buildProfileHtml(d, isOwnProfile);
     content.style.display = 'flex';
     _setupGiftsObserver(content.querySelector('#giftsGrid'));
     initAnimatedGiftsInGrid(content.querySelector('#giftsGrid'));
@@ -2256,6 +2269,17 @@ async function loadProfile() {
     const isOnline = onlineData.online.includes(+d.user_id);
     const dot = document.getElementById('profileOnlineDot');
     if (dot) dot.style.display = isOnline ? 'inline-block' : 'none';
+    if (!isOwnProfile && state.userId) {
+      const fs = await api(`/api/friends?user_id=${state.userId}`).catch(()=>({friends:[],outgoing:[],incoming:[]}));
+      const targetId = d.user_id;
+      const isFriend = fs.friends.some(f => f.other_user_id === targetId);
+      const isPending = fs.outgoing.some(f => f.other_user_id === targetId);
+      const addBtn = document.getElementById('addFriendBtn');
+      if (addBtn) {
+        if (isFriend) { addBtn.textContent = '✅ Friends'; addBtn.disabled = true; }
+        else if (isPending) { addBtn.textContent = '⏳ Pending'; addBtn.disabled = true; }
+      }
+    }
   } catch(e) {
     errEl.textContent = e.message;
   }
@@ -2354,7 +2378,8 @@ async function loadSocial() {
           ${isOnline ? '<div class="friend-online"></div>' : '<div style="width:8px"></div>'}
           <div class="friend-card-name" onclick="viewUser(${f.other_user_id})" style="cursor:pointer">${esc(f.other_display)}</div>
           <div class="friend-card-actions">
-            <button class="btn" onclick="openTradeModal(${f.other_user_id})">Trade</button>
+            <button class="btn" onclick="openSendWrk(${f.other_user_id}, '${esc(f.other_display)}')">Send WRK$</button>
+            <button class="btn outline" onclick="openTradeModal(${f.other_user_id})">Trade</button>
             <button class="btn outline" style="color:var(--red)" onclick="removeFriend(${f.id})">Remove</button>
           </div>
         </div>`;
@@ -2405,6 +2430,40 @@ async function removeFriend(id) {
 let _tradeTargetId = null;
 let _tradeOfferGiftId = null;
 let _tradeRequestGiftId = null;
+
+// ── Send WRK$ modal ──────────────────────────────────────────────────────────
+let _sendWrkTargetId = null;
+function openSendWrk(targetId, targetName) {
+  _sendWrkTargetId = targetId;
+  document.getElementById('sendWrkTarget').textContent = `Sending to ${targetName}`;
+  document.getElementById('sendWrkAmount').value = '';
+  document.getElementById('sendWrkModal').style.display = 'flex';
+  document.getElementById('sendWrkOverlay').style.display = 'block';
+}
+function closeSendWrk() {
+  document.getElementById('sendWrkModal').style.display = 'none';
+  document.getElementById('sendWrkOverlay').style.display = 'none';
+}
+async function submitSendWrk() {
+  const amount = parseInt(document.getElementById('sendWrkAmount').value);
+  if (!amount || amount <= 0) return alert('Enter a valid amount');
+  try {
+    const data = await api('/api/send-wrk', { method: 'POST', json: {
+      from_user_id: +state.userId, to_user_id: _sendWrkTargetId, amount
+    }});
+    state.balance = data.new_balance;
+    refreshHeaderBal();
+    closeSendWrk();
+    alert(`Sent ${fmt(amount)} WRK$!`);
+  } catch(e) { alert(e.message); }
+}
+async function sendFriendRequest(targetId) {
+  try {
+    await api('/api/friends/request', { method: 'POST', json: { from_user_id: +state.userId, to_user_id: targetId }});
+    const btn = document.getElementById('addFriendBtn');
+    if (btn) { btn.textContent = '⏳ Pending'; btn.disabled = true; }
+  } catch(e) { alert(e.message); }
+}
 
 function openTradeModal(targetUserId) {
   _tradeTargetId = targetUserId;
@@ -2591,7 +2650,12 @@ function buildProfileHtml(d, isOwn) {
       ${isOwn ? `<select id="pinnedStatPicker" style="margin-top:6px;background:var(--card);color:#fff;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 10px;font-size:12px" onchange="setPinnedStat(this.value)">
         ${[['crash_mult','Best Crash Mult'],['gamble_won','Total WRK$ Won'],['gamble_lost','Total WRK$ Lost'],['gifts_owned','Gifts Owned'],['streak','Day Streak']].map(([v,l]) => `<option value="${v}"${d.pinned_stat===v?' selected':''}>${l}</option>`).join('')}
       </select>` : ''}
-      ${!isOwn && state.userId ? `<button class="btn" style="margin-top:10px;width:100%" onclick="openTradeModal(${d.user_id})">🔄 Trade</button>` : ''}
+      ${!isOwn && state.userId ? `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn" style="flex:1" onclick="openSendWrk(${d.user_id}, '${esc(d.username || d.name)}')">💸 Send WRK$</button>
+        <button class="btn outline" style="flex:1" onclick="openTradeModal(${d.user_id})">🔄 Trade Gift</button>
+        <button class="btn outline" style="flex:1" id="addFriendBtn" onclick="sendFriendRequest(${d.user_id})">➕ Add Friend</button>
+      </div>` : ''}
     </div>
     <div>
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
