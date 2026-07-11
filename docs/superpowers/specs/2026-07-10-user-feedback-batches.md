@@ -1,6 +1,7 @@
 # User Feedback — Implementation Batches
 
-Source: feedback from Nookie + Bryce (2026-07-10 → 2026-07-11).
+Source: feedback from Nookie + Bryce (2026-07-10 → 2026-07-11).  
+Last updated: 2026-07-11
 
 ---
 
@@ -15,67 +16,77 @@ Source: feedback from Nookie + Bryce (2026-07-10 → 2026-07-11).
 
 ---
 
-## Priority Fixes (ship before Batch B)
+## Priority Fixes (shipped before Batch B) ✅ IMPLEMENTED
 
-Quick bugs and one-liners — no spec/plan needed, implement directly.
-
-- **Hack HTTP 600**: some users see HTTP 600 error — investigate server error handling in `/api/hack/*` endpoints
-- **Commas on numbers**: all WRK$ amounts should use comma formatting (1,000,000 not 1000000) — check `fmt()` usage and any places it's skipped
-- **Leaderboard profile embed**: remove the profile preview/embed that appears on the leaderboard
-- **Coinflip same side**: both sides of the coin flip animation show the same face — make heads/tails visually distinct
-- **Bet button spacing**: in the new games (roulette, craps, hack, rob, high-low), the preset bet buttons are too close to the confirm/bet button — add spacing
-- **Infinite scroll on other user's profile loads wrong gifts**: when viewing another user's profile and scrolling to load more gifts, the scroll loads the wrong user's gifts (likely own user's gifts). `_giftsProfileId` / `window._profileIsOwn` may not be resetting correctly when navigating between profiles while staying on the profile tab
-- **Gift reorder — drag whole card**: currently dragging requires hitting the small ⠿ handle in the corner; make the entire gift card the drag target in reorder mode (remove the handle overlay, use the whole card)
-- **Gift reorder — multi-move stability**: moving more than one gift in a session bugs out; Sortable state likely not resetting cleanly between moves
+- Hack HTTP 600 ✅
+- Commas on numbers ✅
+- Leaderboard profile embed removed ✅
+- Coinflip same side fix ✅
+- Bet button spacing ✅
+- Infinite scroll on other user's profile wrong gifts fix ✅
+- Gift reorder — drag whole card ✅
+- Gift reorder — multi-move stability ✅
 
 ---
 
-## Batch B — Game Polish & Visual Overhauls
+## Batch B — Game Polish & Visual Overhauls ✅ IMPLEMENTED
 
-- **Blackjack**: full casino table interface redesign + Perfect Pair side bet
-- **Crash**: replace rocket emoji with a proper rocket-on-chart animation (more engaging)
-- **Coinflip**: improved animation (distinct heads/tails, better flip feel)
-- **Roulette**:
-  - Fix wheel layout — 2 red segments are adjacent (incorrect); correct the color sequence
-  - Add numbers to wheel segments
-  - Add betting variants: odd/even, red/black, sectors/columns
-- **Street Craps**:
-  - Smoother dice animation (more frames, better feel)
-  - Auto-continue option: play again without re-selecting a bet after each roll
-  - Refund if player fails to hit come-out point after N rolls (avoid endless loop)
-- **High-Low**: Bryce mentioned a "slider" variant of high-low — clarify if this is a separate game concept (Price is Right style) vs the existing card-chain game. Resolve before implementing.
-- **All games**: "Play again with same bet" quick-continue option after each round ends
-- **All games**: Spacing fix — preset bet chips/buttons need more padding from the main bet/confirm button
+- Blackjack: casino felt redesign + chip-based betting UI + Perfect Pair side bet ✅
+- Crash: SVG line chart with log-scale, rocket at tip, resets each round ✅
+- Coinflip: 4-spin cubic-bezier animation, Flip Again button ✅
+- Roulette: correct color sequence, numbers on wheel, betting variants (odd/even/dozen/col), Spin Again ✅
+- Street Craps: smoother dice animation (14 frames), Roll Again, 25-roll refund ✅
+- High-Low Slider: new standalone game — drag bar, arrow animation, scales payout with risk ✅
+- All games: Play Again / Spin Again / Roll Again buttons ✅
 
 ---
 
-## Batch C — Four New Games
+## Batch C1 — New Solo Games ✅ IMPLEMENTED
 
-- Duck Racing
-- Plinko
-- CS Case Opening
-- Wheel of Fortune
-- **Portals / Marble game**: players wager WRK$ or gifts; board tiles proportional to total value wagered; marble launched from random position; whoever's tile it lands on wins the pot. NFT/gift wagering makes it the first game where gifts are at stake. Complexity: high — needs gift valuation, tile layout math, marble physics/animation, and payout logic.
+- Plinko: 8-row peg board, 3 risk tiers, binomial path, ball animation ✅
+- Wheel of Fortune: 12-segment wheel, 95.8% RTP, spin animation ✅
+- CS Case Opening: reel animation, loot tiers, gift awards ✅
 
 ---
 
-## Batch D — Profile & Social Layer
+## Batch C2 — Live Multiplayer Games ✅ IMPLEMENTED
 
-- **Friends tab**: quick access to contacts — send WRK$, trade gifts faster than searching by username
-- **Profile action buttons**: send money + initiate gift trade as direct buttons on any player's profile page (not just via friends tab)
-- **Net worth**: show balance + total gift value combined on profile
+- Games tab restructure: Live / Solo / Rob & Hack tabs ✅
+- Crash players panel: live bettors list with cashout status ✅
+- Duck Racing: 4 ducks, inverse-weight odds, lane selection, race animation ✅
+- Marbles: proportional zones, gift bets, winner-takes-pot, SVG board, marble animation ✅
+- Live Blackjack: 6-seat table, hit/stand/double, auto-stand, hand legend ✅
+- Texas Hold'Em Poker: hand evaluator, betting rounds, showdown, 6-seat, fold/check/call/raise ✅
+
+---
+
+## Batch D — Profile & Social Layer ⬅ NEXT
+
+Items from original spec:
+- **Friends tab**: quick access to contacts — send WRK$, trade gifts faster than searching
+- **Profile action buttons**: send money + initiate gift trade directly from any player's profile
+- **Net worth**: balance + total gift value combined, shown on profile
 - **Online presence**: display who's currently active in the mini-app
-- **In-game join notifications**: when a user starts Crash (or other social games), online members get a mini-app notification — "Nic has started Crash — join now"
+- **In-game join notifications**: when a user starts Crash (etc.), active members get a mini-app notification — "Nic has started Crash — join now"
 - **Profile tags**: #1 Pepe holder, #1 Scared Cats holder, #1 net worth, etc.
-- **Customizable stat highlights**: user can pin a preferred gamble stat to their profile (e.g. "largest crash mult" swappable with win streak, total wagered, etc.)
+- **Customizable stat highlights**: user pins a preferred gamble stat to their profile (largest crash mult, win streak, total wagered, etc.)
 - **Animated gifts**: gifts animate while scrolling the profile gift grid
 
+Additional items (not in original spec, accumulated since):
+- **Stats expansion**: add game_stats columns for roulette, plinko, wheel, slider, craps, highlow, cases — they currently record no stats
+- **Leaderboard gamble totals**: currently only sum slots+coinflip+BJ+crash; expand to include duck/marbles/livebj/poker
+- **Gift P2P trading**: `gift_offers` table already exists; needs mini-app UI — browse open offers, make/accept/reject trades
+- **/profile bot command**: Telegram slash command showing avatar, balance, leaderboard ranks, pinned gift, streak — same data as mini-app profile but in a formatted bot reply
+
 ---
 
-## Batch E — Multiplayer (Separate Project)
+## Batch E — Multiplayer Core ✅ IMPLEMENTED (via C2)
 
-- Poker table: real-time player-vs-player, WebSocket rooms, per-table game state
-- Note: significantly larger than all other batches combined — own spec/plan/implementation cycle
+Originally planned as a separate project. Shipped in Batch C2:
+- Live Blackjack (6-seat WebSocket table) ✅
+- Texas Hold'Em Poker (6-seat WebSocket table, full hand evaluation) ✅
+- Duck Racing (4-duck WebSocket race) ✅
+- Marbles (proportional-zone WebSocket room with gift wagering) ✅
 
 ---
 
@@ -98,3 +109,9 @@ Quick bugs and one-liners — no spec/plan needed, implement directly.
 - Gift drag-and-drop reorder
 - Infinite scroll observer race fix (profileId captured at setup time)
 - Gift reorder guard fix (disconnect observer after last page)
+- Spin Again duplicate button bug fix (Batch C2)
+- XSS fix: escape player names in crash panel (Batch C2)
+- Wheel straight A-2-3-4-5 ranking fix (Batch C2)
+- Poker pot written back to wallet at showdown (Batch C2)
+- BJ double-down balance check (Batch C2)
+- Marble stats recording (Batch C2)
