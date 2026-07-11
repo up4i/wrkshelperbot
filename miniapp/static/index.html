@@ -1040,6 +1040,30 @@
     font-size: 22px; z-index: 2; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5));
   }
 
+  /* ── CS Case Opening ── */
+  .case-reel-wrap {
+    width: 100%; overflow: hidden; position: relative;
+    border: 1px solid var(--border); border-radius: 8px;
+    height: 110px; margin: 12px 0;
+  }
+  .case-reel-wrap::before, .case-reel-wrap::after {
+    content: ''; position: absolute; top: 0; height: 100%; width: 50px; z-index: 2; pointer-events: none;
+  }
+  .case-reel-wrap::before { left: 0; background: linear-gradient(to right, var(--bg), transparent); }
+  .case-reel-wrap::after  { right: 0; background: linear-gradient(to left, var(--bg), transparent); }
+  .case-reel-center {
+    position: absolute; top: 0; left: 50%; width: 2px; height: 100%;
+    background: #f59e0b; transform: translateX(-50%); z-index: 3;
+  }
+  .case-reel { display: flex; gap: 6px; padding: 0 6px; will-change: transform; }
+  .case-item {
+    min-width: 84px; height: 98px; border-radius: 8px; border: 2px solid;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; background: rgba(0,0,0,.25); flex-shrink: 0;
+  }
+  .case-item-emoji { font-size: 26px; }
+  .case-item-label { font-size: 9px; font-weight: 700; text-align: center; padding: 0 4px; line-height: 1.2; }
+
   /* floating +X animation */
   .float-earn {
     position: fixed;
@@ -1169,6 +1193,11 @@
           <div class="gicon">🎡</div>
           <div class="gname">Wheel</div>
           <div class="gdesc">Spin your fate</div>
+        </div>
+        <div class="game-card" onclick="openCase()">
+          <div class="gicon">📦</div>
+          <div class="gname">Case</div>
+          <div class="gdesc">75,000 WRK$ — gifts inside</div>
         </div>
       </div>
     </div>
@@ -1583,6 +1612,25 @@
     </div>
     <div class="balance-display">Balance: <span class="b" id="wheelBal">—</span> WRK$</div>
     <div class="error-msg" id="wheelErr"></div>
+  </div>
+</div>
+
+<!-- CASE MODAL -->
+<div class="modal-bg" id="caseModal" onclick="closeModal('caseModal',event)">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('caseModal')">✕</button>
+    <div class="modal-title">📦 Case Opening</div>
+    <div style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:4px">75,000 WRK$ per open</div>
+    <div class="case-reel-wrap">
+      <div class="case-reel-center"></div>
+      <div class="case-reel" id="caseReel"></div>
+    </div>
+    <div class="result-box" id="caseResult"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn" id="caseOpenBtn" onclick="playCase()" style="flex:1">OPEN CASE</button>
+    </div>
+    <div class="balance-display">Balance: <span class="b" id="caseBal">—</span> WRK$</div>
+    <div class="error-msg" id="caseErr"></div>
   </div>
 </div>
 
@@ -3169,6 +3217,102 @@ function wheelPlayAgain(bet) {
   const pa = document.getElementById('wheelModal').querySelector('.btn.outline');
   if (pa) pa.remove();
   spinWheel();
+}
+
+// ── CS Case Opening ───────────────────────────────────────────────────────────
+const _CASE_TIER_COLORS = {
+  common:    '#6b7280',
+  uncommon:  '#3b82f6',
+  rare:      '#8b5cf6',
+  epic:      '#f59e0b',
+  legendary: '#ec4899',
+};
+const _CASE_FILLER = ['common','common','common','common','uncommon','uncommon','rare'];
+const _CASE_REVEAL_IDX = 24;
+const _CASE_ITEM_W = 90; // 84px + 6px gap
+
+function openCase() {
+  if (!state.userId) return alert('Open in Telegram to play.');
+  document.getElementById('caseResult').className = 'result-box';
+  document.getElementById('caseErr').textContent = '';
+  document.getElementById('caseBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
+  _buildCaseReel(null, null, null, null);
+  document.getElementById('caseModal').classList.add('open');
+}
+
+function _buildCaseReel(wonTier, wonEmoji, wonName, wonWrk) {
+  const reel = document.getElementById('caseReel');
+  if (!reel) return;
+  const items = [];
+  for (let i = 0; i < 30; i++) {
+    if (i === _CASE_REVEAL_IDX) {
+      items.push({ tier: wonTier || 'common', emoji: wonEmoji || '💰', label: wonName || (wonWrk ? fmt(wonWrk) + ' WRK$' : '?') });
+    } else {
+      const t = _CASE_FILLER[Math.floor(Math.random() * _CASE_FILLER.length)];
+      items.push({ tier: t, emoji: '💰', label: t.charAt(0).toUpperCase() + t.slice(1) });
+    }
+  }
+  reel.style.transition = 'none';
+  reel.style.transform = 'translateX(0)';
+  reel.innerHTML = items.map(item => `
+    <div class="case-item" style="border-color:${_CASE_TIER_COLORS[item.tier]}">
+      <div class="case-item-emoji">${item.emoji}</div>
+      <div class="case-item-label" style="color:${_CASE_TIER_COLORS[item.tier]}">${item.label}</div>
+    </div>
+  `).join('');
+}
+
+async function _animateCaseReel() {
+  const reel = document.getElementById('caseReel');
+  if (!reel) return;
+  const finalShift = _CASE_REVEAL_IDX * _CASE_ITEM_W - (140 - 42);
+  await sleep(50);
+  reel.style.transition = 'transform 4s cubic-bezier(0.12, 0, 0.39, 0)';
+  reel.style.transform = `translateX(-${finalShift}px)`;
+  await sleep(4100);
+}
+
+async function playCase() {
+  const errEl = document.getElementById('caseErr');
+  errEl.textContent = '';
+  document.getElementById('caseOpenBtn').disabled = true;
+  document.getElementById('caseResult').className = 'result-box';
+  _buildCaseReel(null, null, null, null);
+
+  try {
+    const data = await api('/api/play/case', { method: 'POST', json: { user_id: +state.userId } });
+
+    // Rebuild reel with actual won item at reveal position, then animate
+    const wonEmoji = data.gift_emoji || '💰';
+    const wonLabel = data.gift_name || fmt(data.wrk_reward) + ' WRK$';
+    _buildCaseReel(data.tier, wonEmoji, wonLabel, data.wrk_reward);
+    await sleep(50);
+    await _animateCaseReel();
+
+    const resEl = document.getElementById('caseResult');
+    const tierColor = _CASE_TIER_COLORS[data.tier];
+    if (data.gift_id) {
+      resEl.innerHTML = `<span style="color:${tierColor};font-weight:800">${data.tier.toUpperCase()}</span> — ${wonEmoji} ${data.gift_name} added to your profile!`;
+    } else {
+      resEl.innerHTML = `<span style="color:${tierColor};font-weight:800">${data.tier.toUpperCase()}</span> — +${fmt(data.wrk_reward)} WRK$`;
+    }
+    resEl.className = 'result-box show win-box';
+    resEl.insertAdjacentHTML('afterend',
+      `<button class="btn outline" style="width:100%;margin-top:8px" onclick="caseOpenAgain()">📦 Open Again</button>`);
+    state.balance = data.new_balance;
+    document.getElementById('caseBal').textContent = fmt(state.balance);
+    refreshHeaderBal();
+  } catch (e) {
+    errEl.textContent = e.message;
+  }
+  document.getElementById('caseOpenBtn').disabled = false;
+}
+
+function caseOpenAgain() {
+  document.getElementById('caseResult').className = 'result-box';
+  const pa = document.getElementById('caseModal').querySelector('.btn.outline');
+  if (pa) pa.remove();
+  playCase();
 }
 
 // ── Modals ────────────────────────────────────────────────────────────────────
