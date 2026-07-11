@@ -2511,6 +2511,97 @@ def presence_online():
     return {"online": [r["user_id"] for r in rows]}
 
 
+# ── Friendships ───────────────────────────────────────────────────────────────
+
+class FriendRequestCreate(BaseModel):
+    from_user_id: int
+    to_user_id: int
+
+class FriendActionRequest(BaseModel):
+    user_id: int
+
+@app.get("/api/friends")
+def get_friends(user_id: int):
+    with db_conn() as db:
+        def _enrich(row):
+            d = dict(row)
+            other_id = d["to_user_id"] if d["from_user_id"] == user_id else d["from_user_id"]
+            other = db.execute(
+                "SELECT username, full_name FROM economy WHERE user_id=?", (other_id,)
+            ).fetchone()
+            d["other_user_id"] = other_id
+            d["other_display"] = (f"@{other['username']}" if other and other["username"]
+                                  else (other["full_name"] if other else f"User {other_id}"))
+            return d
+
+        friends = [_enrich(r) for r in db.execute(
+            "SELECT * FROM friendships WHERE status='accepted' AND (from_user_id=? OR to_user_id=?)",
+            (user_id, user_id)
+        ).fetchall()]
+        incoming = [_enrich(r) for r in db.execute(
+            "SELECT * FROM friendships WHERE to_user_id=? AND status='pending'", (user_id,)
+        ).fetchall()]
+        outgoing = [_enrich(r) for r in db.execute(
+            "SELECT * FROM friendships WHERE from_user_id=? AND status='pending'", (user_id,)
+        ).fetchall()]
+        return {"friends": friends, "incoming": incoming, "outgoing": outgoing}
+
+@app.post("/api/friends/request")
+def send_friend_request(req: FriendRequestCreate):
+    import time as _time
+    if req.from_user_id == req.to_user_id:
+        raise HTTPException(400, "Cannot add yourself")
+    with db_conn() as db:
+        existing = db.execute(
+            "SELECT id, status FROM friendships WHERE "
+            "(from_user_id=? AND to_user_id=?) OR (from_user_id=? AND to_user_id=?)",
+            (req.from_user_id, req.to_user_id, req.to_user_id, req.from_user_id)
+        ).fetchone()
+        if existing:
+            if existing["status"] == "accepted":
+                raise HTTPException(400, "Already friends")
+            if existing["status"] == "pending":
+                raise HTTPException(400, "Request already pending")
+        db.execute(
+            "INSERT INTO friendships (from_user_id, to_user_id, status, created_at) VALUES (?,?,?,?)",
+            (req.from_user_id, req.to_user_id, "pending", int(_time.time()))
+        )
+        db.commit()
+    return {"ok": True}
+
+@app.post("/api/friends/{friendship_id}/accept")
+def accept_friend(friendship_id: int, req: FriendActionRequest):
+    with db_conn() as db:
+        row = db.execute("SELECT * FROM friendships WHERE id=?", (friendship_id,)).fetchone()
+        if not row or row["to_user_id"] != req.user_id:
+            raise HTTPException(403, "Not your request to accept")
+        if row["status"] != "pending":
+            raise HTTPException(400, "Not pending")
+        db.execute("UPDATE friendships SET status='accepted' WHERE id=?", (friendship_id,))
+        db.commit()
+    return {"ok": True}
+
+@app.post("/api/friends/{friendship_id}/decline")
+def decline_friend(friendship_id: int, req: FriendActionRequest):
+    with db_conn() as db:
+        row = db.execute("SELECT * FROM friendships WHERE id=?", (friendship_id,)).fetchone()
+        if not row or row["to_user_id"] != req.user_id:
+            raise HTTPException(403, "Not your request to decline")
+        db.execute("UPDATE friendships SET status='declined' WHERE id=?", (friendship_id,))
+        db.commit()
+    return {"ok": True}
+
+@app.delete("/api/friends/{friendship_id}")
+def remove_friend(friendship_id: int, user_id: int):
+    with db_conn() as db:
+        row = db.execute("SELECT * FROM friendships WHERE id=?", (friendship_id,)).fetchone()
+        if not row or (row["from_user_id"] != user_id and row["to_user_id"] != user_id):
+            raise HTTPException(403, "Not your friendship")
+        db.execute("DELETE FROM friendships WHERE id=?", (friendship_id,))
+        db.commit()
+    return {"ok": True}
+
+
 @app.on_event("startup")
 async def _startup():
     asyncio.create_task(_crash_loop())
@@ -2594,6 +2685,14 @@ async def _startup():
         db.execute("""CREATE TABLE IF NOT EXISTS online_sessions (
     user_id   INTEGER PRIMARY KEY,
     last_ping INTEGER NOT NULL
+)""")
+        db.execute("""CREATE TABLE IF NOT EXISTS friendships (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    from_user_id  INTEGER NOT NULL,
+    to_user_id    INTEGER NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'pending',
+    created_at    INTEGER NOT NULL,
+    UNIQUE(from_user_id, to_user_id)
 )""")
         db.commit()
         for col in ("duck_won INTEGER DEFAULT 0", "duck_lost INTEGER DEFAULT 0",
