@@ -215,6 +215,8 @@
     font-weight: 600;
   }
 
+  .profile-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+  .profile-tag { background: rgba(0,194,255,.15); color: var(--primary); border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
   .profile-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
   .pstat { text-align: center; }
   .pstat .v { font-size: 18px; font-weight: 700; }
@@ -2440,6 +2442,7 @@ function buildProfileHtml(d, isOwn) {
         <div class="pstat"><div class="v purple">${d.gift_count}</div><div class="l">gifts</div></div>
       </div>
       ${d.net_worth !== undefined ? `<div id="profileNetWorth" style="font-size:13px;color:var(--muted);margin-top:2px">💎 Net Worth: ${fmtK(d.net_worth)} WRK$</div>` : ''}
+      ${d.tags && d.tags.length > 0 ? `<div class="profile-tags">${d.tags.map(t => `<span class="profile-tag">${t}</span>`).join('')}</div>` : ''}
       ${!isOwn && state.userId ? `<button class="btn" style="margin-top:10px;width:100%" onclick="openTradeModal(${d.user_id})">🔄 Trade</button>` : ''}
     </div>
     <div>

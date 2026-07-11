@@ -240,6 +240,63 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         (net_worth,)
     ).fetchone()[0]
 
+    tags = []
+
+    # #1 Net Worth
+    nw_rank = db.execute(
+        """SELECT COUNT(*)+1 FROM (
+               SELECT e.user_id, e.balance + COALESCE(SUM(gp.current_price),0) AS nw
+               FROM economy e
+               LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id
+               LEFT JOIN gift_models gm ON gm.id = gi.model_id
+               LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+               GROUP BY e.user_id
+           ) WHERE nw > (
+               SELECT e2.balance + COALESCE(SUM(gp2.current_price),0)
+               FROM economy e2
+               LEFT JOIN gift_instances gi2 ON gi2.owner_id = e2.user_id
+               LEFT JOIN gift_models gm2 ON gm2.id = gi2.model_id
+               LEFT JOIN gift_prices gp2 ON gp2.collection = gm2.collection AND gp2.background = gi2.background
+               WHERE e2.user_id = ?
+           )""", (user_id,)
+    ).fetchone()[0]
+    if nw_rank == 1:
+        tags.append("#1 Net Worth")
+
+    # #1 Crash Mult
+    mult_row = db.execute(
+        "SELECT COUNT(*)+1 FROM game_stats WHERE crash_best_mult > "
+        "(SELECT COALESCE(crash_best_mult,0) FROM game_stats WHERE user_id=?)",
+        (user_id,)
+    ).fetchone()
+    if mult_row and mult_row[0] == 1:
+        tags.append("#1 Crash Mult")
+
+    # #1 [Collection] Holder
+    top_holders = db.execute(
+        """SELECT gm.collection, COUNT(*) AS cnt FROM gift_instances gi
+           JOIN gift_models gm ON gm.id = gi.model_id
+           WHERE gi.owner_id = ?
+           GROUP BY gm.collection""", (user_id,)
+    ).fetchall()
+    for holder_row in top_holders:
+        collection = holder_row["collection"]
+        cnt = holder_row["cnt"]
+        rank = db.execute(
+            """SELECT COUNT(*)+1 FROM (
+                   SELECT owner_id, COUNT(*) AS c FROM gift_instances gi2
+                   JOIN gift_models gm2 ON gm2.id = gi2.model_id
+                   WHERE gm2.collection=? AND owner_id IS NOT NULL
+                   GROUP BY owner_id
+               ) WHERE c > ?""",
+            (collection, cnt)
+        ).fetchone()[0]
+        if rank == 1 and len(tags) < 3:
+            display_col = collection.replace("_", " ").title()
+            tags.append(f"#1 {display_col} Holder")
+        if len(tags) >= 3:
+            break
+
     return {
         "user_id": row["user_id"],
         "name": display,
@@ -258,6 +315,7 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         "pinned_gift": pinned_gift,
         "pinned_gift_id": row["pinned_gift_id"],
         "has_more": len(gifts) == gifts_limit and (gifts_offset + gifts_limit) < gift_count,
+        "tags": tags[:3],
     }
 
 
