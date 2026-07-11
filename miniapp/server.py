@@ -695,38 +695,64 @@ def play_coinflip(req: CoinflipRequest):
 
 # ── Roulette ──────────────────────────────────────────────────────────────────
 
+# American roulette wheel (clockwise from 0): (color_code, number). -1 = "00".
+_RL_WHEEL = [
+    ('G',0),('B',28),('R',9),('B',26),('R',30),('B',11),('R',7),('B',20),
+    ('R',32),('B',17),('R',5),('B',22),('R',34),('B',15),('R',3),('B',24),
+    ('R',36),('B',13),('R',1),('G',-1),('R',27),('B',10),('R',25),('B',29),
+    ('R',12),('B',8),('R',19),('B',31),('R',18),('B',6),('R',21),('B',33),
+    ('R',16),('B',4),('R',23),('B',35),('R',14),('B',2),
+]
+
 class RouletteRequest(BaseModel):
     user_id: int
     bet: int
-    color: str
+    bet_type: str  # red|black|green|odd|even|dozen1|dozen2|dozen3|col1|col2|col3
 
 
 @app.post("/api/play/roulette")
 def play_roulette(req: RouletteRequest):
-    if req.color not in ("red", "black", "green"):
-        raise HTTPException(400, "color must be red, black, or green")
+    valid = {"red","black","green","odd","even","dozen1","dozen2","dozen3","col1","col2","col3"}
+    if req.bet_type not in valid:
+        raise HTTPException(400, f"bet_type must be one of: {', '.join(sorted(valid))}")
     with db_conn() as db:
         bal = _deduct_and_check(db, req.user_id, req.bet)
         slot = random.randint(0, 37)
-        if slot <= 1:
-            winning_color = "green"
-            payout_mult = 14
-        elif slot <= 19:
-            winning_color = "red"
-            payout_mult = 2
-        else:
-            winning_color = "black"
-            payout_mult = 2
-        won = req.color == winning_color
-        delta = req.bet * (payout_mult - 1) if won else -req.bet
+        color_code, number = _RL_WHEEL[slot]
+        winning_color = {"G":"green","R":"red","B":"black"}[color_code]
+        bt = req.bet_type
+        if bt == "red":
+            won, mult = color_code == "R", 2
+        elif bt == "black":
+            won, mult = color_code == "B", 2
+        elif bt == "green":
+            won, mult = color_code == "G", 14
+        elif bt == "odd":
+            won, mult = number > 0 and number % 2 == 1, 2
+        elif bt == "even":
+            won, mult = number > 0 and number % 2 == 0, 2
+        elif bt == "dozen1":
+            won, mult = 1 <= number <= 12, 3
+        elif bt == "dozen2":
+            won, mult = 13 <= number <= 24, 3
+        elif bt == "dozen3":
+            won, mult = 25 <= number <= 36, 3
+        elif bt == "col1":
+            won, mult = number > 0 and number % 3 == 1, 3
+        elif bt == "col2":
+            won, mult = number > 0 and number % 3 == 2, 3
+        else:  # col3
+            won, mult = number > 0 and number % 3 == 0, 3
+        delta = req.bet * (mult - 1) if won else -req.bet
         new_bal = bal + delta
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
         db.commit()
         return {
             "slot": slot,
             "winning_color": winning_color,
+            "winning_number": number if number >= 0 else "00",
             "won": won,
-            "payout_mult": payout_mult if won else 0,
+            "payout_mult": mult if won else 0,
             "delta": delta,
             "new_balance": new_bal,
         }

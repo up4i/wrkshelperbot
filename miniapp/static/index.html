@@ -1253,9 +1253,32 @@
     </div>
     <div class="result-box" id="rouletteResult"></div>
     <div class="cf-choice" id="rouletteColors">
-      <div class="cf-btn" id="rouletteRed" onclick="setRouletteColor('red')" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.5)">🔴 Red ×2</div>
-      <div class="cf-btn" id="rouletteBlack" onclick="setRouletteColor('black')" style="background:rgba(30,30,40,.5);border-color:rgba(100,100,120,.5)">⚫ Black ×2</div>
-      <div class="cf-btn" id="rouletteGreen" onclick="setRouletteColor('green')" style="background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.5)">🟢 Green ×14</div>
+      <div class="cf-btn" id="rouletteRed" onclick="setRouletteBet('red')" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.5)">🔴 Red ×2</div>
+      <div class="cf-btn" id="rouletteBlack" onclick="setRouletteBet('black')" style="background:rgba(30,30,40,.5);border-color:rgba(100,100,120,.5)">⚫ Black ×2</div>
+      <div class="cf-btn" id="rouletteGreen" onclick="setRouletteBet('green')" style="background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.5)">🟢 Green ×14</div>
+    </div>
+    <div style="margin-top:10px">
+      <div class="bj-section-label">Odd / Even (2×)</div>
+      <div class="cf-choice" style="gap:8px">
+        <div class="cf-btn" id="rlOdd"  onclick="setRouletteBet('odd')">🔢 Odd ×2</div>
+        <div class="cf-btn" id="rlEven" onclick="setRouletteBet('even')">🔢 Even ×2</div>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <div class="bj-section-label">Dozens (3×)</div>
+      <div class="cf-choice" style="gap:8px;grid-template-columns:1fr 1fr 1fr">
+        <div class="cf-btn" id="rlD1" onclick="setRouletteBet('dozen1')">1–12 ×3</div>
+        <div class="cf-btn" id="rlD2" onclick="setRouletteBet('dozen2')">13–24 ×3</div>
+        <div class="cf-btn" id="rlD3" onclick="setRouletteBet('dozen3')">25–36 ×3</div>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <div class="bj-section-label">Columns (3×)</div>
+      <div class="cf-choice" style="gap:8px;grid-template-columns:1fr 1fr 1fr">
+        <div class="cf-btn" id="rlC1" onclick="setRouletteBet('col1')">Col 1 ×3</div>
+        <div class="cf-btn" id="rlC2" onclick="setRouletteBet('col2')">Col 2 ×3</div>
+        <div class="cf-btn" id="rlC3" onclick="setRouletteBet('col3')">Col 3 ×3</div>
+      </div>
     </div>
     <div class="card-title" style="margin-top:4px">Bet amount</div>
     <div class="bet-presets" id="roulettePresets"></div>
@@ -2008,7 +2031,7 @@ let _sortableInstance = null;
 let _reorderDebounce = null;
 let _sortableCancelHandler = null;
 
-let rouletteColor = null;
+let rouletteBetType = null;
 
 // American roulette wheel segment colors (0, 28, 9, 26, 30, 11, ... order)
 const _RL_COLORS = ['G','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','G','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B'];
@@ -2072,17 +2095,12 @@ function _rlStopSpin() {
   _rlLastTs = null;
 }
 
-async function _rlLand(winColor) {
+async function _rlLand(slot) {
   _rlStopSpin();
   const svg = document.getElementById('rouletteWheelSvg').querySelector('svg');
   if (!svg) return;
-  const code = winColor === 'red' ? 'R' : winColor === 'black' ? 'B' : 'G';
-  const matches = _RL_COLORS.reduce((a, c, i) => { if (c === code) a.push(i); return a; }, []);
-  const seg = matches[Math.floor(Math.random() * matches.length)];
   const degPerSlot = 360 / _RL_N;
-  const segCenter = (seg + 0.5) * degPerSlot + (Math.random() - 0.5) * degPerSlot * 0.6;
-  // Clockwise rotation X puts the original position (360-X) under the pointer,
-  // so to show segCenter we need rotation ≡ (360 - segCenter) mod 360.
+  const segCenter = (slot + 0.5) * degPerSlot;
   const desired = (360 - segCenter % 360 + 360) % 360;
   let delta = (desired - _rlAngle % 360 + 360) % 360;
   if (delta < 30) delta += 360;
@@ -2097,8 +2115,8 @@ async function _rlLand(winColor) {
 
 function openRoulette() {
   if (!state.userId) return alert('Open in Telegram to play.');
-  rouletteColor = null;
-  ['rouletteRed','rouletteBlack','rouletteGreen'].forEach(id => document.getElementById(id).classList.remove('selected'));
+  rouletteBetType = null;
+  _RL_ALL_BTN_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('selected'); });
   document.getElementById('rouletteResult').className = 'result-box';
   document.getElementById('rouletteErr').textContent = '';
   document.getElementById('rouletteBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
@@ -2107,14 +2125,17 @@ function openRoulette() {
   document.getElementById('rouletteModal').classList.add('open');
 }
 
-function setRouletteColor(c) {
-  rouletteColor = c;
-  ['rouletteRed','rouletteBlack','rouletteGreen'].forEach(id => document.getElementById(id).classList.remove('selected'));
-  document.getElementById('roulette' + c.charAt(0).toUpperCase() + c.slice(1)).classList.add('selected');
+const _RL_ALL_BTN_IDS = ['rouletteRed','rouletteBlack','rouletteGreen','rlOdd','rlEven','rlD1','rlD2','rlD3','rlC1','rlC2','rlC3'];
+function setRouletteBet(type) {
+  rouletteBetType = type;
+  _RL_ALL_BTN_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('selected'); });
+  const map = {red:'rouletteRed',black:'rouletteBlack',green:'rouletteGreen',odd:'rlOdd',even:'rlEven',dozen1:'rlD1',dozen2:'rlD2',dozen3:'rlD3',col1:'rlC1',col2:'rlC2',col3:'rlC3'};
+  const el = document.getElementById(map[type]);
+  if (el) el.classList.add('selected');
 }
 
 async function spinRoulette() {
-  if (!rouletteColor) return alert('Pick a color first.');
+  if (!rouletteBetType) return alert('Pick a bet type first.');
   const bet = parseInt(document.getElementById('rouletteBet').value);
   const errEl = document.getElementById('rouletteErr');
   errEl.textContent = '';
@@ -2122,15 +2143,18 @@ async function spinRoulette() {
   document.getElementById('rouletteResult').className = 'result-box';
   _rlStartSpin(); // RAF spin — angle tracked in _rlAngle, no CSS animation needed
   try {
-    const data = await api('/api/play/roulette', { method:'POST', json:{ user_id:+state.userId, bet, color:rouletteColor } });
-    await _rlLand(data.winning_color);
+    const data = await api('/api/play/roulette', { method:'POST', json:{ user_id:+state.userId, bet, bet_type:rouletteBetType } });
+    await _rlLand(data.slot);
     const resEl = document.getElementById('rouletteResult');
     const colorEmoji = { red:'🔴', black:'⚫', green:'🟢' }[data.winning_color];
+    const numLabel = data.winning_number;
     const delta = data.delta > 0 ? `+${fmt(data.delta)}` : fmt(data.delta);
     resEl.textContent = data.won
-      ? `${colorEmoji} ${data.winning_color.toUpperCase()}! You win! ${delta} WRK$`
-      : `${colorEmoji} ${data.winning_color.toUpperCase()}. You lose. ${delta} WRK$`;
+      ? `${colorEmoji} ${numLabel} — You win! ${delta} WRK$`
+      : `${colorEmoji} ${numLabel} — You lose. ${delta} WRK$`;
     resEl.className = `result-box show ${data.won ? 'win-box' : 'lose-box'}`;
+    resEl.insertAdjacentHTML('afterend',
+      `<button class="btn outline" style="width:100%;margin-top:8px" onclick="rlPlayAgain(${bet})">⚡ Spin Again</button>`);
     state.balance = data.new_balance;
     document.getElementById('rouletteBal').textContent = fmt(state.balance);
     refreshHeaderBal();
@@ -2140,6 +2164,13 @@ async function spinRoulette() {
   } finally {
     document.getElementById('rouletteSpinBtn').disabled = false;
   }
+}
+
+function rlPlayAgain(bet) {
+  document.getElementById('rouletteBet').value = bet;
+  document.getElementById('rouletteResult').className = 'result-box';
+  const pa = document.getElementById('rouletteModal').querySelector('.btn.outline');
+  if (pa) pa.remove();
 }
 
 // ── High-Low ──────────────────────────────────────────────────────────────────
