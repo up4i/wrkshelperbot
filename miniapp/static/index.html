@@ -832,12 +832,6 @@
     display: flex; flex-direction: column; align-items: center; gap: 6px;
     padding: 16px 0 8px; min-height: 150px; justify-content: center;
   }
-  .crash-rocket { font-size: 48px; transition: transform .1s; }
-  .crash-rocket.flying { animation: rocket-fly 1s ease-in-out infinite alternate; }
-  @keyframes rocket-fly {
-    0%   { transform: translateY(0) rotate(-8deg); }
-    100% { transform: translateY(-14px) rotate(-14deg); }
-  }
   .crash-mult {
     font-size: 60px; font-weight: 900; font-variant-numeric: tabular-nums;
     color: var(--green); line-height: 1; min-height: 68px;
@@ -884,6 +878,17 @@
   @keyframes cashout-pulse {
     0%   { box-shadow: 0 0 0 0 rgba(16,185,129,.4); }
     100% { box-shadow: 0 0 20px 4px rgba(16,185,129,.25); }
+  }
+  .crash-chart-wrap {
+    width: 100%; height: 110px; position: relative;
+    border-radius: 8px; background: rgba(0,0,0,.2); margin-bottom: 6px; overflow: hidden;
+  }
+  .crash-chart-wrap svg { display: block; width: 100%; height: 100%; }
+  .crash-chart-rocket {
+    position: absolute; font-size: 20px;
+    transform: translate(-50%, -50%) rotate(-35deg);
+    transition: top .12s linear, left .12s linear;
+    pointer-events: none; z-index: 2;
   }
 
   /* ── Blackjack ── */
@@ -3472,6 +3477,9 @@ async function executeGiftDetailBuy(btn) {
 let crashWs = null;
 let crashMyBet = 0;
 let crashLastPhase = null;
+let _crashRoundStart = 0;
+let _crashPts = [];
+let _crashMaxMult = 2;
 
 function openCrash() {
   if (!state.userId) return alert('Set your user ID first.');
@@ -3518,11 +3526,14 @@ function handleCrashMsg(msg) {
 function initCrashUI() {
   document.getElementById('crashContent').innerHTML = `
     <div class="crash-history" id="crashHistory"></div>
-    <div class="crash-arena">
-      <div class="crash-rocket" id="crashRocket">🚀</div>
-      <div class="crash-mult" id="crashMult"></div>
-      <div class="crash-phase-txt" id="crashPhase">Connecting…</div>
+    <div class="crash-chart-wrap" id="crashChartWrap">
+      <svg id="crashChartSvg" viewBox="0 0 300 110" preserveAspectRatio="none">
+        <polyline id="crashChartLine" points="0,110" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+      <div class="crash-chart-rocket" id="crashChartRocket" style="left:0%;top:100%">🚀</div>
     </div>
+    <div class="crash-mult" id="crashMult"></div>
+    <div class="crash-phase-txt" id="crashPhase">Connecting…</div>
     <div class="crash-bet-info" id="crashBetInfo"></div>
     <div id="crashActionsArea"></div>
     <div class="error-msg" id="crashErr"></div>
@@ -3537,7 +3548,6 @@ function updateCrashDisplay(msg) {
 
   const multEl = document.getElementById('crashMult');
   const phaseEl = document.getElementById('crashPhase');
-  const rocketEl = document.getElementById('crashRocket');
   const histEl = document.getElementById('crashHistory');
   const actEl = document.getElementById('crashActionsArea');
   const infoEl = document.getElementById('crashBetInfo');
@@ -3555,8 +3565,18 @@ function updateCrashDisplay(msg) {
     multEl.textContent = `${mult.toFixed(2)}×`;
     multEl.className = 'crash-mult';
     phaseEl.textContent = '🚀 Flying…';
-    rocketEl.textContent = '🚀';
-    rocketEl.className = 'crash-rocket flying';
+    if (phaseChanged) {
+      _crashRoundStart = Date.now();
+      _crashPts = [[0, 1.0]];
+      _crashMaxMult = 2;
+      const line = document.getElementById('crashChartLine');
+      if (line) { line.setAttribute('points', '0,110'); line.setAttribute('stroke', '#10b981'); }
+      const r = document.getElementById('crashChartRocket');
+      if (r) r.textContent = '🚀';
+    }
+    _crashMaxMult = Math.max(_crashMaxMult, mult * 1.2);
+    _crashPts.push([(Date.now() - _crashRoundStart) / 1000, mult]);
+    _drawCrashChart();
     if (crashMyBet > 0) {
       const payout = Math.floor(crashMyBet * mult);
       const btn = document.getElementById('crashCashoutBtn');
@@ -3573,8 +3593,10 @@ function updateCrashDisplay(msg) {
     multEl.textContent = `${mult.toFixed(2)}×`;
     multEl.className = 'crash-mult red';
     phaseEl.textContent = `💥 Crashed at ${mult.toFixed(2)}×`;
-    rocketEl.textContent = '💥';
-    rocketEl.className = 'crash-rocket';
+    const cl = document.getElementById('crashChartLine');
+    if (cl) cl.setAttribute('stroke', '#dc2626');
+    const cr = document.getElementById('crashChartRocket');
+    if (cr) cr.textContent = '💥';
     actEl.innerHTML = '';
     if (crashMyBet > 0) {
       if (infoEl) { infoEl.style.display='block'; infoEl.className='crash-bet-info lose'; infoEl.textContent=`💀 Lost ${fmt(crashMyBet)} WRK$ — crashed!`; }
@@ -3587,8 +3609,6 @@ function updateCrashDisplay(msg) {
     multEl.textContent = '';
     multEl.className = 'crash-mult';
     phaseEl.textContent = msg.countdown > 0 ? `Next round in ${msg.countdown.toFixed(1)}s` : 'Starting…';
-    rocketEl.textContent = '🚀';
-    rocketEl.className = 'crash-rocket';
     if (phaseChanged && crashMyBet === 0) {
       actEl.innerHTML = `
         <div class="bet-row" style="margin-bottom:8px">
@@ -3616,6 +3636,28 @@ function crashPlaceBet() {
 function crashCashout() {
   if (!crashWs || crashWs.readyState !== 1) return;
   crashWs.send(JSON.stringify({ type: 'cashout', user_id: +state.userId }));
+}
+
+function _drawCrashChart() {
+  const line = document.getElementById('crashChartLine');
+  const rocket = document.getElementById('crashChartRocket');
+  if (!line || !_crashPts.length) return;
+  const W = 300, H = 110, PAD = 10;
+  const maxT = Math.max(8, (_crashPts[_crashPts.length-1][0] || 1) * 1.15);
+  const maxM = _crashMaxMult;
+  function toX(t) { return PAD + (t / maxT) * (W - PAD * 2); }
+  function toY(m) {
+    const logM = Math.log(Math.max(1, m));
+    const logMax = Math.log(Math.max(1.01, maxM));
+    return H - PAD - (logM / logMax) * (H - PAD * 2);
+  }
+  const pts = _crashPts.map(([t,m]) => `${toX(t).toFixed(1)},${toY(m).toFixed(1)}`).join(' ');
+  line.setAttribute('points', `0,${H} ` + pts);
+  if (rocket) {
+    const [lt, lm] = _crashPts[_crashPts.length-1];
+    rocket.style.left = (toX(lt) / W * 100).toFixed(1) + '%';
+    rocket.style.top  = (toY(lm) / H * 100).toFixed(1) + '%';
+  }
 }
 
 // ── Blackjack ─────────────────────────────────────────────────────────────────
