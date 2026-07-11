@@ -878,11 +878,11 @@ _CASE_PRICE = 75_000
 
 # Cumulative weights (roll 1-100). Each entry: (threshold, tier, wrk_min, wrk_max, gift_tier)
 _CASE_LOOT = [
-    (55,  "common",    100,    400,  None),
-    (80,  "uncommon",  500,   2000,  None),
-    (92,  "rare",     2000,  10000,  None),
-    (98,  "epic",        0,      0,  "mid"),
-    (100, "legendary",   0,      0,  "high"),
+    (55,  "common",    15_000,  40_000,  None),
+    (80,  "uncommon",  40_000,  80_000,  None),
+    (92,  "rare",      80_000, 200_000,  None),
+    (98,  "epic",           0,       0,  "mid"),
+    (100, "legendary",      0,       0,  "high"),
 ]
 
 

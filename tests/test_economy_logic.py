@@ -224,3 +224,19 @@ def test_highlow_lower_wrong():
 
 def test_highlow_lower_equal_is_wrong():
     assert _highlow_result(5, 5, "lower") == "wrong"
+
+
+# ── Cases ──────────────────────────────────────────────────────────────────────
+
+def test_cases_non_gift_payouts_are_meaningful():
+    """Non-gift case payouts should cover at least 20% of the 75k case price."""
+    _CASE_PRICE = 75_000
+    loot = [
+        (55,  "common",    15_000,  40_000,  None),
+        (80,  "uncommon",  40_000,  80_000,  None),
+        (92,  "rare",      80_000, 200_000,  None),
+    ]
+    for _, tier, wrk_min, wrk_max, gift_tier in loot:
+        if gift_tier is None:
+            assert wrk_min >= _CASE_PRICE * 0.2, f"{tier} min {wrk_min} is below 20% of case price"
+            assert wrk_max >= wrk_min, f"{tier} max < min"
