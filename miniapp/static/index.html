@@ -1286,29 +1286,6 @@
       <div class="cf-btn" id="rouletteBlack" onclick="setRouletteBet('black')" style="background:rgba(30,30,40,.5);border-color:rgba(100,100,120,.5)">⚫ Black ×2</div>
       <div class="cf-btn" id="rouletteGreen" onclick="setRouletteBet('green')" style="background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.5)">🟢 Green ×14</div>
     </div>
-    <div style="margin-top:10px">
-      <div class="bj-section-label">Odd / Even (2×)</div>
-      <div class="cf-choice" style="gap:8px">
-        <div class="cf-btn" id="rlOdd"  onclick="setRouletteBet('odd')">🔢 Odd ×2</div>
-        <div class="cf-btn" id="rlEven" onclick="setRouletteBet('even')">🔢 Even ×2</div>
-      </div>
-    </div>
-    <div style="margin-top:10px">
-      <div class="bj-section-label">Dozens (3×)</div>
-      <div class="cf-choice" style="gap:8px;grid-template-columns:1fr 1fr 1fr">
-        <div class="cf-btn" id="rlD1" onclick="setRouletteBet('dozen1')">1–12 ×3</div>
-        <div class="cf-btn" id="rlD2" onclick="setRouletteBet('dozen2')">13–24 ×3</div>
-        <div class="cf-btn" id="rlD3" onclick="setRouletteBet('dozen3')">25–36 ×3</div>
-      </div>
-    </div>
-    <div style="margin-top:10px">
-      <div class="bj-section-label">Columns (3×)</div>
-      <div class="cf-choice" style="gap:8px;grid-template-columns:1fr 1fr 1fr">
-        <div class="cf-btn" id="rlC1" onclick="setRouletteBet('col1')">Col 1 ×3</div>
-        <div class="cf-btn" id="rlC2" onclick="setRouletteBet('col2')">Col 2 ×3</div>
-        <div class="cf-btn" id="rlC3" onclick="setRouletteBet('col3')">Col 3 ×3</div>
-      </div>
-    </div>
     <div class="card-title" style="margin-top:4px">Bet amount</div>
     <div class="bet-presets" id="roulettePresets"></div>
     <div class="bet-row">
@@ -2154,11 +2131,11 @@ function openRoulette() {
   document.getElementById('rouletteModal').classList.add('open');
 }
 
-const _RL_ALL_BTN_IDS = ['rouletteRed','rouletteBlack','rouletteGreen','rlOdd','rlEven','rlD1','rlD2','rlD3','rlC1','rlC2','rlC3'];
+const _RL_COLOR_BTN_IDS = ['rouletteRed','rouletteBlack','rouletteGreen'];
 function setRouletteBet(type) {
   rouletteBetType = type;
-  _RL_ALL_BTN_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('selected'); });
-  const map = {red:'rouletteRed',black:'rouletteBlack',green:'rouletteGreen',odd:'rlOdd',even:'rlEven',dozen1:'rlD1',dozen2:'rlD2',dozen3:'rlD3',col1:'rlC1',col2:'rlC2',col3:'rlC3'};
+  _RL_COLOR_BTN_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('selected'); });
+  const map = {red:'rouletteRed',black:'rouletteBlack',green:'rouletteGreen'};
   const el = document.getElementById(map[type]);
   if (el) el.classList.add('selected');
 }
