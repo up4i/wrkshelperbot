@@ -5085,7 +5085,7 @@ function _updatePokerDisplay(msg) {
   } else if ((msg.phase === 'lobby' || msg.phase === 'waiting') && !_pokerSeated) {
     actEl.innerHTML = `<button class="btn" style="width:100%;margin-top:8px" onclick="_pokerJoin()">Buy In — 10,000 WRK$</button>`;
   } else if ((msg.phase === 'lobby' || msg.phase === 'waiting') && _pokerSeated) {
-    actEl.innerHTML = `<button class="btn outline" style="width:100%;margin-top:8px" onclick="_pokerLeave()">🚪 Leave Table (refund buy-in)</button>`;
+    actEl.innerHTML = `<button class="btn outline" id="pokerLeaveBtn" style="width:100%;margin-top:8px" onclick="_pokerLeave()">🚪 Leave Table (refund buy-in)</button>`;
   } else if (!myTurn && _pokerSeated && msg.phase !== 'lobby' && msg.phase !== 'waiting' && msg.phase !== 'showdown') {
     actEl.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:13px;padding:8px">Waiting for your turn…</div>`;
   } else if (msg.phase === 'showdown') {
@@ -5126,6 +5126,7 @@ function _pokerJoin() {
 }
 
 function _pokerLeave() {
+  if (!_pokerMyUid) return;
   if (!pokerWs || pokerWs.readyState !== 1) return;
   pokerWs.send(JSON.stringify({ type: 'leave', user_id: _pokerMyUid }));
 }
