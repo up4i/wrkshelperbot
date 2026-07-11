@@ -956,6 +956,8 @@ def craps_roll(req: CrapsRollRequest):
         if not sess:
             raise HTTPException(404, "No active craps session — start one first")
         sess = dict(sess)
+        roll_count = sess.get("roll_count", 0) + 1
+        db.execute("UPDATE craps_sessions SET roll_count = ? WHERE user_id = ?", (roll_count, req.user_id))
         d1 = random.randint(1, 6)
         d2 = random.randint(1, 6)
         total = d1 + d2
@@ -993,6 +995,15 @@ def craps_roll(req: CrapsRollRequest):
                 db.commit()
                 return {"d1": d1, "d2": d2, "total": total, "result": "lose", "lost": sess["bet"], "new_balance": row["balance"]}
             else:
+                if roll_count >= 25:
+                    refund = sess["bet"] // 2
+                    db.execute("DELETE FROM craps_sessions WHERE user_id = ?", (req.user_id,))
+                    row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+                    new_bal = row["balance"] + refund
+                    db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+                    db.commit()
+                    return {"d1": d1, "d2": d2, "total": total, "result": "refund", "refund": refund, "new_balance": new_bal}
+                db.commit()
                 return {"d1": d1, "d2": d2, "total": total, "result": "rolling", "point": sess["point"]}
 
 
@@ -1930,6 +1941,11 @@ async def _startup():
             point      INTEGER,
             started_at INTEGER NOT NULL
         )""")
+        try:
+            db.execute("ALTER TABLE craps_sessions ADD COLUMN roll_count INTEGER NOT NULL DEFAULT 0")
+            db.commit()
+        except Exception:
+            pass
         db.execute("""CREATE TABLE IF NOT EXISTS highlow_sessions (
             user_id      INTEGER PRIMARY KEY,
             bet          INTEGER NOT NULL,

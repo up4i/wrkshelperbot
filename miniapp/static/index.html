@@ -2273,10 +2273,10 @@ const _DICE_EMOJI = ['','⚀','⚁','⚂','⚃','⚄','⚅'];
 async function _animateDice(d1, d2) {
   const el1 = document.getElementById('crapsDie1');
   const el2 = document.getElementById('crapsDie2');
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 14; i++) {
     el1.textContent = _DICE_EMOJI[Math.ceil(Math.random() * 6)];
     el2.textContent = _DICE_EMOJI[Math.ceil(Math.random() * 6)];
-    await new Promise(r => setTimeout(r, 65));
+    await new Promise(r => setTimeout(r, 55));
   }
   el1.textContent = _DICE_EMOJI[d1];
   el2.textContent = _DICE_EMOJI[d2];
@@ -2314,6 +2314,9 @@ function _crapsEnterGame(point) {
   document.getElementById('crapsDie1').textContent = '🎲';
   document.getElementById('crapsDie2').textContent = '🎲';
   document.getElementById('crapsTotal').textContent = '';
+  document.getElementById('crapsRollBtn').style.display = '';
+  const ra = document.getElementById('crapsGameWrap')?.querySelector('.craps-roll-again');
+  if (ra) ra.remove();
 }
 
 async function startCraps() {
@@ -2350,7 +2353,8 @@ async function rollCraps() {
       const resEl = document.getElementById('crapsResult');
       resEl.textContent = `🎉 Winner! +${fmt(data.winnings)} WRK$`;
       resEl.className = 'result-box show win-box';
-      setTimeout(_crapsShowBet, 2000); // keep dice visible before resetting
+      document.getElementById('crapsRollBtn').style.display = 'none';
+      _crapsShowRollAgain();
     } else if (data.result === 'lose') {
       state.balance = data.new_balance;
       document.getElementById('crapsBal').textContent = fmt(state.balance);
@@ -2358,7 +2362,17 @@ async function rollCraps() {
       const resEl = document.getElementById('crapsResult');
       resEl.textContent = `💀 Seven out. Lost ${fmt(data.lost)} WRK$.`;
       resEl.className = 'result-box show lose-box';
-      setTimeout(_crapsShowBet, 2000);
+      document.getElementById('crapsRollBtn').style.display = 'none';
+      _crapsShowRollAgain();
+    } else if (data.result === 'refund') {
+      state.balance = data.new_balance;
+      document.getElementById('crapsBal').textContent = fmt(state.balance);
+      refreshHeaderBal();
+      const resEl = document.getElementById('crapsResult');
+      resEl.textContent = `⏳ 25 rolls — no point hit. Refunded ${fmt(data.refund)} WRK$ (50% back).`;
+      resEl.className = 'result-box show';
+      document.getElementById('crapsRollBtn').style.display = 'none';
+      _crapsShowRollAgain();
     } else if (data.result === 'point') {
       document.getElementById('crapsStatus').textContent = `Point set: ${data.point} — roll it again before a 7!`;
     } else {
@@ -2369,6 +2383,29 @@ async function rollCraps() {
   } finally {
     document.getElementById('crapsRollBtn').disabled = false;
   }
+}
+
+function _crapsShowRollAgain() {
+  const lastBet = document.getElementById('crapsBet')?.value || 100;
+  const gameWrap = document.getElementById('crapsGameWrap');
+  if (!gameWrap) return;
+  const existing = gameWrap.querySelector('.craps-roll-again');
+  if (existing) existing.remove();
+  const btn = document.createElement('button');
+  btn.className = 'btn outline craps-roll-again';
+  btn.style.cssText = 'margin-top:10px;width:100%';
+  btn.textContent = '🎲 Roll Again';
+  btn.onclick = () => crapsRollAgain(lastBet);
+  gameWrap.appendChild(btn);
+}
+
+function crapsRollAgain(bet) {
+  document.getElementById('crapsResult').className = 'result-box';
+  document.getElementById('crapsRollBtn').style.display = '';
+  const ra = document.getElementById('crapsGameWrap')?.querySelector('.craps-roll-again');
+  if (ra) ra.remove();
+  document.getElementById('crapsBet').value = bet;
+  _crapsShowBet();
 }
 
 // ── Hack ──────────────────────────────────────────────────────────────────────
