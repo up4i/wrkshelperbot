@@ -2642,6 +2642,36 @@ def remove_friend(friendship_id: int, user_id: int):
     return {"ok": True}
 
 
+@app.get("/api/game-timers")
+def game_timers():
+    def _crash_info():
+        if _crash.phase == "waiting":
+            return {"phase": "waiting", "countdown": round(_crash.countdown, 1)}
+        return {"phase": _crash.phase, "countdown": 0}
+
+    def _duck_info():
+        if _duck.phase == "waiting":
+            return {"phase": "waiting", "countdown": round(_duck.countdown, 1)}
+        return {"phase": _duck.phase, "countdown": 0}
+
+    def _marble_info():
+        if _marble.phase == "open":
+            return {"phase": "waiting", "countdown": round(_marble.countdown, 1)}
+        return {"phase": _marble.phase, "countdown": 0}
+
+    def _livebj_info():
+        if _livebj.phase == "waiting":
+            return {"phase": "waiting", "countdown": round(_livebj.countdown, 1)}
+        return {"phase": _livebj.phase, "countdown": 0}
+
+    return {
+        "crash": _crash_info(),
+        "duck": _duck_info(),
+        "marbles": _marble_info(),
+        "livebj": _livebj_info(),
+    }
+
+
 @app.on_event("startup")
 async def _startup():
     asyncio.create_task(_crash_loop())
@@ -3263,7 +3293,7 @@ class _LiveBJState:
         self.deck: list[str] = []
         self.current_seat: int = 0
         self.turn_deadline: float = 0.0
-        self.connections: set[WebSocket] = set()
+        self.connections: dict[WebSocket, int | None] = {}  # ws -> uid
         self.countdown: float = _LBJ_BETTING_SECS
 
     def seat_for(self, uid: int) -> dict | None:
@@ -3273,14 +3303,27 @@ class _LiveBJState:
 _livebj = _LiveBJState()
 
 
+async def _livebj_broadcast_state():
+    """Send personalized state snapshots — each player sees their own cards."""
+    dead = set()
+    for ws, uid in list(_livebj.connections.items()):
+        try:
+            await ws.send_json({"type": "state", **_livebj_snapshot(uid)})
+        except Exception:
+            dead.add(ws)
+    for ws in dead:
+        del _livebj.connections[ws]
+
+
 async def _livebj_broadcast(msg: dict):
     dead = set()
-    for ws in list(_livebj.connections):
+    for ws in list(_livebj.connections.keys()):
         try:
             await ws.send_json(msg)
         except Exception:
             dead.add(ws)
-    _livebj.connections -= dead
+    for ws in dead:
+        del _livebj.connections[ws]
 
 
 def _livebj_snapshot(for_uid: int | None = None) -> dict:
@@ -3318,7 +3361,7 @@ async def _livebj_loop():
             deadline = asyncio.get_running_loop().time() + _LBJ_BETTING_SECS
             while True:
                 _livebj.countdown = max(0.0, deadline - asyncio.get_running_loop().time())
-                await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+                await _livebj_broadcast_state()
                 if _livebj.countdown <= 0:
                     break
                 await asyncio.sleep(0.5)
@@ -3352,7 +3395,7 @@ async def _livebj_loop():
                 seat["status"] = "playing"
                 seat["doubled"] = False
             _livebj.dealer_hand = [_livebj.deck.pop(), _livebj.deck.pop()]
-            await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+            await _livebj_broadcast_state()
             await asyncio.sleep(1.0)
 
             # Player turns
@@ -3361,7 +3404,7 @@ async def _livebj_loop():
                 _livebj.current_seat = i
                 if _lbj_is_blackjack(seat["hand"]):
                     seat["status"] = "blackjack"
-                    await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+                    await _livebj_broadcast_state()
                     await asyncio.sleep(1.0)
                     continue
                 turn_deadline = asyncio.get_running_loop().time() + _LBJ_TURN_SECS
@@ -3371,7 +3414,7 @@ async def _livebj_loop():
                         seat["status"] = "stood"
                         break
                     _livebj.countdown = remaining
-                    await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+                    await _livebj_broadcast_state()
                     await asyncio.sleep(0.5)
 
             # Dealer
@@ -3379,7 +3422,7 @@ async def _livebj_loop():
             _livebj.dealer_hole_shown = True
             while _lbj_hand_value(_livebj.dealer_hand) < 17:
                 _livebj.dealer_hand.append(_livebj.deck.pop())
-            await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+            await _livebj_broadcast_state()
             await asyncio.sleep(1.5)
 
             # Results
@@ -3409,7 +3452,7 @@ async def _livebj_loop():
                         db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (payout, seat["user_id"]))
                     _record_stats(db, seat["user_id"], livebj_won=max(0, payout - bet), livebj_lost=bet if payout == 0 else 0)
                 db.commit()
-            await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+            await _livebj_broadcast_state()
             await asyncio.sleep(_LBJ_RESULTS_SECS)
 
         except Exception:
@@ -3419,7 +3462,7 @@ async def _livebj_loop():
 @app.websocket("/ws/livebj")
 async def livebj_ws(ws: WebSocket):
     await ws.accept()
-    _livebj.connections.add(ws)
+    _livebj.connections[ws] = None
     uid_ref = [None]
     await ws.send_json({"type": "state", **_livebj_snapshot()})
     try:
@@ -3430,6 +3473,7 @@ async def livebj_ws(ws: WebSocket):
                 continue
             uid = int(uid)
             uid_ref[0] = uid
+            _livebj.connections[ws] = uid
 
             if data.get("type") == "join":
                 if _livebj.phase != "waiting":
@@ -3458,7 +3502,7 @@ async def livebj_ws(ws: WebSocket):
                     {"type": "player_joined", "game": "livebj", "game_label": "Live Blackjack", "user": _livebj.seats[-1]["name"]}
                 ))
                 await ws.send_json({"type": "joined", "bet": bet, "new_balance": new_bal})
-                await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+                await _livebj_broadcast_state()
 
             elif data.get("type") in ("hit", "stand", "double"):
                 seat = _livebj.seat_for(uid)
@@ -3491,12 +3535,12 @@ async def livebj_ws(ws: WebSocket):
                         seat["status"] = "bust"
                 if action == "stand":
                     seat["status"] = "stood"
-                await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
+                await _livebj_broadcast_state()
 
     except WebSocketDisconnect:
-        _livebj.connections.discard(ws)
+        _livebj.connections.pop(ws, None)
     except Exception:
-        _livebj.connections.discard(ws)
+        _livebj.connections.pop(ws, None)
 
 
 # ── Texas Hold'Em Poker ───────────────────────────────────────────────────────

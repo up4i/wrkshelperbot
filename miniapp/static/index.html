@@ -1281,22 +1281,22 @@
           <div class="game-card" onclick="openCrash()">
             <div class="gicon">🚀</div>
             <div class="gname">Crash</div>
-            <div class="gdesc">Cash out before it crashes</div>
+            <div class="gdesc" id="gtimer-crash">Cash out before it crashes</div>
           </div>
           <div class="game-card" onclick="openDuck()">
             <div class="gicon">🦆</div>
             <div class="gname">Duck Race</div>
-            <div class="gdesc">Pick your duck, ride the odds</div>
+            <div class="gdesc" id="gtimer-duck">Pick your duck, ride the odds</div>
           </div>
           <div class="game-card" onclick="openMarbles()">
             <div class="gicon">🔮</div>
             <div class="gname">Marbles</div>
-            <div class="gdesc">Bet your space, win the pot</div>
+            <div class="gdesc" id="gtimer-marbles">Bet your space, win the pot</div>
           </div>
           <div class="game-card" onclick="openLiveBJ()">
             <div class="gicon">🃏</div>
             <div class="gname">Live Blackjack</div>
-            <div class="gdesc">Up to 6 players vs the dealer</div>
+            <div class="gdesc" id="gtimer-livebj">Up to 6 players vs the dealer</div>
           </div>
           <div class="game-card" onclick="openPoker()">
             <div class="gicon">♠️</div>
@@ -1519,7 +1519,7 @@
     <button class="nav-btn" onclick="showPage('profile',this)" data-page="profile">
       <span class="icon">👤</span>Profile
     </button>
-    <button class="nav-btn" onclick="openSendWrkWithPicker()" style="flex-basis:auto;padding:10px 12px;gap:2px">
+    <button class="nav-btn" onclick="openSendWrkWithPicker()">
       <span class="icon">💸</span>Send
     </button>
   </nav>
@@ -2102,6 +2102,7 @@ function showPage(id, btn) {
   if (id === 'work') openWorkPage();
   if (id === 'market') { loadMarketCollections(); loadMarket(true); }
   if (id === 'profile') openProfilePage();
+  if (id === 'games') _startGameTimers(); else _stopGameTimers();
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -2512,16 +2513,13 @@ async function openSendWrkWithPicker() {
   ]);
   const onlineSet = new Set(onlineData.online);
 
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.style.cssText = 'display:block;z-index:1100';
-  const modal = document.createElement('div');
-  modal.className = 'modal';
-  modal.style.cssText = 'display:block;z-index:1101';
-  modal.innerHTML = `
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.style.cssText = 'display:flex;z-index:1100';
+  bg.innerHTML = `<div class="modal" style="max-height:80vh;display:flex;flex-direction:column">
     <div class="modal-header"><span class="modal-title">Send WRK$ To</span>
       <button class="modal-close" id="_swrPickerClose">✕</button></div>
-    <div class="modal-body">
+    <div class="modal-body" style="overflow-y:auto">
       ${friendData.friends.length ? `<p style="font-weight:700;margin-bottom:8px">Friends</p>
         ${friendData.friends.map(f => {
           const isOnline = onlineSet.has(f.other_user_id);
@@ -2533,13 +2531,13 @@ async function openSendWrkWithPicker() {
       <p style="font-weight:700;margin:12px 0 8px">Search</p>
       <input id="_swrSearch" class="input" placeholder="@username or name" oninput="_swrDoSearch(this.value)">
       <div id="_swrResults"></div>
-    </div>`;
-  document.body.appendChild(overlay);
-  document.body.appendChild(modal);
+    </div>
+  </div>`;
+  document.body.appendChild(bg);
 
-  const cleanup = () => { overlay.remove(); modal.remove(); };
+  const cleanup = () => { bg.remove(); };
   document.getElementById('_swrPickerClose').onclick = cleanup;
-  overlay.onclick = cleanup;
+  bg.onclick = e => { if (e.target === bg) cleanup(); };
   modal.querySelectorAll('.friend-card[data-uid]').forEach(el => {
     el.onclick = () => { cleanup(); openSendWrk(+el.dataset.uid, el.dataset.name); };
   });
@@ -2567,16 +2565,13 @@ async function openTradeWithPicker() {
   ]);
   const onlineSet = new Set(onlineData.online);
 
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.style.cssText = 'display:block;z-index:1100';
-  const modal = document.createElement('div');
-  modal.className = 'modal';
-  modal.style.cssText = 'display:block;z-index:1101';
-  modal.innerHTML = `
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.style.cssText = 'display:flex;z-index:1100';
+  bg.innerHTML = `<div class="modal" style="max-height:80vh;display:flex;flex-direction:column">
     <div class="modal-header"><span class="modal-title">Trade With</span>
       <button class="modal-close" id="_tradePickerClose">✕</button></div>
-    <div class="modal-body">
+    <div class="modal-body" style="overflow-y:auto">
       ${friendData.friends.length ? `<p style="font-weight:700;margin-bottom:8px">Friends</p>
         ${friendData.friends.map(f => {
           const isOnline = onlineSet.has(f.other_user_id);
@@ -2588,14 +2583,14 @@ async function openTradeWithPicker() {
       <p style="font-weight:700;margin:12px 0 8px">Search</p>
       <input id="_tradePSearch" class="input" placeholder="@username" oninput="_tradePSearch_fn(this.value)">
       <div id="_tradePResults"></div>
-    </div>`;
-  document.body.appendChild(overlay);
-  document.body.appendChild(modal);
+    </div>
+  </div>`;
+  document.body.appendChild(bg);
 
-  const cleanup = () => { overlay.remove(); modal.remove(); };
+  const cleanup = () => { bg.remove(); };
   document.getElementById('_tradePickerClose').onclick = cleanup;
-  overlay.onclick = cleanup;
-  modal.querySelectorAll('.friend-card[data-uid]').forEach(el => {
+  bg.onclick = e => { if (e.target === bg) cleanup(); };
+  bg.querySelectorAll('.friend-card[data-uid]').forEach(el => {
     el.onclick = () => { cleanup(); openTradeModal(+el.dataset.uid); };
   });
 
@@ -2605,10 +2600,11 @@ async function openTradeWithPicker() {
     const el = document.getElementById('_tradePResults');
     if (!el) return;
     if (!res) { el.innerHTML = '<p style="color:var(--muted)">Not found</p>'; return; }
-    el.innerHTML = `<div class="friend-card" style="cursor:pointer" onclick="(function(){cleanup();openTradeModal(${res.user_id});})()">
+    el.innerHTML = `<div class="friend-card" style="cursor:pointer" onclick="(function(){if(window._tradePickerCleanup)window._tradePickerCleanup();openTradeModal(${res.user_id});})()">
       <div class="friend-card-name">${esc(res.username ? '@'+res.username : res.full_name || 'User '+res.user_id)}</div>
     </div>`;
   };
+  window._tradePickerCleanup = cleanup;
 }
 
 function openTradeModal(targetUserId) {
@@ -4989,6 +4985,8 @@ let _duckSelected = -1;
 let _duckLastPhase = null;
 let _duckMyBet = 0;
 let _duckMyDuck = -1;
+let _duckPositions = [5, 5, 5, 5];
+let _duckRaceInterval = null;
 
 function openDuck() {
   if (!state.userId) return alert('Open in Telegram to play.');
@@ -5033,16 +5031,39 @@ function _updateDuckDisplay(msg) {
   // Track
   const track = document.getElementById('duckTrack');
   if (track && msg.ducks) {
-    track.innerHTML = msg.ducks.map((d, i) => {
-      const isWinner = msg.phase === 'finished' && msg.winner_idx === i;
-      const isSelected = _duckSelected === i || _duckMyDuck === i;
-      const progress = msg.phase === 'racing' ? Math.random() * 60 + 20 : (isWinner && msg.phase === 'finished' ? 85 : 5);
-      return `<div class="duck-lane${isSelected ? ' selected' : ''}${isWinner ? ' winner' : ''}" onclick="_selectDuck(${i})">
-        <span class="duck-runner" style="margin-left:${progress}%">${esc(d.emoji)}</span>
-        <span class="duck-name">${esc(d.name)}</span>
-        <span class="duck-mult ${_multClass(d.mult)}">${d.mult}×</span>
-      </div>`;
-    }).join('');
+    if (msg.phase === 'racing') {
+      if (phaseChanged) {
+        _duckPositions = [5, 5, 5, 5];
+        track.innerHTML = msg.ducks.map((d, i) => {
+          const isSelected = _duckSelected === i || _duckMyDuck === i;
+          return `<div class="duck-lane${isSelected ? ' selected' : ''}" id="duck-lane-${i}">
+            <span class="duck-runner" id="duck-runner-${i}" style="margin-left:5%;transition:margin-left 0.35s ease">${esc(d.emoji)}</span>
+            <span class="duck-mult ${_multClass(d.mult)}">${d.mult}×</span>
+          </div>`;
+        }).join('');
+        if (_duckRaceInterval) clearInterval(_duckRaceInterval);
+        _duckRaceInterval = setInterval(() => {
+          (_duckLastState?.ducks || []).forEach((_, i) => {
+            _duckPositions[i] = Math.min(_duckPositions[i] + Math.random() * 9 + 2, 78);
+            const el = document.getElementById(`duck-runner-${i}`);
+            if (el) el.style.marginLeft = _duckPositions[i] + '%';
+          });
+        }, 350);
+      }
+    } else {
+      if (_duckRaceInterval) { clearInterval(_duckRaceInterval); _duckRaceInterval = null; }
+      if (msg.phase === 'waiting' && phaseChanged) _duckPositions = [5, 5, 5, 5];
+      track.innerHTML = msg.ducks.map((d, i) => {
+        const isWinner = msg.phase === 'finished' && msg.winner_idx === i;
+        const isSelected = _duckSelected === i || _duckMyDuck === i;
+        const pos = msg.phase === 'finished' ? (isWinner ? 85 : Math.min(_duckPositions[i], 62)) : 5;
+        return `<div class="duck-lane${isSelected ? ' selected' : ''}${isWinner ? ' winner' : ''}" id="duck-lane-${i}" onclick="_selectDuck(${i})">
+          <span class="duck-runner" id="duck-runner-${i}" style="margin-left:${pos}%;transition:margin-left 0.5s ease">${esc(d.emoji)}</span>
+          <span class="duck-name">${esc(d.name)}</span>
+          <span class="duck-mult ${_multClass(d.mult)}">${d.mult}×</span>
+        </div>`;
+      }).join('');
+    }
   }
 
   // Phase text
@@ -5821,6 +5842,41 @@ function navigateToGame(game) {
   showPage('games', document.querySelector('[data-page="games"]'));
   setGameTab('live');
   setTimeout(() => openers[game]?.(), 200);
+}
+
+// ── Game card timers ─────────────────────────────────────────────────────────
+const _GTIMER_DEFAULT = { crash: 'Cash out before it crashes', duck: 'Pick your duck, ride the odds', marbles: 'Bet your space, win the pot', livebj: 'Up to 6 players vs the dealer' };
+let _gtimerInterval = null;
+
+async function _pollGameTimers() {
+  try {
+    const d = await api('/api/game-timers');
+    for (const [key, info] of Object.entries(d)) {
+      const el = document.getElementById(`gtimer-${key}`);
+      if (!el) continue;
+      if (info.phase === 'waiting' && info.countdown > 0) {
+        el.textContent = `Betting open — ${Math.ceil(info.countdown)}s`;
+      } else if (info.phase === 'waiting') {
+        el.textContent = 'Starting…';
+      } else {
+        el.textContent = _GTIMER_DEFAULT[key] || '';
+      }
+    }
+  } catch {}
+}
+
+function _startGameTimers() {
+  if (_gtimerInterval) return;
+  _pollGameTimers();
+  _gtimerInterval = setInterval(_pollGameTimers, 1500);
+}
+
+function _stopGameTimers() {
+  if (_gtimerInterval) { clearInterval(_gtimerInterval); _gtimerInterval = null; }
+  for (const [key, txt] of Object.entries(_GTIMER_DEFAULT)) {
+    const el = document.getElementById(`gtimer-${key}`);
+    if (el) el.textContent = txt;
+  }
 }
 </script>
 
