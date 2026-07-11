@@ -2971,7 +2971,7 @@ async def _poker_send(uid: int, msg: dict):
 def _poker_snapshot(for_uid: int | None = None) -> dict:
     seats_out = []
     for i, s in enumerate(_poker.seats):
-        sc = {k: v for k, v in s.items() if k != "hole_cards"}
+        sc = {k: v for k, v in s.items() if k not in ("hole_cards", "_acted", "_raised")}
         sc["hole_cards"] = s["hole_cards"] if (s["user_id"] == for_uid or _poker.phase == "showdown") else ["🂠","🂠"]
         sc["is_turn"] = (i == _poker.current_seat and _poker.phase in ("pre_flop","flop","turn","river"))
         seats_out.append(sc)
