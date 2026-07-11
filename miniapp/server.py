@@ -789,6 +789,44 @@ def play_slider(req: SliderRequest):
         }
 
 
+# ── Plinko ────────────────────────────────────────────────────────────────────
+
+_PLINKO_ROWS = 8
+_PLINKO_MULTS = {
+    "low":    [0.3, 0.5, 0.8, 1.0, 1.4, 1.0, 0.8, 0.5, 0.3],
+    "medium": [0.2, 0.4, 0.6, 1.5, 3.0, 1.5, 0.6, 0.4, 0.2],
+    "high":   [0.1, 0.2, 0.5, 2.0, 10.0, 2.0, 0.5, 0.2, 0.1],
+}
+
+
+class PlinkoRequest(BaseModel):
+    user_id: int
+    bet: int
+    risk: str  # low | medium | high
+
+
+@app.post("/api/play/plinko")
+def play_plinko(req: PlinkoRequest):
+    if req.risk not in _PLINKO_MULTS:
+        raise HTTPException(400, "risk must be low, medium, or high")
+    with db_conn() as db:
+        bal = _deduct_and_check(db, req.user_id, req.bet)
+        path = [random.choice([False, True]) for _ in range(_PLINKO_ROWS)]
+        slot = sum(1 for p in path if p)   # 0 = all-left, 8 = all-right
+        mult = _PLINKO_MULTS[req.risk][slot]
+        delta = int(req.bet * mult) - req.bet
+        new_bal = bal + delta
+        db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+        db.commit()
+        return {
+            "path": path,
+            "slot": slot,
+            "multiplier": mult,
+            "delta": delta,
+            "new_balance": new_bal,
+        }
+
+
 # ── High-Low ──────────────────────────────────────────────────────────────────
 
 class HighLowStartRequest(BaseModel):
