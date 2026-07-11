@@ -2276,6 +2276,7 @@ async function spinRoulette() {
   const bet = parseInt(document.getElementById('rouletteBet').value);
   const errEl = document.getElementById('rouletteErr');
   errEl.textContent = '';
+  document.getElementById('rouletteModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('rouletteSpinBtn').disabled = true;
   document.getElementById('rouletteResult').className = 'result-box';
   _rlStartSpin(); // RAF spin — angle tracked in _rlAngle, no CSS animation needed
@@ -2755,6 +2756,7 @@ async function spinSlots() {
   const bet = parseInt(document.getElementById('slotBet').value);
   const errEl = document.getElementById('slotsErr');
   errEl.textContent = '';
+  document.getElementById('slotsModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('slotsResult').className = 'result-box';
   slotsSpinning = true;
   document.getElementById('spinBtn').disabled = true;
@@ -2843,6 +2845,7 @@ async function flipCoin() {
   const bet = parseInt(document.getElementById('cfBet').value);
   const errEl = document.getElementById('cfErr');
   errEl.textContent = '';
+  document.getElementById('cfModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('cfFlipBtn').disabled = true;
   document.getElementById('cfResult').className = 'result-box';
 
@@ -2957,6 +2960,7 @@ async function playSlider() {
   const errEl = document.getElementById('sliderErr');
   errEl.textContent = '';
   if (!bet || bet < 10) { errEl.textContent = 'Minimum bet is 10 WRK$'; return; }
+  document.getElementById('sliderModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('sliderPlayBtn').disabled = true;
   document.getElementById('sliderBarWrap').style.pointerEvents = 'none';
   document.getElementById('sliderResult').className = 'result-box';
@@ -3088,6 +3092,7 @@ async function playPlinko() {
   const bet = parseInt(document.getElementById('plinkoBet').value);
   const errEl = document.getElementById('plinkoErr');
   errEl.textContent = '';
+  document.getElementById('plinkoModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('plinkoPlayBtn').disabled = true;
   document.getElementById('plinkoResult').className = 'result-box';
   _buildPlinkoBoard();
@@ -3187,6 +3192,7 @@ async function spinWheel() {
   const bet = parseInt(document.getElementById('wheelBet').value);
   const errEl = document.getElementById('wheelErr');
   errEl.textContent = '';
+  document.getElementById('wheelModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('wheelSpinBtn').disabled = true;
   document.getElementById('wheelResult').className = 'result-box';
 
@@ -3275,6 +3281,7 @@ async function _animateCaseReel() {
 async function playCase() {
   const errEl = document.getElementById('caseErr');
   errEl.textContent = '';
+  document.getElementById('caseModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('caseOpenBtn').disabled = true;
   document.getElementById('caseResult').className = 'result-box';
   _buildCaseReel(null, null, null, null);
