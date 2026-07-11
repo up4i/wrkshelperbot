@@ -2273,6 +2273,16 @@ async def _startup():
                 db.commit()
             except Exception:
                 pass
+        # gift_offers new columns for two-sided trades
+        for col in (
+            "request_gift_id INTEGER",
+            "request_wrk INTEGER NOT NULL DEFAULT 0",
+        ):
+            try:
+                db.execute(f"ALTER TABLE gift_offers ADD COLUMN {col}")
+                db.commit()
+            except Exception:
+                pass
 
 
 @app.websocket("/ws/crash")
