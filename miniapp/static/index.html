@@ -723,6 +723,8 @@
     display: block; margin: 0 auto 4px;
     border-radius: 6px;
   }
+  .gift-emoji-container { display: flex; justify-content: center; margin-bottom: 4px; }
+  .gift-emoji-container svg { width: 50px; height: 50px; }
   .market-search {
     width: 100%;
     background: var(--card2);
@@ -2196,6 +2198,7 @@ async function loadOwnProfile() {
     const d = await api(`/api/profile/${state.userId}`);
     el.innerHTML = buildProfileHtml(d, true);
     _setupGiftsObserver(el.querySelector('#giftsGrid'));
+    initAnimatedGiftsInGrid(el.querySelector('#giftsGrid'));
   } catch(e) {
     el.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
   }
@@ -2214,6 +2217,7 @@ async function loadProfile() {
     content.innerHTML = buildProfileHtml(d, false);
     content.style.display = 'flex';
     _setupGiftsObserver(content.querySelector('#giftsGrid'));
+    initAnimatedGiftsInGrid(content.querySelector('#giftsGrid'));
   } catch(e) {
     errEl.textContent = e.message;
   }
@@ -2403,15 +2407,18 @@ function _pinnedBadgeHtml(pg) {
 
 function _buildGiftCardHtml(g, isOwn, pinnedGiftId) {
   const tierColor = { common:'', uncommon:'', rare:'rare', epic:'epic', legendary:'legendary' };
-  const gemHtml = g.custom_emoji_id
+  const hasAnim = !!g.custom_emoji_id;
+  const innerEmoji = g.custom_emoji_id
     ? `<img class="gift-emoji-img" src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<div class=\\'gem\\'>🎁</div>'">`
     : `<div class="gem">${g.model_emoji || '🎁'}</div>`;
+  const gemHtml = `<div class="gift-emoji-container">${innerEmoji}</div>`;
   const isPinned = pinnedGiftId === g.id;
   const ownCls = isOwn ? ' own-gift' : '';
   const pinnedCls = isPinned ? ' pinned-gift' : '';
   const bgColor = (g.background && BG_HEX[g.background]) || 'var(--card2)';
+  const animAttrs = hasAnim ? ` data-has-anim="true" data-emoji-id="${g.custom_emoji_id}"` : '';
   return `
-        <div class="gift-card${ownCls}${pinnedCls}" style="cursor:pointer;background:${bgColor}" onclick="openProfileGiftModal(${g.id})">
+        <div class="gift-card${ownCls}${pinnedCls}"${animAttrs} style="cursor:pointer;background:${bgColor}" onclick="openProfileGiftModal(${g.id})">
           ${gemHtml}
           <div class="gname">${esc(g.model_name)}</div>
           <div class="gtier ${tierColor[g.tier]||''}">${g.tier} #${g.gift_number||g.id}</div>
@@ -2589,6 +2596,8 @@ function _setupGiftsObserver(gridEl) {
       d.gifts.forEach(g => {
         if (window._profileGifts) window._profileGifts[g.id] = g;
         capturedGrid.insertAdjacentHTML('beforeend', _buildGiftCardHtml(g, isOwn, pinnedId));
+        const newCard = capturedGrid.lastElementChild;
+        if (newCard && newCard.dataset.hasAnim) initAnimatedGift(newCard, newCard.dataset.emojiId);
       });
       localOffset += d.gifts.length;
       _giftsOffset = localOffset;
@@ -2607,6 +2616,32 @@ function _setupGiftsObserver(gridEl) {
     }
   }, { threshold: 0.1 });
   _giftsObserver.observe(sentinel);
+}
+
+const _lottieInstances = new Map();
+
+function initAnimatedGift(cardEl, emojiId) {
+  if (!emojiId || !window.lottie) return;
+  const container = cardEl.querySelector('.gift-emoji-container');
+  if (!container) return;
+  fetch(`/emoji-anim/${emojiId}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(animData => {
+      if (!animData) return;
+      container.innerHTML = '';
+      const inst = lottie.loadAnimation({ container, renderer: 'svg', loop: false, autoplay: false, animationData: animData });
+      _lottieInstances.set(cardEl, inst);
+      cardEl.addEventListener('mouseenter', () => inst.goToAndPlay(0, true));
+      cardEl.addEventListener('mouseleave', () => { inst.stop(); inst.goToAndStop(0, true); });
+    })
+    .catch(() => {});
+}
+
+function initAnimatedGiftsInGrid(gridEl) {
+  if (!gridEl) return;
+  gridEl.querySelectorAll('.gift-card[data-has-anim="true"]').forEach(cardEl => {
+    if (!_lottieInstances.has(cardEl)) initAnimatedGift(cardEl, cardEl.dataset.emojiId);
+  });
 }
 
 function showPinSheet(instanceId, isCurrentlyPinned) {
