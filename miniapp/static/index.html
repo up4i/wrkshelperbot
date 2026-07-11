@@ -3002,6 +3002,8 @@ async function spinSlots() {
     const deltaStr = data.delta > 0 ? `+${fmt(data.delta)} WRK$` : data.delta < 0 ? `${fmt(data.delta)} WRK$` : '';
     resEl.textContent = deltaStr ? `${labels[data.result]} — ${deltaStr}` : labels[data.result];
     resEl.className = `result-box show ${isWin ? 'win-box' : isPush ? '' : 'lose-box'}`;
+    const _existingSlotsAgain = resEl.nextElementSibling;
+    if (_existingSlotsAgain && _existingSlotsAgain.classList.contains('btn')) _existingSlotsAgain.remove();
     resEl.insertAdjacentHTML('afterend',
       `<button class="btn outline" style="width:100%;margin-top:8px" onclick="slotsPlayAgain(${bet})">⚡ Spin Again</button>`);
 
