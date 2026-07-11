@@ -4052,7 +4052,7 @@ function _updateCrashPlayers(players) {
     const status = p.cashed_out ? `✅ ${p.mult?.toFixed(2)}×` : (p.mult ? `💀` : '🟡');
     return `<div class="crash-player-row">
       <div class="crash-player-dot ${dotCls}${lostCls}"></div>
-      <span class="crash-player-name">${p.name}</span>
+      <span class="crash-player-name">${esc(p.name)}</span>
       <span class="crash-player-bet">${fmt(p.bet)}</span>
       <span class="crash-player-status">${status}</span>
     </div>`;
