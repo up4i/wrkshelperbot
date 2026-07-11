@@ -5082,8 +5082,11 @@ function _updateDuckDisplay(msg) {
         }).join('');
         if (_duckRaceInterval) clearInterval(_duckRaceInterval);
         _duckRaceInterval = setInterval(() => {
+          const winIdx = _duckLastState?.winner_idx ?? -1;
           (_duckLastState?.ducks || []).forEach((_, i) => {
-            _duckPositions[i] = Math.min(_duckPositions[i] + Math.random() * 9 + 2, 78);
+            const isWinner = i === winIdx;
+            const step = isWinner ? Math.random() * 8 + 6 : Math.random() * 6 + 1;
+            _duckPositions[i] = Math.min(_duckPositions[i] + step, isWinner ? 82 : 72);
             const el = document.getElementById(`duck-runner-${i}`);
             if (el) el.style.marginLeft = _duckPositions[i] + '%';
           });
