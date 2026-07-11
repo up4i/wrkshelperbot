@@ -1336,6 +1336,7 @@
       </div>
       <div class="tab-row" id="lbTabRow">
         <div class="tab-btn active" onclick="setLbTab('balance',this)">💰 Balance</div>
+        <div class="tab-btn" onclick="setLbTab('networth',this)">💎 Net Worth</div>
         <div class="tab-btn" onclick="setLbTab('streak',this)">🔥 Streak</div>
         <div class="tab-btn" onclick="setLbTab('gifts',this)">🎁 Gifts</div>
         <div class="tab-btn" onclick="setLbTab('gamble_won',this)">🤑 Gamble Won</div>
@@ -2063,6 +2064,7 @@ const LB_META = {
   blackjack:   { fmt: v => `+${fmtK(v)} WRK$`,  color: 'gold',   sub: () => '' },
   crash:       { fmt: v => `+${fmtK(v)} WRK$`,  color: 'gold',   sub: () => '' },
   crash_mult:  { fmt: v => `${Number(v).toFixed(2)}×`, color: 'purple', sub: () => '' },
+  networth:    { fmt: v => `${fmtK(v)} WRK$`,         color: 'gold',   sub: () => '' },
 };
 
 async function loadLeaderboard(tab) {
@@ -2430,12 +2432,14 @@ function buildProfileHtml(d, isOwn) {
         <span class="rank-pill">💰 #${d.balance_rank} Balance</span>
         <span class="rank-pill">🔥 #${d.streak_rank} Streak</span>
         <span class="rank-pill">🎁 #${d.gift_rank} Gifts</span>
+        ${d.networth_rank !== undefined ? `<span class="rank-pill">💎 #${d.networth_rank} Net Worth</span>` : ''}
       </div>
       <div class="profile-stats">
         <div class="pstat"><div class="v gold">${fmtK(d.balance)}</div><div class="l">WRK$</div></div>
         <div class="pstat"><div class="v green">${d.streak}</div><div class="l">day streak</div></div>
         <div class="pstat"><div class="v purple">${d.gift_count}</div><div class="l">gifts</div></div>
       </div>
+      ${d.net_worth !== undefined ? `<div id="profileNetWorth" style="font-size:13px;color:var(--muted);margin-top:2px">💎 Net Worth: ${fmtK(d.net_worth)} WRK$</div>` : ''}
       ${!isOwn && state.userId ? `<button class="btn" style="margin-top:10px;width:100%" onclick="openTradeModal(${d.user_id})">🔄 Trade</button>` : ''}
     </div>
     <div>

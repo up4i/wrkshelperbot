@@ -642,6 +642,31 @@ async def get_profile(db_path: str, user_id: int) -> dict | None:
         else:
             d["total_won"] = d["total_lost"] = d["best_mult"] = 0
 
+        async with db.execute(
+            """SELECT COALESCE(SUM(gp.current_price), 0) AS gift_value
+               FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+               WHERE gi.owner_id = ?""",
+            (user_id,)
+        ) as cur:
+            row2 = await cur.fetchone()
+            d["gift_value"] = row2[0] if row2 else 0
+        d["net_worth"] = d["balance"] + d["gift_value"]
+
+        async with db.execute(
+            """SELECT COUNT(*)+1 FROM (
+                   SELECT e.user_id, e.balance + COALESCE(SUM(gp.current_price),0) AS nw
+                   FROM economy e
+                   LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id
+                   LEFT JOIN gift_models gm ON gm.id = gi.model_id
+                   LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+                   GROUP BY e.user_id
+               ) WHERE nw > ?""",
+            (d["net_worth"],)
+        ) as cur:
+            d["networth_rank"] = (await cur.fetchone())[0]
+
         return d
 
 

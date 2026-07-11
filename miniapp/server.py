@@ -106,6 +106,22 @@ def leaderboard(tab: str = "balance", limit: int = 20):
             return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
                      "value": r["gift_count"], "balance": r["balance"]} for i, r in enumerate(rows)]
 
+        if tab == "networth":
+            rows = db.execute(
+                f"""SELECT e.user_id,
+                           e.username AS e_username, e.full_name AS e_full_name,
+                           a.username AS a_username, a.full_name AS a_full_name,
+                           e.balance + COALESCE(SUM(gp.current_price), 0) AS value
+                    FROM economy e
+                    LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id
+                    LEFT JOIN gift_models gm ON gm.id = gi.model_id
+                    LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+                    {_name_subquery}
+                    GROUP BY e.user_id ORDER BY value DESC LIMIT ?""", (limit,)
+            ).fetchall()
+            return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
+                     "value": r["value"]} for i, r in enumerate(rows)]
+
         # ── Game stat tabs ────────────────────────────────────────────────────
         _gs_col = {
             "gamble_won":  (
@@ -203,6 +219,27 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         ).fetchone()
         pinned_gift = dict(pg) if pg else None
 
+    gift_value = db.execute(
+        """SELECT COALESCE(SUM(gp.current_price), 0)
+           FROM gift_instances gi
+           JOIN gift_models gm ON gm.id = gi.model_id
+           JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+           WHERE gi.owner_id = ?""",
+        (user_id,)
+    ).fetchone()[0]
+    net_worth = row["balance"] + gift_value
+    networth_rank = db.execute(
+        """SELECT COUNT(*)+1 FROM (
+               SELECT e.user_id, e.balance + COALESCE(SUM(gp.current_price),0) AS nw
+               FROM economy e
+               LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id
+               LEFT JOIN gift_models gm ON gm.id = gi.model_id
+               LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+               GROUP BY e.user_id
+           ) WHERE nw > ?""",
+        (net_worth,)
+    ).fetchone()[0]
+
     return {
         "user_id": row["user_id"],
         "name": display,
@@ -214,6 +251,9 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         "streak_rank": streak_rank,
         "gift_count": gift_count,
         "gift_rank": gift_rank,
+        "gift_value": gift_value,
+        "net_worth": net_worth,
+        "networth_rank": networth_rank,
         "gifts": [dict(g) for g in gifts],
         "pinned_gift": pinned_gift,
         "pinned_gift_id": row["pinned_gift_id"],
