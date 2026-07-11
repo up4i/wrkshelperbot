@@ -2011,7 +2011,8 @@ let _sortableCancelHandler = null;
 let rouletteColor = null;
 
 // American roulette wheel segment colors (0, 28, 9, 26, 30, 11, ... order)
-const _RL_COLORS = ['G','R','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','G','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B'];
+const _RL_COLORS = ['G','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','G','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B'];
+const _RL_NUMS   = [0,28,9,26,30,11,7,20,32,17,5,22,34,15,3,24,36,13,1,'00',27,10,25,29,12,8,19,31,18,6,21,33,16,4,23,35,14,2];
 const _RL_N = 38;
 let _rlBuilt = false;
 
@@ -2028,6 +2029,16 @@ function _buildRouletteWheel() {
     const x1 = cx + R * Math.cos(a0), y1 = cy + R * Math.sin(a0);
     const x2 = cx + R * Math.cos(a1), y2 = cy + R * Math.sin(a1);
     paths += `<path d="M${cx},${cy} L${x1.toFixed(2)},${y1.toFixed(2)} A${R},${R} 0 0,1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${cmap[_RL_COLORS[i]]}" stroke="#09090f" stroke-width="0.7"/>`;
+  }
+  const mid_r = 60;
+  for (let i = 0; i < _RL_N; i++) {
+    const midAngle = ((i + 0.5) * deg - 90) * Math.PI / 180;
+    const midAngleDeg = (i + 0.5) * deg - 90;
+    const tx = cx + mid_r * Math.cos(midAngle);
+    const ty = cy + mid_r * Math.sin(midAngle);
+    const n = _RL_NUMS[i];
+    const fs = String(n).length > 1 ? 4 : 5;
+    paths += `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" font-size="${fs}" fill="white" text-anchor="middle" dominant-baseline="middle" font-weight="700" transform="rotate(${(midAngleDeg + 90).toFixed(1)},${tx.toFixed(1)},${ty.toFixed(1)})">${n}</text>`;
   }
   document.getElementById('rouletteWheelSvg').innerHTML =
     `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
