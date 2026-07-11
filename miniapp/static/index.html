@@ -2443,6 +2443,13 @@ function buildProfileHtml(d, isOwn) {
       </div>
       ${d.net_worth !== undefined ? `<div id="profileNetWorth" style="font-size:13px;color:var(--muted);margin-top:2px">💎 Net Worth: ${fmtK(d.net_worth)} WRK$</div>` : ''}
       ${d.tags && d.tags.length > 0 ? `<div class="profile-tags">${d.tags.map(t => `<span class="profile-tag">${t}</span>`).join('')}</div>` : ''}
+      <div id="profileStatHighlight" style="margin-top:10px;text-align:center">
+        <div id="profileStatLabel" style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">${d.stat_highlight_label || ''}</div>
+        <div id="profileStatValue" style="font-size:20px;font-weight:800;margin-top:2px">${d.stat_highlight_value || '—'}</div>
+      </div>
+      ${isOwn ? `<select id="pinnedStatPicker" style="margin-top:6px;background:var(--card);color:#fff;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 10px;font-size:12px" onchange="setPinnedStat(this.value)">
+        ${[['crash_mult','Best Crash Mult'],['gamble_won','Total WRK$ Won'],['gamble_lost','Total WRK$ Lost'],['gifts_owned','Gifts Owned'],['streak','Day Streak']].map(([v,l]) => `<option value="${v}"${d.pinned_stat===v?' selected':''}>${l}</option>`).join('')}
+      </select>` : ''}
       ${!isOwn && state.userId ? `<button class="btn" style="margin-top:10px;width:100%" onclick="openTradeModal(${d.user_id})">🔄 Trade</button>` : ''}
     </div>
     <div>
@@ -2512,6 +2519,11 @@ function toggleReorderMode() {
     }
   };
   document.addEventListener('touchcancel', _sortableCancelHandler);
+}
+
+async function setPinnedStat(val) {
+  await api('/api/profile/stat', { method: 'PATCH', json: { user_id: +state.userId, pinned_stat: val } });
+  loadOwnProfile();
 }
 
 async function _saveGiftOrder() {

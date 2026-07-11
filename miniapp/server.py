@@ -297,6 +297,39 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         if len(tags) >= 3:
             break
 
+    # Pinned stat highlight
+    row_ps = db.execute("SELECT pinned_stat FROM economy WHERE user_id=?", (user_id,)).fetchone()
+    pinned_stat = row_ps["pinned_stat"] if row_ps and row_ps["pinned_stat"] else "crash_mult"
+    d: dict = {}
+    d["pinned_stat"] = pinned_stat
+
+    gs = db.execute("SELECT * FROM game_stats WHERE user_id=?", (user_id,)).fetchone()
+    if pinned_stat == "crash_mult":
+        d["stat_highlight_label"] = "Best crash mult"
+        d["stat_highlight_value"] = f"{gs['crash_best_mult']:.2f}×" if gs and gs["crash_best_mult"] else "—"
+    elif pinned_stat == "gamble_won":
+        total = 0
+        if gs:
+            won_cols = [c for c in gs.keys() if c.endswith("_won") and c != "crash_best_mult"]
+            total = sum(gs[c] for c in won_cols)
+        d["stat_highlight_label"] = "Total WRK$ won"
+        d["stat_highlight_value"] = f"{total:,} WRK$"
+    elif pinned_stat == "gamble_lost":
+        total = 0
+        if gs:
+            lost_cols = [c for c in gs.keys() if c.endswith("_lost")]
+            total = sum(gs[c] for c in lost_cols)
+        d["stat_highlight_label"] = "Total WRK$ lost"
+        d["stat_highlight_value"] = f"{total:,} WRK$"
+    elif pinned_stat == "gifts_owned":
+        cnt = db.execute("SELECT COUNT(*) FROM gift_instances WHERE owner_id=?", (user_id,)).fetchone()[0]
+        d["stat_highlight_label"] = "Gifts owned"
+        d["stat_highlight_value"] = str(cnt)
+    elif pinned_stat == "streak":
+        streak_row = db.execute("SELECT streak FROM economy WHERE user_id=?", (user_id,)).fetchone()
+        d["stat_highlight_label"] = "Day streak"
+        d["stat_highlight_value"] = f"{streak_row['streak']} days" if streak_row else "—"
+
     return {
         "user_id": row["user_id"],
         "name": display,
@@ -316,6 +349,7 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         "pinned_gift_id": row["pinned_gift_id"],
         "has_more": len(gifts) == gifts_limit and (gifts_offset + gifts_limit) < gift_count,
         "tags": tags[:3],
+        **d,
     }
 
 
@@ -368,6 +402,24 @@ def pin_gift(req: PinGiftRequest):
             "UPDATE economy SET pinned_gift_id = ? WHERE user_id = ?",
             (req.gift_id, req.user_id),
         )
+        db.commit()
+    return {"ok": True}
+
+
+_VALID_PINNED_STATS = {"crash_mult", "gamble_won", "gamble_lost", "gifts_owned", "streak"}
+
+
+class PinnedStatRequest(BaseModel):
+    user_id: int
+    pinned_stat: str
+
+
+@app.patch("/api/profile/stat")
+def update_pinned_stat(req: PinnedStatRequest):
+    if req.pinned_stat not in _VALID_PINNED_STATS:
+        raise HTTPException(400, f"pinned_stat must be one of: {', '.join(_VALID_PINNED_STATS)}")
+    with db_conn() as db:
+        db.execute("UPDATE economy SET pinned_stat=? WHERE user_id=?", (req.pinned_stat, req.user_id))
         db.commit()
     return {"ok": True}
 
@@ -2547,6 +2599,11 @@ async def _startup():
                 db.commit()
             except Exception:
                 pass
+        try:
+            db.execute("ALTER TABLE economy ADD COLUMN pinned_stat TEXT NOT NULL DEFAULT 'crash_mult'")
+            db.commit()
+        except Exception:
+            pass
 
 
 @app.websocket("/ws/crash")
