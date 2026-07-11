@@ -827,6 +827,35 @@ def play_plinko(req: PlinkoRequest):
         }
 
 
+# ── Wheel of Fortune ──────────────────────────────────────────────────────────
+
+# 12 segments: 7 bankrupt, 3×1.5, 1×2.0, 1×5.0 → ~95.8% RTP
+_WHEEL_SEGS = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.5, 1.5, 1.5, 2.0, 5.0]
+
+
+class WheelRequest(BaseModel):
+    user_id: int
+    bet: int
+
+
+@app.post("/api/play/wheel")
+def play_wheel(req: WheelRequest):
+    with db_conn() as db:
+        bal = _deduct_and_check(db, req.user_id, req.bet)
+        segment = random.randint(0, 11)
+        mult = _WHEEL_SEGS[segment]
+        delta = int(req.bet * mult) - req.bet
+        new_bal = bal + delta
+        db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+        db.commit()
+        return {
+            "segment": segment,
+            "multiplier": mult,
+            "delta": delta,
+            "new_balance": new_bal,
+        }
+
+
 # ── High-Low ──────────────────────────────────────────────────────────────────
 
 class HighLowStartRequest(BaseModel):
