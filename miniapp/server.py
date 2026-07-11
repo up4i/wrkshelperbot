@@ -2538,6 +2538,12 @@ async def _marble_loop():
                 db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (_marble.pot_wrk, winner_id))
                 for gid in _marble.pot_gifts:
                     db.execute("UPDATE gift_instances SET owner_id = ?, staked = 0 WHERE id = ?", (winner_id, gid))
+                # Record stats
+                for uid, b in _marble.bets.items():
+                    if uid == winner_id:
+                        _record_stats(db, uid, marbles_won=_marble.pot_wrk)  # approximate, WRK only
+                    else:
+                        _record_stats(db, uid, marbles_lost=b["wrk"])
                 db.commit()
             await _marble_broadcast({"type": "state", **_marble_snapshot()})
             await asyncio.sleep(_MARBLE_FINISHED_SECS)
@@ -2846,19 +2852,26 @@ async def livebj_ws(ws: WebSocket):
                     await ws.send_json({"type": "error", "message": "Not your turn"})
                     continue
                 action = data["type"]
-                if action in ("hit", "double"):
+                if action == "double":
+                    # Check balance before doubling
+                    with db_conn() as db:
+                        row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()
+                        if not row or row["balance"] < seat["bet"]:
+                            await ws.send_json({"type": "error", "message": "Insufficient balance to double"})
+                            continue
+                        db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (seat["bet"], uid))
+                        db.commit()
+                    seat["bet"] *= 2
+                    seat["doubled"] = True
                     seat["hand"].append(_livebj.deck.pop())
-                    if action == "double":
-                        # Deduct extra bet
-                        with db_conn() as db:
-                            db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (seat["bet"], uid))
-                            db.commit()
-                        seat["bet"] *= 2
-                        seat["doubled"] = True
                     if _lbj_hand_value(seat["hand"]) > 21:
                         seat["status"] = "bust"
-                    elif action == "double":
+                    else:
                         seat["status"] = "stood"
+                elif action == "hit":
+                    seat["hand"].append(_livebj.deck.pop())
+                    if _lbj_hand_value(seat["hand"]) > 21:
+                        seat["status"] = "bust"
                 if action == "stand":
                     seat["status"] = "stood"
                 await _livebj_broadcast({"type": "state", **_livebj_snapshot()})
