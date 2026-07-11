@@ -899,6 +899,22 @@
   .lbj-actions { display: flex; gap: 6px; margin-top: 8px; }
   .lbj-actions .btn { flex: 1; padding: 10px 0; font-size: 13px; }
 
+  /* ── Poker ── */
+  .poker-table { width: 100%; background: radial-gradient(ellipse at center, #166534 0%, #14532d 100%); border-radius: 16px; padding: 12px 8px; margin: 8px 0; }
+  .poker-community { display: flex; gap: 4px; justify-content: center; margin-bottom: 10px; min-height: 44px; align-items: center; }
+  .poker-pot { text-align: center; font-size: 12px; color: rgba(255,255,255,.7); margin-bottom: 8px; }
+  .poker-seats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .poker-seat { background: rgba(0,0,0,.25); border-radius: 8px; padding: 6px; text-align: center; border: 1px solid rgba(255,255,255,.1); min-height: 80px; }
+  .poker-seat.active-turn { border-color: #f59e0b; background: rgba(245,158,11,.1); }
+  .poker-seat.mine { border-color: var(--primary); }
+  .poker-seat.folded { opacity: .4; }
+  .poker-seat-name { font-size: 10px; color: rgba(255,255,255,.7); }
+  .poker-seat-chips { font-size: 10px; color: var(--gold); margin: 2px 0; }
+  .poker-seat-bet { font-size: 9px; color: var(--muted); }
+  .poker-actions { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+  .poker-actions .btn { flex: 1; min-width: 60px; padding: 8px 4px; font-size: 12px; }
+  .poker-legend { background: rgba(0,0,0,.2); border-radius: 8px; padding: 10px; font-size: 11px; line-height: 1.9; }
+
   @keyframes bj-flip-reveal {
     from { transform: rotateY(90deg) scaleX(0.5); opacity: 0; }
     to   { transform: rotateY(0deg)  scaleX(1);   opacity: 1; }
@@ -1221,7 +1237,11 @@
             <div class="gname">Live Blackjack</div>
             <div class="gdesc">Up to 6 players vs the dealer</div>
           </div>
-          <!-- Poker card — added in Task 10 -->
+          <div class="game-card" onclick="openPoker()">
+            <div class="gicon">♠️</div>
+            <div class="gname">Hold'Em</div>
+            <div class="gdesc">10,000 WRK$ buy-in poker</div>
+          </div>
         </div>
         <!-- SOLO GAMES -->
         <div class="game-category" id="gcatSolo">
@@ -1789,6 +1809,37 @@
     <div class="result-box" id="lbjResult"></div>
     <div id="lbjBetArea"></div>
     <div class="error-msg" id="lbjErr"></div>
+  </div>
+</div>
+
+<!-- POKER MODAL -->
+<div class="modal-bg" id="pokerModal" onclick="closeModal('pokerModal',event)">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('pokerModal')">✕</button>
+    <div class="modal-title">♠️ Texas Hold'Em
+      <button onclick="togglePokerLegend()" style="float:right;background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px;color:var(--muted);cursor:pointer">?</button>
+    </div>
+    <div id="pokerLegend" style="display:none" class="poker-legend">
+      👑 Royal Flush — A K Q J 10 same suit<br>
+      🌊 Straight Flush — 5 in sequence, same suit<br>
+      4️⃣ Four of a Kind — four same rank<br>
+      🏠 Full House — three of a kind + pair<br>
+      ♠ Flush — any 5 same suit<br>
+      📈 Straight — 5 in sequence<br>
+      3️⃣ Three of a Kind — three same rank<br>
+      2️⃣ Two Pair — two different pairs<br>
+      1️⃣ One Pair — two same rank<br>
+      🃏 High Card — none of the above
+    </div>
+    <div class="poker-table">
+      <div class="poker-pot" id="pokerPot">Pot: —</div>
+      <div class="poker-community" id="pokerCommunity"></div>
+      <div class="poker-seats" id="pokerSeats"></div>
+    </div>
+    <div class="crash-phase-txt" id="pokerPhase">Connecting…</div>
+    <div class="result-box" id="pokerResult"></div>
+    <div id="pokerActionArea"></div>
+    <div class="error-msg" id="pokerErr"></div>
   </div>
 </div>
 
@@ -4910,6 +4961,159 @@ function _lbjJoin() {
   if (!bet || bet < 10) { document.getElementById('lbjErr').textContent = 'Min 10 WRK$'; return; }
   if (!liveBjWs || liveBjWs.readyState !== 1) return;
   liveBjWs.send(JSON.stringify({ type: 'join', user_id: _lbjMyUid, bet }));
+}
+
+// ── Texas Hold'Em Poker ───────────────────────────────────────────────────────
+let pokerWs = null;
+let _pokerLastPhase = null;
+let _pokerMyUid = null;
+let _pokerSeated = false;
+
+function openPoker() {
+  if (!state.userId) return alert('Open in Telegram to play.');
+  _pokerMyUid = +state.userId;
+  document.getElementById('pokerModal').classList.add('open');
+  _connectPokerWs();
+}
+
+function togglePokerLegend() {
+  const el = document.getElementById('pokerLegend');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function _connectPokerWs() {
+  if (pokerWs && pokerWs.readyState <= 1) return;
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  pokerWs = new WebSocket(`${proto}//${location.host}/ws/poker`);
+  pokerWs.onmessage = e => _handlePokerMsg(JSON.parse(e.data));
+  pokerWs.onclose = () => {
+    setTimeout(() => {
+      if (document.getElementById('pokerModal').classList.contains('open')) _connectPokerWs();
+    }, 2000);
+  };
+}
+
+function _pokerCardHtml(card) {
+  if (card === '🂠') return `<div class="lbj-card back" style="width:28px;height:40px;font-size:11px">🂠</div>`;
+  const suit = card.slice(-1);
+  const red = suit === '♥' || suit === '♦';
+  return `<div class="lbj-card${red?' red':''}" style="width:28px;height:40px;font-size:11px">${esc(card)}</div>`;
+}
+
+function _handlePokerMsg(msg) {
+  if (msg.type === 'state') _updatePokerDisplay(msg);
+  else if (msg.type === 'joined') {
+    _pokerSeated = true;
+    state.balance = msg.new_balance; refreshHeaderBal();
+  } else if (msg.type === 'left') {
+    _pokerSeated = false;
+    const resEl = document.getElementById('pokerResult');
+    resEl.textContent = `Cashed out ${fmt(msg.chips_returned)} WRK$`;
+    resEl.className = 'result-box show win-box';
+  } else if (msg.type === 'error') {
+    const el = document.getElementById('pokerErr');
+    if (el) { el.textContent = msg.message; setTimeout(() => el.textContent = '', 3000); }
+  }
+}
+
+function _updatePokerDisplay(msg) {
+  const phaseChanged = msg.phase !== _pokerLastPhase;
+  _pokerLastPhase = msg.phase;
+
+  // Pot
+  document.getElementById('pokerPot').textContent = `Pot: ${fmt(msg.pot)} chips · Current bet: ${fmt(msg.current_bet)}`;
+
+  // Community cards
+  const comm = document.getElementById('pokerCommunity');
+  if (comm) comm.innerHTML = (msg.community || []).map(_pokerCardHtml).join('') || '<span style="color:rgba(255,255,255,.3);font-size:12px">Waiting for cards…</span>';
+
+  // Seats
+  const seatsEl = document.getElementById('pokerSeats');
+  if (seatsEl) {
+    seatsEl.innerHTML = (msg.seats || []).map(s => {
+      const isMine = s.user_id === _pokerMyUid;
+      const cls = `poker-seat${s.is_turn?' active-turn':''}${isMine?' mine':''}${s.status==='folded'?' folded':''}`;
+      return `<div class="${cls}">
+        <div class="poker-seat-name">${esc(s.name)}</div>
+        <div class="lbj-cards" style="justify-content:center;margin:4px 0">${(s.hole_cards||[]).map(_pokerCardHtml).join('')}</div>
+        <div class="poker-seat-chips">${fmt(s.chips)} chips</div>
+        ${s.current_bet > 0 ? `<div class="poker-seat-bet">bet: ${fmt(s.current_bet)}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  // Phase text
+  const phaseEl = document.getElementById('pokerPhase');
+  if (phaseEl) {
+    const phases = {lobby:'Waiting for players (need 2)…',pre_flop:'Pre-flop',flop:'Flop',turn:'Turn',river:'River',showdown:'Showdown!'};
+    const activeSeat = msg.seats?.[msg.current_seat];
+    const isMyTurn = activeSeat?.user_id === _pokerMyUid;
+    if (activeSeat && msg.phase !== 'lobby' && msg.phase !== 'showdown') {
+      phaseEl.textContent = `${phases[msg.phase] || msg.phase} — ${isMyTurn ? 'Your turn' : esc(activeSeat.name) + "'s turn"} (${msg.countdown?.toFixed(0)}s)`;
+    } else {
+      phaseEl.textContent = phases[msg.phase] || msg.phase;
+    }
+  }
+
+  // My turn actions
+  const myTurn = msg.seats?.[msg.current_seat]?.user_id === _pokerMyUid && ['pre_flop','flop','turn','river'].includes(msg.phase);
+  const actEl = document.getElementById('pokerActionArea');
+  if (myTurn && _pokerSeated) {
+    const mySeat = msg.seats?.find(s => s.user_id === _pokerMyUid);
+    const canCheck = msg.current_bet <= (mySeat?.current_bet || 0);
+    actEl.innerHTML = `<div class="poker-actions">
+      <button class="btn outline" onclick="_pokerAction('fold')">Fold</button>
+      ${canCheck ? '<button class="btn outline" onclick="_pokerAction(\'check\')">Check</button>' : `<button class="btn outline" onclick="_pokerAction('call')">Call ${fmt(msg.current_bet)}</button>`}
+      <button class="btn" onclick="_pokerRaise()">Raise</button>
+    </div>
+    <div class="bet-row" style="margin-top:6px">
+      <input class="input bet-input" id="pokerRaiseInput" type="number" min="${msg.min_raise}" value="${msg.min_raise}" placeholder="Raise amount">
+    </div>`;
+  } else if (msg.phase === 'lobby' && !_pokerSeated) {
+    actEl.innerHTML = `<button class="btn" style="width:100%;margin-top:8px" onclick="_pokerJoin()">Buy In — 10,000 WRK$</button>`;
+  } else if (msg.phase === 'lobby' && _pokerSeated) {
+    actEl.innerHTML = `<button class="btn outline" style="width:100%;margin-top:8px" onclick="_pokerLeave()">Leave & Cash Out</button>`;
+  } else if (!myTurn && _pokerSeated && msg.phase !== 'lobby' && msg.phase !== 'showdown') {
+    actEl.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:13px;padding:8px">Waiting for your turn…</div>`;
+  } else if (msg.phase === 'showdown') {
+    actEl.innerHTML = '';
+  }
+
+  if (msg.phase === 'showdown' && phaseChanged) {
+    const mySeat = msg.seats?.find(s => s.user_id === _pokerMyUid);
+    if (mySeat) {
+      const resEl = document.getElementById('pokerResult');
+      resEl.textContent = mySeat.status === 'folded' ? 'You folded.' : `Your hand: ${mySeat.hole_cards?.map(c => esc(c)).join(' ')}`;
+      resEl.className = 'result-box show';
+    }
+  }
+
+  if (msg.phase === 'lobby' && phaseChanged) {
+    document.getElementById('pokerResult').className = 'result-box';
+    if (!_pokerSeated) actEl.innerHTML = `<button class="btn" style="width:100%;margin-top:8px" onclick="_pokerJoin()">Buy In — 10,000 WRK$</button>`;
+  }
+}
+
+function _pokerAction(action) {
+  if (!pokerWs || pokerWs.readyState !== 1) return;
+  pokerWs.send(JSON.stringify({ type: action, user_id: _pokerMyUid }));
+}
+
+function _pokerRaise() {
+  const amount = parseInt(document.getElementById('pokerRaiseInput')?.value);
+  if (!amount) return;
+  if (!pokerWs || pokerWs.readyState !== 1) return;
+  pokerWs.send(JSON.stringify({ type: 'raise', user_id: _pokerMyUid, amount }));
+}
+
+function _pokerJoin() {
+  if (!pokerWs || pokerWs.readyState !== 1) return;
+  pokerWs.send(JSON.stringify({ type: 'join', user_id: _pokerMyUid }));
+}
+
+function _pokerLeave() {
+  if (!pokerWs || pokerWs.readyState !== 1) return;
+  pokerWs.send(JSON.stringify({ type: 'leave', user_id: _pokerMyUid }));
 }
 
 boot();
