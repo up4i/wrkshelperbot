@@ -5016,9 +5016,13 @@ function _handlePokerMsg(msg) {
     state.balance = msg.new_balance; refreshHeaderBal();
   } else if (msg.type === 'left') {
     _pokerSeated = false;
+    _pokerMyUid = null;
+    if (msg.new_balance != null) { state.balance = msg.new_balance; refreshHeaderBal(); }
     const resEl = document.getElementById('pokerResult');
-    resEl.textContent = `Cashed out ${fmt(msg.chips_returned)} WRK$`;
+    resEl.textContent = `Left table — ${fmt(msg.refund ?? msg.chips_returned)} WRK$ refunded`;
     resEl.className = 'result-box show win-box';
+    const actEl = document.getElementById('pokerActionArea');
+    if (actEl) actEl.innerHTML = `<button class="btn" style="width:100%;margin-top:8px" onclick="_pokerJoin()">Buy In — 10,000 WRK$</button>`;
   } else if (msg.type === 'error') {
     const el = document.getElementById('pokerErr');
     if (el) { el.textContent = msg.message; setTimeout(() => el.textContent = '', 3000); }
@@ -5054,7 +5058,7 @@ function _updatePokerDisplay(msg) {
   // Phase text
   const phaseEl = document.getElementById('pokerPhase');
   if (phaseEl) {
-    const phases = {lobby:'Waiting for players (need 2)…',pre_flop:'Pre-flop',flop:'Flop',turn:'Turn',river:'River',showdown:'Showdown!'};
+    const phases = {waiting:'Waiting for players (need 2)…',lobby:'Waiting for players (need 2)…',pre_flop:'Pre-flop',flop:'Flop',turn:'Turn',river:'River',showdown:'Showdown!'};
     const activeSeat = msg.seats?.[msg.current_seat];
     const isMyTurn = activeSeat?.user_id === _pokerMyUid;
     if (activeSeat && msg.phase !== 'lobby' && msg.phase !== 'showdown') {
@@ -5078,11 +5082,11 @@ function _updatePokerDisplay(msg) {
     <div class="bet-row" style="margin-top:6px">
       <input class="input bet-input" id="pokerRaiseInput" type="number" min="${msg.min_raise}" value="${msg.min_raise}" placeholder="Raise amount">
     </div>`;
-  } else if (msg.phase === 'lobby' && !_pokerSeated) {
+  } else if ((msg.phase === 'lobby' || msg.phase === 'waiting') && !_pokerSeated) {
     actEl.innerHTML = `<button class="btn" style="width:100%;margin-top:8px" onclick="_pokerJoin()">Buy In — 10,000 WRK$</button>`;
-  } else if (msg.phase === 'lobby' && _pokerSeated) {
-    actEl.innerHTML = `<button class="btn outline" style="width:100%;margin-top:8px" onclick="_pokerLeave()">Leave & Cash Out</button>`;
-  } else if (!myTurn && _pokerSeated && msg.phase !== 'lobby' && msg.phase !== 'showdown') {
+  } else if ((msg.phase === 'lobby' || msg.phase === 'waiting') && _pokerSeated) {
+    actEl.innerHTML = `<button class="btn outline" style="width:100%;margin-top:8px" onclick="_pokerLeave()">🚪 Leave Table (refund buy-in)</button>`;
+  } else if (!myTurn && _pokerSeated && msg.phase !== 'lobby' && msg.phase !== 'waiting' && msg.phase !== 'showdown') {
     actEl.innerHTML = `<div style="text-align:center;color:var(--muted);font-size:13px;padding:8px">Waiting for your turn…</div>`;
   } else if (msg.phase === 'showdown') {
     actEl.innerHTML = '';
@@ -5097,7 +5101,7 @@ function _updatePokerDisplay(msg) {
     }
   }
 
-  if (msg.phase === 'lobby' && phaseChanged) {
+  if ((msg.phase === 'lobby' || msg.phase === 'waiting') && phaseChanged) {
     document.getElementById('pokerResult').className = 'result-box';
     if (!_pokerSeated) actEl.innerHTML = `<button class="btn" style="width:100%;margin-top:8px" onclick="_pokerJoin()">Buy In — 10,000 WRK$</button>`;
   }
@@ -5117,6 +5121,7 @@ function _pokerRaise() {
 
 function _pokerJoin() {
   if (!pokerWs || pokerWs.readyState !== 1) return;
+  if (!_pokerMyUid && state.userId) _pokerMyUid = +state.userId;
   pokerWs.send(JSON.stringify({ type: 'join', user_id: _pokerMyUid }));
 }
 
@@ -5124,6 +5129,8 @@ function _pokerLeave() {
   if (!pokerWs || pokerWs.readyState !== 1) return;
   pokerWs.send(JSON.stringify({ type: 'leave', user_id: _pokerMyUid }));
 }
+
+function pokerLeave() { _pokerLeave(); }
 
 boot();
 </script>

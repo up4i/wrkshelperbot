@@ -3062,6 +3062,8 @@ async def _poker_betting_round():
 async def _poker_loop():
     while True:
         try:
+            _poker.phase = "waiting"
+            await _poker_broadcast({"type": "state", **_poker_snapshot()})
             if len(_poker.seats) < 2:
                 await asyncio.sleep(2.0)
                 continue
@@ -3202,15 +3204,26 @@ async def poker_ws(ws: WebSocket):
                 await _poker_broadcast({"type": "state", **_poker_snapshot()})
 
             elif data.get("type") == "leave":
-                seat = _poker.seat_for(uid)
-                if seat and _poker.phase == "lobby":
-                    with db_conn() as db:
-                        db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (seat["chips"], uid))
-                        db.commit()
-                    _poker.seats = [s for s in _poker.seats if s["user_id"] != uid]
-                    _poker.connections.pop(uid, None)
-                    await ws.send_json({"type": "left", "chips_returned": seat["chips"]})
-                    await _poker_broadcast({"type": "state", **_poker_snapshot()})
+                seat = next((s for s in _poker.seats if s["user_id"] == uid), None)
+                if not seat:
+                    await ws.send_json({"type": "error", "message": "Not seated"})
+                    continue
+                if _poker.phase not in ("lobby", "waiting"):
+                    await ws.send_json({"type": "error", "message": "Cannot leave during a hand"})
+                    continue
+                _poker.seats = [s for s in _poker.seats if s["user_id"] != uid]
+                _poker.connections.pop(uid, None)
+                with db_conn() as db:
+                    db.execute(
+                        "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                        (_POKER_BUYIN, uid)
+                    )
+                    new_bal = db.execute(
+                        "SELECT balance FROM economy WHERE user_id = ?", (uid,)
+                    ).fetchone()["balance"]
+                    db.commit()
+                await ws.send_json({"type": "left", "refund": _POKER_BUYIN, "new_balance": new_bal})
+                await _poker_broadcast({"type": "state", **_poker_snapshot()})
 
             elif data.get("type") in ("fold","check","call","raise"):
                 seat = _poker.seat_for(uid)
