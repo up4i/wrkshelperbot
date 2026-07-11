@@ -1926,6 +1926,19 @@ class BlackjackActionRequest(BaseModel):
     action: str
 
 
+class TradeCreateRequest(BaseModel):
+    from_user_id: int
+    to_user_id: int
+    offer_gift_id: int | None = None
+    offer_wrk: int = 0
+    request_gift_id: int | None = None
+    request_wrk: int = 0
+
+
+class TradeActionRequest(BaseModel):
+    user_id: int
+
+
 @app.get("/api/blackjack/status/{user_id}")
 def blackjack_status(user_id: int):
     game = _bj_games.get(user_id)
@@ -2062,6 +2075,158 @@ def blackjack_action(req: BlackjackActionRequest):
             return _bj_playing_state(game, balance)
 
     return _bj_playing_state(game, balance)  # unreachable but satisfies linter
+
+
+# ── Trades ────────────────────────────────────────────────────────────────────
+
+@app.get("/api/trades")
+def get_trades(user_id: int):
+    with db_conn() as db:
+        def _offer_row(row) -> dict:
+            d = dict(row)
+            # instance_id is the offered gift column
+            offer_gift_col = d.get("instance_id") or d.get("offer_gift_id")
+            if offer_gift_col:
+                og = db.execute(
+                    "SELECT gi.id, gi.gift_number, gi.background, gm.model_name, gm.model_emoji, gm.custom_emoji_id, gm.collection "
+                    "FROM gift_instances gi JOIN gift_models gm ON gm.id=gi.model_id WHERE gi.id=?",
+                    (offer_gift_col,)
+                ).fetchone()
+                d["offer_gift"] = dict(og) if og else None
+            else:
+                d["offer_gift"] = None
+            if d.get("request_gift_id"):
+                rg = db.execute(
+                    "SELECT gi.id, gi.gift_number, gi.background, gm.model_name, gm.model_emoji, gm.custom_emoji_id, gm.collection "
+                    "FROM gift_instances gi JOIN gift_models gm ON gm.id=gi.model_id WHERE gi.id=?",
+                    (d["request_gift_id"],)
+                ).fetchone()
+                d["request_gift"] = dict(rg) if rg else None
+            else:
+                d["request_gift"] = None
+            return d
+
+        incoming = [_offer_row(r) for r in db.execute(
+            "SELECT * FROM gift_offers WHERE to_user_id=? AND status='pending'", (user_id,)
+        ).fetchall()]
+        outgoing = [_offer_row(r) for r in db.execute(
+            "SELECT * FROM gift_offers WHERE from_user_id=? AND status='pending'", (user_id,)
+        ).fetchall()]
+        return {"incoming": incoming, "outgoing": outgoing}
+
+
+@app.post("/api/trades")
+def create_trade(req: TradeCreateRequest):
+    import time as _time
+    if req.from_user_id == req.to_user_id:
+        raise HTTPException(400, "Cannot trade with yourself")
+    if not req.offer_gift_id and req.offer_wrk <= 0 and not req.request_gift_id and req.request_wrk <= 0:
+        raise HTTPException(400, "Trade must have at least one item on either side")
+    with db_conn() as db:
+        if req.offer_gift_id:
+            row = db.execute("SELECT owner_id FROM gift_instances WHERE id=?", (req.offer_gift_id,)).fetchone()
+            if not row or row["owner_id"] != req.from_user_id:
+                raise HTTPException(400, "You don't own that gift")
+        if req.request_gift_id:
+            row = db.execute("SELECT owner_id FROM gift_instances WHERE id=?", (req.request_gift_id,)).fetchone()
+            if not row or row["owner_id"] != req.to_user_id:
+                raise HTTPException(400, "Target doesn't own that gift")
+        if req.offer_wrk > 0:
+            bal = db.execute("SELECT balance FROM economy WHERE user_id=?", (req.from_user_id,)).fetchone()
+            if not bal or bal["balance"] < req.offer_wrk:
+                raise HTTPException(400, "Insufficient balance for WRK$ offer")
+        db.execute(
+            "INSERT INTO gift_offers (from_user_id, to_user_id, instance_id, wrk_offered, request_gift_id, request_wrk, status, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (req.from_user_id, req.to_user_id,
+             req.offer_gift_id, req.offer_wrk,
+             req.request_gift_id, req.request_wrk,
+             "pending", int(_time.time()))
+        )
+        db.commit()
+        return {"ok": True}
+
+
+@app.post("/api/trades/{offer_id}/accept")
+def accept_trade(offer_id: int, req: TradeActionRequest):
+    with db_conn() as db:
+        offer = db.execute("SELECT * FROM gift_offers WHERE id=?", (offer_id,)).fetchone()
+        if not offer:
+            raise HTTPException(404, "Offer not found")
+        if offer["to_user_id"] != req.user_id:
+            raise HTTPException(403, "Not your offer to accept")
+        if offer["status"] != "pending":
+            raise HTTPException(400, "Offer is no longer pending")
+
+        from_id = offer["from_user_id"]
+        to_id = offer["to_user_id"]
+        offered_gift = offer["instance_id"] if "instance_id" in offer.keys() else offer.get("offer_gift_id")
+
+        if offered_gift:
+            row = db.execute("SELECT owner_id FROM gift_instances WHERE id=?", (offered_gift,)).fetchone()
+            if not row or row["owner_id"] != from_id:
+                raise HTTPException(400, "Sender no longer owns the offered gift")
+        if offer["request_gift_id"]:
+            row = db.execute("SELECT owner_id FROM gift_instances WHERE id=?", (offer["request_gift_id"],)).fetchone()
+            if not row or row["owner_id"] != to_id:
+                raise HTTPException(400, "You no longer own the requested gift")
+        wrk_offered = offer["wrk_offered"] if "wrk_offered" in offer.keys() else offer.get("offer_wrk", 0)
+        if wrk_offered > 0:
+            bal = db.execute("SELECT balance FROM economy WHERE user_id=?", (from_id,)).fetchone()
+            if not bal or bal["balance"] < wrk_offered:
+                raise HTTPException(400, "Sender has insufficient balance")
+        if offer["request_wrk"] > 0:
+            bal = db.execute("SELECT balance FROM economy WHERE user_id=?", (to_id,)).fetchone()
+            if not bal or bal["balance"] < offer["request_wrk"]:
+                raise HTTPException(400, "Insufficient balance to meet WRK$ request")
+
+        if offered_gift:
+            db.execute("UPDATE gift_instances SET owner_id=? WHERE id=?", (to_id, offered_gift))
+        if offer["request_gift_id"]:
+            db.execute("UPDATE gift_instances SET owner_id=? WHERE id=?", (from_id, offer["request_gift_id"]))
+        if wrk_offered > 0:
+            db.execute("UPDATE economy SET balance=balance-? WHERE user_id=?", (wrk_offered, from_id))
+            db.execute("UPDATE economy SET balance=balance+? WHERE user_id=?", (wrk_offered, to_id))
+        if offer["request_wrk"] > 0:
+            db.execute("UPDATE economy SET balance=balance-? WHERE user_id=?", (offer["request_wrk"], to_id))
+            db.execute("UPDATE economy SET balance=balance+? WHERE user_id=?", (offer["request_wrk"], from_id))
+
+        db.execute("UPDATE gift_offers SET status='accepted' WHERE id=?", (offer_id,))
+        for gid in [offered_gift, offer["request_gift_id"]]:
+            if gid:
+                db.execute(
+                    "UPDATE gift_offers SET status='rejected' WHERE id!=? AND status='pending' "
+                    "AND (instance_id=? OR request_gift_id=?)",
+                    (offer_id, gid, gid)
+                )
+        db.commit()
+        return {"ok": True}
+
+
+@app.post("/api/trades/{offer_id}/reject")
+def reject_trade(offer_id: int, req: TradeActionRequest):
+    with db_conn() as db:
+        offer = db.execute("SELECT * FROM gift_offers WHERE id=?", (offer_id,)).fetchone()
+        if not offer or offer["to_user_id"] != req.user_id:
+            raise HTTPException(403, "Not your offer to reject")
+        if offer["status"] != "pending":
+            raise HTTPException(400, "Offer is no longer pending")
+        db.execute("UPDATE gift_offers SET status='rejected' WHERE id=?", (offer_id,))
+        db.commit()
+        return {"ok": True}
+
+
+@app.post("/api/trades/{offer_id}/cancel")
+def cancel_trade(offer_id: int, req: TradeActionRequest):
+    with db_conn() as db:
+        offer = db.execute("SELECT * FROM gift_offers WHERE id=?", (offer_id,)).fetchone()
+        if not offer or offer["from_user_id"] != req.user_id:
+            raise HTTPException(403, "Not your offer to cancel")
+        if offer["status"] != "pending":
+            raise HTTPException(400, "Offer is no longer pending")
+        db.execute("UPDATE gift_offers SET status='cancelled' WHERE id=?", (offer_id,))
+        db.commit()
+        return {"ok": True}
 
 
 # ── Crash ─────────────────────────────────────────────────────────────────────
