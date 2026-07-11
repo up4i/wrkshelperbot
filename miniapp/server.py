@@ -985,6 +985,17 @@ def play_case(req: CaseRequest):
             "INSERT INTO cases_opened (user_id, tier, wrk_reward, gift_id, opened_at) VALUES (?, ?, ?, ?, ?)",
             (req.user_id, tier_name, wrk_reward, gift_id, int(_time.time()))
         )
+        if gift_id:
+            gift_val_row = db.execute(
+                "SELECT gp.base_price FROM gift_instances gi "
+                "JOIN gift_models gm ON gm.id = gi.model_id "
+                "JOIN gift_prices gp ON gp.collection = gm.collection "
+                "WHERE gi.id = ?", (gift_id,)
+            ).fetchone()
+            cases_win_val = gift_val_row["base_price"] if gift_val_row else 50_000
+        else:
+            cases_win_val = wrk_reward
+        _record_stats(db, req.user_id, cases_won=cases_win_val, cases_lost=_CASE_PRICE)
         db.commit()
         return {
             "tier": tier_name,
@@ -1073,6 +1084,7 @@ def highlow_guess(req: HighLowGuessRequest):
             }
         else:
             db.execute("DELETE FROM highlow_sessions WHERE user_id = ?", (req.user_id,))
+            _record_stats(db, req.user_id, highlow_lost=sess["bet"])
             db.commit()
             new_bal = db.execute(
                 "SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)
@@ -1100,6 +1112,7 @@ def highlow_cashout(req: HighLowCashoutRequest):
         row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
         new_bal = row["balance"] + winnings
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+        _record_stats(db, req.user_id, highlow_won=winnings - sess["bet"])
         db.commit()
         return {"winnings": winnings, "multiplier": sess["multiplier"], "new_balance": new_bal}
 
@@ -1177,11 +1190,13 @@ def craps_roll(req: CrapsRollRequest):
                 row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
                 new_bal = row["balance"] + winnings
                 db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+                _record_stats(db, req.user_id, craps_won=winnings - sess["bet"])
                 db.commit()
                 return {"d1": d1, "d2": d2, "total": total, "result": "win", "winnings": winnings, "new_balance": new_bal}
             elif total in (2, 3, 12):
                 db.execute("DELETE FROM craps_sessions WHERE user_id = ?", (req.user_id,))
                 row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+                _record_stats(db, req.user_id, craps_lost=sess["bet"])
                 db.commit()
                 return {"d1": d1, "d2": d2, "total": total, "result": "lose", "lost": sess["bet"], "new_balance": row["balance"]}
             else:
@@ -1195,11 +1210,13 @@ def craps_roll(req: CrapsRollRequest):
                 row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
                 new_bal = row["balance"] + winnings
                 db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+                _record_stats(db, req.user_id, craps_won=winnings - sess["bet"])
                 db.commit()
                 return {"d1": d1, "d2": d2, "total": total, "result": "win", "winnings": winnings, "new_balance": new_bal}
             elif total == 7:
                 db.execute("DELETE FROM craps_sessions WHERE user_id = ?", (req.user_id,))
                 row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
+                _record_stats(db, req.user_id, craps_lost=sess["bet"])
                 db.commit()
                 return {"d1": d1, "d2": d2, "total": total, "result": "lose", "lost": sess["bet"], "new_balance": row["balance"]}
             else:
