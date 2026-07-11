@@ -3078,6 +3078,8 @@ async function flipCoin() {
     const delta = data.delta > 0 ? `+${fmt(data.delta)}` : fmt(data.delta);
     resEl.textContent = data.won ? `✅ ${data.result.toUpperCase()}! You win! ${delta} WRK$` : `❌ ${data.result.toUpperCase()}. You lose. ${delta} WRK$`;
     resEl.className = `result-box show ${data.won ? 'win-box' : 'lose-box'}`;
+    const _existingCfAgain = resEl.nextElementSibling;
+    if (_existingCfAgain && _existingCfAgain.classList.contains('btn')) _existingCfAgain.remove();
     resEl.insertAdjacentHTML('afterend',
       `<button class="btn outline" style="width:100%;margin-top:8px" onclick="cfPlayAgain(${bet})">⚡ Flip Again</button>`);
 
