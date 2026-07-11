@@ -793,6 +793,10 @@ def play_roulette(req: RouletteRequest):
         delta = req.bet * (mult - 1) if won else -req.bet
         new_bal = bal + delta
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+        if delta > 0:
+            _record_stats(db, req.user_id, roulette_won=delta)
+        elif delta < 0:
+            _record_stats(db, req.user_id, roulette_lost=req.bet)
         db.commit()
         return {
             "slot": slot,
@@ -825,6 +829,10 @@ def play_slider(req: SliderRequest):
         delta = int(req.bet * (payout_mult - 1)) if won else -req.bet
         new_bal = bal + delta
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+        if delta > 0:
+            _record_stats(db, req.user_id, slider_won=delta)
+        elif delta < 0:
+            _record_stats(db, req.user_id, slider_lost=req.bet)
         db.commit()
         return {
             "won": won,
@@ -864,6 +872,10 @@ def play_plinko(req: PlinkoRequest):
         delta = int(req.bet * mult) - req.bet
         new_bal = bal + delta
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+        if delta > 0:
+            _record_stats(db, req.user_id, plinko_won=delta)
+        elif delta < 0:
+            _record_stats(db, req.user_id, plinko_lost=req.bet)
         db.commit()
         return {
             "path": path,
@@ -894,6 +906,10 @@ def play_wheel(req: WheelRequest):
         delta = int(req.bet * mult) - req.bet
         new_bal = bal + delta
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+        if delta > 0:
+            _record_stats(db, req.user_id, wheel_won=delta)
+        elif delta < 0:
+            _record_stats(db, req.user_id, wheel_lost=req.bet)
         db.commit()
         return {
             "segment": segment,
