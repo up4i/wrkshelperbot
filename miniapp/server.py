@@ -707,7 +707,7 @@ _JOBS = [
     (600,  "🔍 On-Chain Analyst",   400,  800),
     (1000, "⚙️ Protocol Dev",       600, 1200),
     (2000, "🦈 Blockchain Shark",   900, 1800),
-    (5000, "👑 Blockchain Baron",  1500, 3000),
+    (5000, "👑 Blockchain Baron",  1000, 2000),
 ]
 _SHIFT_MAX_TAPS = 50
 _SHIFT_COOLDOWN = 15 * 60  # seconds
@@ -1096,15 +1096,15 @@ def play_wheel(req: WheelRequest):
 
 # ── CS Case Opening ───────────────────────────────────────────────────────────
 
-_CASE_PRICE = 75_000
+_CASE_PRICE = 55_000
 
 # Cumulative weights (roll 1-100). Each entry: (threshold, tier, wrk_min, wrk_max, gift_tier)
 _CASE_LOOT = [
     (55,  "common",    15_000,  40_000,  None),
     (80,  "uncommon",  40_000,  80_000,  None),
     (92,  "rare",      80_000, 200_000,  None),
-    (98,  "epic",           0,       0,  "mid"),
-    (100, "legendary",      0,       0,  "high"),
+    (98,  "epic",           0,       0,  "low"),
+    (100, "legendary",      0,       0,  "mid"),
 ]
 
 
@@ -1629,7 +1629,7 @@ _ROB_GETAWAY = [
     ("🧊", "{robber} fumbled the job on {target} but kept their cool and disappeared. No loss."),
 ]
 
-_ROB_COOLDOWN = 900  # 15 minutes
+_ROB_COOLDOWN = 3600  # 1 hour
 
 
 class RobAttemptRequest(BaseModel):
