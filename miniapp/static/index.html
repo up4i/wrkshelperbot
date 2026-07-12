@@ -5545,7 +5545,7 @@ function renderBjFinished(data) {
   document.getElementById('bjContent').innerHTML = `
     <div class="bj-table">
       <div>
-        <div class="bj-section-label">Dealer — ${data.dealer_value ?? ''}</div>
+        <div class="bj-section-label" id="bjDealerLabel">Dealer — ?</div>
         <div class="bj-hand-row">${dealerCardHtml}</div>
       </div>
       <div class="divider"></div>
@@ -5558,6 +5558,10 @@ function renderBjFinished(data) {
     <div class="balance-display" style="${fadeIn(resultDelay + 80)}">Balance: <span class="b">${fmt(data.new_balance)}</span> WRK$</div>
     <button class="btn" style="width:100%;${fadeIn(resultDelay + 160)}" onclick="renderBjBetting()">Play Again</button>
   `;
+  setTimeout(() => {
+    const lbl = document.getElementById('bjDealerLabel');
+    if (lbl) lbl.textContent = `Dealer — ${data.dealer_value ?? ''}`;
+  }, resultDelay - 80);
   _bjShowPP(data);
 }
 
