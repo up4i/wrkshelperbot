@@ -2339,7 +2339,12 @@ async function loadTrades() {
 
   function renderSide(gift, wrk, label) {
     let content = '';
-    if (gift) content += `<div>${gift.model_emoji} ${gift.model_name} #${gift.gift_number}</div>`;
+    if (gift) {
+      const img = gift.custom_emoji_id
+        ? `<img src="/emoji/${gift.custom_emoji_id}" style="width:32px;height:32px;vertical-align:middle;border-radius:4px" onerror="this.outerHTML='<span>${gift.model_emoji || '🎁'}</span>'">`
+        : `<span style="font-size:24px">${gift.model_emoji || '🎁'}</span>`;
+      content += `<div style="display:flex;align-items:center;gap:6px">${img}<span>${gift.model_name} #${gift.gift_number}</span></div>`;
+    }
     if (wrk > 0) content += `<div>${fmt(wrk)} WRK$</div>`;
     if (!gift && wrk <= 0) content += `<div style="color:var(--muted)">Nothing</div>`;
     return `<div class="trade-side"><div class="trade-side-label">${label}</div>${content}</div>`;
@@ -2359,7 +2364,7 @@ async function loadTrades() {
       data.incoming.map(o => `
         <div class="trade-card">
           <div class="trade-card-sides">
-            ${renderSide(o.offer_gift, o.wrk_offered, 'They offer')}
+            ${renderSide(o.offer_gift, o.wrk_offered, `${esc(o.from_display || 'Someone')} offers`)}
             <div class="trade-arrow">→</div>
             ${renderSide(o.request_gift, o.request_wrk, 'They want')}
           </div>
