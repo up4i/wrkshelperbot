@@ -583,6 +583,7 @@ async def get_profile(db_path: str, user_id: int) -> dict | None:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT e.user_id, e.balance, e.streak, e.work_count, e.pinned_gift_id,
+                      COALESCE(e.pinned_stat, 'crash_mult') AS pinned_stat,
                       COALESCE(a.username, e.username) AS username,
                       COALESCE(a.full_name, e.full_name) AS full_name
                FROM economy e
@@ -666,6 +667,28 @@ async def get_profile(db_path: str, user_id: int) -> dict | None:
             (d["net_worth"],)
         ) as cur:
             d["networth_rank"] = (await cur.fetchone())[0]
+
+        pinned_stat = d.get("pinned_stat", "crash_mult")
+        if pinned_stat == "crash_mult":
+            d["stat_highlight_label"] = "Best crash mult"
+            bm = d.get("best_mult") or 0
+            d["stat_highlight_value"] = f"{bm:.2f}×" if bm else "—"
+        elif pinned_stat == "gamble_won":
+            d["stat_highlight_label"] = "Total WRK$ won"
+            d["stat_highlight_value"] = f'{d.get("total_won", 0):,} WRK$'
+        elif pinned_stat == "gamble_lost":
+            d["stat_highlight_label"] = "Total WRK$ lost"
+            d["stat_highlight_value"] = f'{d.get("total_lost", 0):,} WRK$'
+        elif pinned_stat == "gifts_owned":
+            d["stat_highlight_label"] = "Gifts owned"
+            d["stat_highlight_value"] = str(d.get("gift_count", 0))
+        elif pinned_stat == "streak":
+            d["stat_highlight_label"] = "Current streak"
+            d["stat_highlight_value"] = f'{d.get("streak", 0)} days'
+        else:
+            d["stat_highlight_label"] = "Best crash mult"
+            bm = d.get("best_mult") or 0
+            d["stat_highlight_value"] = f"{bm:.2f}×" if bm else "—"
 
         return d
 
