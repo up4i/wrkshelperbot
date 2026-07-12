@@ -2265,6 +2265,14 @@ def get_trades(user_id: int):
     with db_conn() as db:
         def _offer_row(row) -> dict:
             d = dict(row)
+            name_row = db.execute(
+                "SELECT username, full_name FROM economy WHERE user_id=?",
+                (d.get("from_user_id"),)
+            ).fetchone()
+            if name_row:
+                d["from_display"] = name_row["full_name"] or name_row["username"] or f'User {d["from_user_id"]}'
+            else:
+                d["from_display"] = f'User {d.get("from_user_id", "?")}'
             # instance_id is the offered gift column
             offer_gift_col = d.get("instance_id")
             if offer_gift_col:
