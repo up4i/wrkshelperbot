@@ -4254,7 +4254,7 @@ function _formatBetInput(el) {
   const mult = m[2] === 'b' ? 1_000_000_000 : m[2] === 'm' ? 1_000_000 : m[2] === 'k' ? 1_000 : 1;
   const val = Math.floor(num * mult);
   if (isNaN(val) || val < 0) { el.value = ''; return; }
-  if (m[2]) el.value = val.toLocaleString('en-US');
+  el.value = val.toLocaleString('en-US');
 }
 function _parseBet(id) {
   const raw = (document.getElementById(id)?.value || '').replace(/,/g, '').trim().toLowerCase();
