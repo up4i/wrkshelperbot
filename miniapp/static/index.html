@@ -1275,7 +1275,6 @@
       <div class="game-tabs">
         <div class="game-tab-btn active" id="gtabLive" onclick="setGameTab('live')">🔴 Live</div>
         <div class="game-tab-btn" id="gtabSolo" onclick="setGameTab('solo')">🎮 Solo</div>
-        <div class="game-tab-btn" id="gtabFun" onclick="setGameTab('fun')">😈 Rob & Hack</div>
       </div>
       <div class="games-grid" id="gamesGrid">
         <!-- LIVE GAMES -->
@@ -1357,19 +1356,6 @@
             <div class="gicon">📦</div>
             <div class="gname">Case</div>
             <div class="gdesc">75,000 WRK$ — gifts inside</div>
-          </div>
-        </div>
-        <!-- ROB & HACK -->
-        <div class="game-category" id="gcatFun">
-          <div class="game-card" onclick="openHack()">
-            <div class="gicon">🖥️</div>
-            <div class="gname">Hack</div>
-            <div class="gdesc">Crack the word, drain the wallet</div>
-          </div>
-          <div class="game-card" onclick="openRob()">
-            <div class="gicon">🔫</div>
-            <div class="gname">Rob</div>
-            <div class="gdesc">Pick a target and take the bag</div>
           </div>
         </div>
       </div>
@@ -1468,6 +1454,22 @@
 
       <!-- dynamic job content (hidden until logged in) -->
       <div id="workContent" style="display:none;flex-direction:column;gap:14px"></div>
+      <!-- Criminal activity (shown when logged in) -->
+      <div id="workCrimeWrap" style="display:none;flex-direction:column;gap:10px">
+        <div class="section-title" style="font-size:14px;margin-top:8px">🕵️ Criminal Activity</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="game-card" onclick="openHack()">
+            <div class="gicon">🖥️</div>
+            <div class="gname">Hack</div>
+            <div class="gdesc">Crack the word, drain a wallet</div>
+          </div>
+          <div class="game-card" onclick="openRob()">
+            <div class="gicon">🔫</div>
+            <div class="gname">Rob</div>
+            <div class="gdesc">Pick a target and take the bag</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- MARKET -->
@@ -2205,7 +2207,7 @@ async function loadLeaderboard(tab) {
 }
 
 function setGameTab(tab) {
-  ['live','solo','fun'].forEach(t => {
+  ['live','solo'].forEach(t => {
     document.getElementById('gtab' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.toggle('active', t === tab);
     document.getElementById('gcat' + t.charAt(0).toUpperCase() + t.slice(1))?.classList.toggle('active', t === tab);
   });
@@ -4319,10 +4321,14 @@ async function openWorkPage() {
   if (!state.userId) {
     document.getElementById('workLoginWall').style.display = '';
     document.getElementById('workContent').style.display = 'none';
+    const wc = document.getElementById('workCrimeWrap');
+    if (wc) wc.style.display = 'none';
     return;
   }
   document.getElementById('workLoginWall').style.display = 'none';
   document.getElementById('workContent').style.display = 'flex';
+  const wc = document.getElementById('workCrimeWrap');
+  if (wc) wc.style.display = 'flex';
   await refreshWorkStatus();
 }
 
