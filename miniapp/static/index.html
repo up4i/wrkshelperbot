@@ -4240,12 +4240,21 @@ function closeModal(id, evt) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function _formatBetInput(el) {
-  const raw = el.value.replace(/,/g, '');
-  if (!/^\d*$/.test(raw)) { el.value = el.value.slice(0, -1); return; }
-  if (raw) el.value = Number(raw).toLocaleString('en-US');
+  const raw = el.value.replace(/,/g, '').trim().toLowerCase();
+  const m = raw.match(/^(\d+(?:\.\d+)?)\s*([kmb])?$/);
+  if (!m) { el.value = ''; return; }
+  const num = parseFloat(m[1]);
+  const mult = m[2] === 'b' ? 1_000_000_000 : m[2] === 'm' ? 1_000_000 : m[2] === 'k' ? 1_000 : 1;
+  const val = Math.floor(num * mult);
+  if (isNaN(val) || val < 0) { el.value = ''; return; }
+  if (m[2]) el.value = val.toLocaleString('en-US');
 }
 function _parseBet(id) {
-  return parseInt((document.getElementById(id)?.value || '').replace(/,/g, ''), 10);
+  const raw = (document.getElementById(id)?.value || '').replace(/,/g, '').trim().toLowerCase();
+  const m = raw.match(/^(\d+(?:\.\d+)?)\s*([kmb])?$/);
+  if (!m) return NaN;
+  const mult = m[2] === 'b' ? 1_000_000_000 : m[2] === 'm' ? 1_000_000 : m[2] === 'k' ? 1_000 : 1;
+  return Math.floor(parseFloat(m[1]) * mult);
 }
 
 function buildPresets(containerId, inputId) {
