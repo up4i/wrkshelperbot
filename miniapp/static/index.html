@@ -2751,7 +2751,7 @@ function buildProfileHtml(d, isOwn) {
   const avatarHtml = `<img class="avatar" src="${ownPhoto}" alt="${initials}" onerror="avatarError(this,'${initials}')">`;
 
   // store gift data for detail modal
-  window._profileGifts = {};
+  if (!window._profileGifts) window._profileGifts = {};
   window._profileIsOwn = isOwn;
   window._profilePinnedId = d.pinned_gift_id || null;
   d.gifts.forEach(g => { window._profileGifts[g.id] = g; });
