@@ -5348,6 +5348,8 @@ function _placeMarbleBet() {
 let bjBusy = false;
 let bjCurrentBet = 0;
 let bjPPBet = 0;
+let bjLastBet = 0;
+let bjLastPPBet = 0;
 
 function bjAddChip(amount) {
   bjCurrentBet += amount;
@@ -5387,7 +5389,7 @@ async function openBlackjack() {
 }
 
 function renderBjBetting() {
-  bjBusy = false; bjCurrentBet = 0; bjPPBet = 0;
+  bjBusy = false; bjCurrentBet = bjLastBet; bjPPBet = bjLastPPBet;
   document.getElementById('bjContent').innerHTML = `
     <div class="bj-bet-section">
       <div class="bj-section-label" style="text-align:center;margin-bottom:8px">Place your bet</div>
@@ -5399,7 +5401,7 @@ function renderBjBetting() {
         <div class="bj-chip c10k"  onclick="bjAddChip(10000)">10K</div>
         <div class="bj-chip c50k"  onclick="bjAddChip(50000)">50K</div>
       </div>
-      <div class="bj-bet-display" id="bjBetDisplay">Tap a chip</div>
+      <div class="bj-bet-display" id="bjBetDisplay">${bjCurrentBet > 0 ? fmt(bjCurrentBet) + ' WRK$' : 'Tap a chip'}</div>
       <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
         <div class="bj-section-label" style="text-align:center">Perfect Pair side bet (optional)</div>
         <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:6px">Both cards same rank? Perfect 6× / Colored 4× / Mixed 3×</div>
@@ -5408,7 +5410,7 @@ function renderBjBetting() {
           <div class="bj-chip c500" onclick="bjAddPP(500)" style="width:46px;height:46px;font-size:10px">PP<br>500</div>
           <div class="bj-chip c1k"  onclick="bjAddPP(1000)" style="width:46px;height:46px;font-size:10px">PP<br>1K</div>
         </div>
-        <div id="bjPPDisplay" style="text-align:center;font-size:12px;color:var(--muted)">No PP side bet</div>
+        <div id="bjPPDisplay" style="text-align:center;font-size:12px;color:var(--muted)">${bjLastPPBet > 0 ? 'PP side bet: ' + fmt(bjLastPPBet) + ' WRK$' : 'No PP side bet'}</div>
       </div>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="btn outline bj-btn" onclick="bjClearBet()" style="flex:1">Clear</button>
@@ -5432,6 +5434,8 @@ async function dealBlackjack() {
   bjBusy = true;
   if (errEl) errEl.textContent = '';
   try {
+    bjLastBet = bjCurrentBet;
+    bjLastPPBet = bjPPBet;
     const data = await api('/api/blackjack/start', { method: 'POST', json: { user_id: +state.userId, bet, pp_bet: bjPPBet } });
     if (data.status === 'playing') renderBjPlaying(data);
     else renderBjFinished(data);
