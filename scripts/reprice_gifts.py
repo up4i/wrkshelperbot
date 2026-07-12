@@ -35,15 +35,34 @@ _BG_MULTIPLIERS = {
 }
 
 TIER_RANGES = {
-    "high": (1_500_000, 2_800_000),
-    "mid":     (70_000,   300_000),
-    "low":      (7_000,    33_000),
+    "high": (6_000_000, 12_000_000),
+    "mid":    (150_000,    600_000),
+    "low":     (10_000,     40_000),
+}
+
+# Explicit overrides for culturally significant collections (base/orange price).
+# Background multipliers (black=3x, onyx=2.5x, etc.) still apply on top.
+PRICE_OVERRIDES = {
+    "plush_pepe":     10_000_000,
+    "scared_cat":      9_000_000,
+    "durovs_cap":     12_000_000,
+    "astral_shard":    9_500_000,
+    "rare_bird":       9_000_000,
+    "westside_sign":   8_500_000,
+    "precious_peach":  8_000_000,
+    "kissed_frog":     7_500_000,
+    "artisan_brick":   6_000_000,
+    "mighty_arm":      7_000_000,
+    "heart_locket":    8_000_000,
+    "swiss_watch":       500_000,
+    "crystal_ball":      400_000,
 }
 
 
 def _base_price(collection_key: str, tier: str) -> int:
+    if collection_key in PRICE_OVERRIDES:
+        return PRICE_OVERRIDES[collection_key]
     lo, hi = TIER_RANGES[tier]
-    # Deterministic 0–1 float from collection name
     h = int(hashlib.md5(collection_key.encode()).hexdigest(), 16)
     frac = (h % 10_000) / 10_000
     return int(lo + frac * (hi - lo))

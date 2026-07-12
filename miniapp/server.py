@@ -1518,8 +1518,8 @@ def hack_start(req: HackStartRequest):
         word, clue = random.choice(_WORDLIST)
         balance = row["balance"] or 0
         reward = random.randint(
-            max(5_000, int(balance * 0.005)),
-            max(15_000, min(int(balance * 0.015), 500_000)),
+            max(2_000, int(balance * 0.003)),
+            max(10_000, min(int(balance * 0.008), 150_000)),
         )
         db.execute(
             "INSERT INTO hack_sessions (user_id, word, clue, reward, attempts, revealed_indices, started_at) "
