@@ -4185,9 +4185,9 @@ async function _animateCaseReel() {
   if (!reel) return;
   const finalShift = _CASE_REVEAL_IDX * _CASE_ITEM_W - (140 - 42);
   await sleep(50);
-  reel.style.transition = 'transform 4s cubic-bezier(0.12, 0, 0.39, 0)';
+  reel.style.transition = 'transform 6s cubic-bezier(0.02, 0.01, 0.21, 1)';
   reel.style.transform = `translateX(-${finalShift}px)`;
-  await sleep(4100);
+  await sleep(6100);
 }
 
 async function playCase() {
