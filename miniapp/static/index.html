@@ -3774,16 +3774,14 @@ function flipSlider() {
 function _updateSliderUI() {
   const pct = _sliderGreenPct;
   const redPct = 100 - pct;
-  const handle = redPct; // handle position as % from left (boundary between zones)
+  const handle = redPct;
   document.getElementById('sliderHandle').style.left = handle + '%';
   if (_sliderFlipped) {
-    // Green on left, red on right
-    document.getElementById('sliderGreen').style.cssText = 'position:absolute;top:0;left:0;height:100%;background:#10b981;width:' + handle + '%';
-    document.getElementById('sliderRed').style.cssText = 'position:absolute;top:0;right:0;height:100%;background:#dc2626;width:' + pct + '%';
+    document.getElementById('sliderGreen').style.cssText = 'position:absolute;top:0;left:0;right:auto;height:100%;background:#10b981;width:' + handle + '%';
+    document.getElementById('sliderRed').style.cssText = 'position:absolute;top:0;left:auto;right:0;height:100%;background:#dc2626;width:' + pct + '%';
   } else {
-    // Red on left, green on right (default)
-    document.getElementById('sliderRed').style.cssText = 'position:absolute;top:0;left:0;height:100%;background:#dc2626;width:' + redPct + '%';
-    document.getElementById('sliderGreen').style.cssText = 'position:absolute;top:0;right:0;height:100%;background:#10b981;width:' + pct + '%';
+    document.getElementById('sliderRed').style.cssText = 'position:absolute;top:0;left:0;right:auto;height:100%;background:#dc2626;width:' + redPct + '%';
+    document.getElementById('sliderGreen').style.cssText = 'position:absolute;top:0;left:auto;right:0;height:100%;background:#10b981;width:' + pct + '%';
   }
   document.getElementById('sliderChanceLabel').textContent = pct + '% chance';
   const mult = Math.min(19.0, +(0.95 / (pct / 100)).toFixed(2));
