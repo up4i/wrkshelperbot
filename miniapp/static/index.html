@@ -1387,6 +1387,7 @@
     <div class="page" id="page-profile">
       <!-- Own profile (shown when logged in) -->
       <div id="ownProfileWrap" style="display:none;flex-direction:column;gap:12px">
+        <button class="btn outline" style="width:100%" onclick="togglePlayerSearch()">🔍 Look up a player</button>
         <div class="tab-row" id="profileTabRow">
           <button class="tab-btn active" id="overviewTabBtn" onclick="setProfileTab('overview',this)">👤 Overview</button>
           <button class="tab-btn" id="tradesTabBtn" onclick="setProfileTab('trades',this)" style="display:none">🔄 Trades</button>
@@ -1401,7 +1402,6 @@
           <div id="friendsList"></div>
           <div id="friendRequests"></div>
         </div>
-        <button class="btn outline" style="width:100%" onclick="togglePlayerSearch()">🔍 Look up a player</button>
       </div>
       <!-- Not logged in -->
       <div id="profileLoginPrompt" style="display:none;flex-direction:column;gap:12px">
