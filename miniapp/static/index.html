@@ -3140,6 +3140,8 @@ async function spinRoulette() {
       ? `${colorEmoji} ${numLabel} — You win! ${delta} WRK$`
       : `${colorEmoji} ${numLabel} — You lose. ${delta} WRK$`;
     resEl.className = `result-box show ${data.won ? 'win-box' : 'lose-box'}`;
+    const _existingRlAgain = resEl.nextElementSibling;
+    if (_existingRlAgain && _existingRlAgain.classList.contains('btn')) _existingRlAgain.remove();
     resEl.insertAdjacentHTML('afterend',
       `<button class="btn outline" style="width:100%;margin-top:8px" onclick="rlPlayAgain(${bet})">⚡ Spin Again</button>`);
     state.balance = data.new_balance;
@@ -4114,6 +4116,8 @@ async function spinWheel() {
       ? `☠ Bankrupt! ${fmt(data.delta)} WRK$`
       : `${data.multiplier}× — ${sign}${fmt(data.delta)} WRK$`;
     resEl.className = `result-box show ${data.delta >= 0 ? 'win-box' : 'lose-box'}`;
+    const _existingWheelAgain = resEl.nextElementSibling;
+    if (_existingWheelAgain && _existingWheelAgain.classList.contains('btn')) _existingWheelAgain.remove();
     resEl.insertAdjacentHTML('afterend',
       `<button class="btn outline" style="width:100%;margin-top:8px" onclick="wheelPlayAgain(${bet})">⚡ Spin Again</button>`);
     state.balance = data.new_balance;
