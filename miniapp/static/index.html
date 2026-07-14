@@ -239,6 +239,14 @@
     backdrop-filter: blur(4px);
   }
   .pin-badge img { width: 18px; height: 18px; object-fit: contain; }
+  .profile-badge {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
+    transition: transform .15s;
+  }
+  .profile-badge:hover { transform: scale(1.15); }
   .gift-card.own-gift { cursor: pointer; }
   .gift-card.own-gift:active { opacity: .7; transform: scale(.95); transition: all .1s; }
   .gift-card.pinned-gift { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
@@ -1969,10 +1977,10 @@
 const API = '';  // same origin
 
 const WRK = '<img src="/emoji/5093898072811898950" style="width:18px;height:18px;vertical-align:middle;margin-left:2px" onerror="this.outerHTML=\'WRK$\'">';
-const BADGE_OWNER    = '<img src="/emoji/5093738587791296253" style="width:20px;height:20px;vertical-align:middle" onerror="this.outerHTML=\'👑\'">';
-const BADGE_ECOADMIN = '<img src="/emoji/5093713423577909638" style="width:20px;height:20px;vertical-align:middle" onerror="this.outerHTML=\'🛡️\'">';
-const BADGE_ADMIN    = '<img src="/emoji/5093944660322158424" style="width:20px;height:20px;vertical-align:middle" onerror="this.outerHTML=\'⚔️\'">';
-const BADGE_PLUSH1   = '<img src="/emoji/5093839648371771344" style="width:20px;height:20px;vertical-align:middle" onerror="this.outerHTML=\'🐸\'">';
+const BADGE_OWNER    = '<img src="/badges/owner.png"     class="profile-badge" title="Owner"      onerror="this.outerHTML=\'👑\'">';
+const BADGE_ECOADMIN = '<img src="/badges/ecoadmin.png"  class="profile-badge" title="EcoAdmin"   onerror="this.outerHTML=\'🛡️\'">';
+const BADGE_ADMIN    = '<img src="/badges/admin.png"     class="profile-badge" title="Admin"      onerror="this.outerHTML=\'⚔️\'">';
+const BADGE_PLUSH1   = '<img src="/badges/plush_pepe_1.png" class="profile-badge" title="Plush Pepe Holder" onerror="this.outerHTML=\'🐸\'">';
 let state = {
   userId: localStorage.getItem('wrkUserId') || null,
   photoUrl: localStorage.getItem('wrkPhotoUrl') || null,
@@ -2754,7 +2762,7 @@ async function _loadProfileBadges(userId) {
     const data = await api(`/api/user/badges/${userId}`);
     const html = (data.badges || [])
       .filter(b => _BADGE_EMOJI[b])
-      .map(b => `<span title="${b}" style="font-size:20px">${_BADGE_EMOJI[b]}</span>`)
+      .map(b => _BADGE_EMOJI[b])
       .join('');
     el.innerHTML = html;
     el.style.display = html ? 'flex' : 'none';
