@@ -2615,6 +2615,65 @@ def get_friends(user_id: int):
         ).fetchall()]
         return {"friends": friends, "incoming": incoming, "outgoing": outgoing}
 
+class DailyClaimRequest(BaseModel):
+    user_id: int
+
+@app.post("/api/daily")
+def claim_daily(req: DailyClaimRequest):
+    now = int(time.time())
+    COOLDOWN = 86400
+    with db_conn() as db:
+        row = db.execute(
+            "SELECT balance, streak, last_daily FROM economy WHERE user_id = ?",
+            (req.user_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "User not found")
+        last = row["last_daily"] or 0
+        if now - last < COOLDOWN:
+            remaining = COOLDOWN - (now - last)
+            h, m = divmod(remaining // 60, 60)
+            raise HTTPException(400, f"Already claimed. Next in {h}h {m}m.")
+        streak = row["streak"] or 0
+        if last > 0 and now - last > 172800:
+            streak = 0
+        streak += 1
+        mult = 4 if streak >= 30 else 3 if streak >= 14 else 2 if streak >= 7 else 1
+        earned = random.randint(3000, 8000) * mult
+        db.execute(
+            "UPDATE economy SET balance = balance + ?, streak = ?, last_daily = ? WHERE user_id = ?",
+            (earned, streak, now, req.user_id)
+        )
+        new_balance = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()["balance"]
+        db.commit()
+    return {
+        "earned": earned,
+        "streak": streak,
+        "mult": mult,
+        "new_balance": new_balance,
+    }
+
+@app.get("/api/daily/status")
+def daily_status(user_id: int):
+    now = int(time.time())
+    COOLDOWN = 86400
+    with db_conn() as db:
+        row = db.execute(
+            "SELECT streak, last_daily FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "User not found")
+        last = row["last_daily"] or 0
+        remaining = max(0, COOLDOWN - (now - last))
+        h, m = divmod(remaining // 60, 60)
+        return {
+            "can_claim": remaining == 0,
+            "remaining_secs": remaining,
+            "remaining_label": f"{h}h {m}m" if remaining > 0 else "Ready!",
+            "streak": row["streak"] or 0,
+        }
+
+
 class SendWrkRequest(BaseModel):
     from_user_id: int
     to_user_id: int

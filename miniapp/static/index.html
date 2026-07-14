@@ -1454,6 +1454,16 @@
 
       <!-- dynamic job content (hidden until logged in) -->
       <div id="workContent" style="display:none;flex-direction:column;gap:14px"></div>
+      <!-- Daily Reward section -->
+      <div class="card" id="dailySection" style="display:none;margin-bottom:12px">
+        <div class="card-title">📅 Daily Reward</div>
+        <div id="dailyStatus" style="color:var(--muted);font-size:13px;margin-bottom:10px">Loading…</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn" id="dailyClaimBtn" onclick="claimDaily()" disabled style="flex:1">Claim Daily</button>
+          <div style="font-size:12px;color:var(--muted)" id="dailyStreakLabel"></div>
+        </div>
+        <div class="result-box" id="dailyResult" style="margin-top:8px"></div>
+      </div>
       <!-- Criminal activity (shown when logged in) -->
       <div id="workCrimeWrap" style="display:none;flex-direction:column;gap:10px">
         <div class="section-title" style="font-size:14px;margin-top:8px">🕵️ Criminal Activity</div>
@@ -4318,6 +4328,41 @@ function fmtK(n) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+// ── Daily Reward ──────────────────────────────────────────────────────────────
+async function loadDailyStatus() {
+  if (!state.userId) return;
+  try {
+    const d = await api(`/api/daily/status?user_id=${state.userId}`);
+    const btn = document.getElementById('dailyClaimBtn');
+    const statusEl = document.getElementById('dailyStatus');
+    const streakEl = document.getElementById('dailyStreakLabel');
+    if (btn) btn.disabled = !d.can_claim;
+    if (statusEl) statusEl.textContent = d.can_claim ? '🟢 Ready to claim!' : `⏳ Next claim in ${d.remaining_label}`;
+    if (streakEl) streakEl.textContent = d.streak > 0 ? `🔥 ${d.streak}-day streak` : '';
+  } catch(e) {}
+}
+
+async function claimDaily() {
+  const btn = document.getElementById('dailyClaimBtn');
+  const resEl = document.getElementById('dailyResult');
+  if (!state.userId || !btn || btn.disabled) return;
+  btn.disabled = true;
+  resEl.className = 'result-box';
+  try {
+    const d = await api('/api/daily', { method: 'POST', json: { user_id: +state.userId } });
+    const multStr = d.mult > 1 ? ` (${d.mult}× streak bonus!)` : '';
+    resEl.textContent = `+${fmt(d.earned)} WRK$${multStr} — Day ${d.streak} streak!`;
+    resEl.className = 'result-box show win-box';
+    state.balance = d.new_balance;
+    refreshHeaderBal();
+    await loadDailyStatus();
+  } catch(e) {
+    resEl.textContent = e.message;
+    resEl.className = 'result-box show lose-box';
+    await loadDailyStatus();
+  }
+}
+
 // ── Work / Jobs ───────────────────────────────────────────────────────────────
 let workState = {
   status: null,
@@ -4336,13 +4381,18 @@ async function openWorkPage() {
     document.getElementById('workContent').style.display = 'none';
     const wc = document.getElementById('workCrimeWrap');
     if (wc) wc.style.display = 'none';
+    const ds = document.getElementById('dailySection');
+    if (ds) ds.style.display = 'none';
     return;
   }
   document.getElementById('workLoginWall').style.display = 'none';
   document.getElementById('workContent').style.display = 'flex';
   const wc = document.getElementById('workCrimeWrap');
   if (wc) wc.style.display = 'flex';
+  const ds = document.getElementById('dailySection');
+  if (ds) ds.style.display = '';
   await refreshWorkStatus();
+  loadDailyStatus();
 }
 
 function loginFromWork() {
