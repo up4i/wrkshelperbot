@@ -5190,6 +5190,7 @@ function _updateDuckDisplay(msg) {
       const payout = Math.round(_duckMyBet * msg.ducks[msg.winner_idx].mult);
       resEl.textContent = `🏆 Your duck won! +${fmt(payout - _duckMyBet)} WRK$`;
       resEl.className = 'result-box show win-box';
+      if (state.balance !== null) { state.balance += (payout - _duckMyBet); refreshHeaderBal(); }
     } else if (lost) {
       resEl.textContent = `💀 Your duck lost. -${fmt(_duckMyBet)} WRK$`;
       resEl.className = 'result-box show lose-box';
@@ -5199,6 +5200,8 @@ function _updateDuckDisplay(msg) {
 
   if (msg.phase === 'waiting' && phaseChanged) {
     document.getElementById('duckResult').className = 'result-box';
+    _duckMyBet = 0;
+    _duckMyDuck = -1;
     if (_duckMyBet === 0) _showDuckBetArea();
   }
 }
