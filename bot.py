@@ -40,7 +40,7 @@ from handlers.economy import (
     cmd_rob, cmd_slots, cmd_coinflip, cmd_dice,
     cmd_blackjack, blackjack_callback,
     cmd_crash, cmd_cashout,
-    cmd_give, cmd_givewrk, cmd_setwrk,
+    cmd_give, cmd_givewrk, cmd_setwrk, cmd_giveadminpepe,
     cmd_hack, cmd_guess,
     cmd_work, cmd_workreminder, cmd_jobs, work_callback,
     cmd_profile, lb_callback,
@@ -150,9 +150,10 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("work",         cmd_work))
     app.add_handler(CommandHandler("workreminder", cmd_workreminder))
     app.add_handler(CommandHandler("jobs",         cmd_jobs))
-    app.add_handler(CommandHandler("give",        cmd_give))
-    app.add_handler(CommandHandler("givewrk",     cmd_givewrk))
-    app.add_handler(CommandHandler("setwrk",      cmd_setwrk))
+    app.add_handler(CommandHandler("give",           cmd_give))
+    app.add_handler(CommandHandler("givewrk",        cmd_givewrk))
+    app.add_handler(CommandHandler("setwrk",         cmd_setwrk))
+    app.add_handler(CommandHandler("giveadminpepe",  cmd_giveadminpepe))
     app.add_handler(CommandHandler("seedgifts",  cmd_seedgifts))
     app.add_handler(CommandHandler("inventory",  cmd_inventory))
     app.add_handler(CommandHandler("inv",        cmd_inventory))

@@ -2738,7 +2738,7 @@ def admin_poker_reset():
 
 class AdminGiftGrantRequest(BaseModel):
     user_id: int
-    collection: str = "Plush Pepe"
+    collection: str = "Admin's Plush Pepe"
 
 @app.post("/api/admin/grant-admin-gift")
 def grant_admin_gift(req: AdminGiftGrantRequest):
@@ -2749,17 +2749,19 @@ def grant_admin_gift(req: AdminGiftGrantRequest):
         ).fetchone()
         if not model:
             raise HTTPException(404, f"No model found for collection '{req.collection}'")
-        bg_row = db.execute(
-            "SELECT background FROM gift_prices WHERE collection = ? LIMIT 1",
-            (req.collection,)
+        # Sequential gift number: count all previously granted + 1
+        count_row = db.execute(
+            "SELECT COUNT(*) FROM gift_instances WHERE model_id = ? AND is_admin_gift = 1",
+            (model["id"],)
         ).fetchone()
-        bg = bg_row["background"] if bg_row else "default"
+        next_number = (count_row[0] or 0) + 1
         db.execute(
-            "INSERT INTO gift_instances (model_id, owner_id, background, is_admin_gift, staked) VALUES (?,?,?,1,0)",
-            (model["id"], req.user_id, bg)
+            "INSERT INTO gift_instances (model_id, owner_id, background, gift_number, is_admin_gift, staked) "
+            "VALUES (?,?,?,?,1,0)",
+            (model["id"], req.user_id, "black", next_number)
         )
         db.commit()
-    return {"ok": True, "message": f"Admin gift granted to user {req.user_id}"}
+    return {"ok": True, "message": f"Admin's Plush Pepe #{next_number} granted to user {req.user_id}"}
 
 
 @app.post("/api/friends/request")

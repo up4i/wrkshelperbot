@@ -1568,3 +1568,58 @@ async def _crash_end(bot, chat_id: int, game: dict, crashed_at: float):
         await bot.send_message(chat_id=chat_id, message_thread_id=game.get("thread_id"), text="\n".join(lines), parse_mode="HTML")
 
     del _crash_games[chat_id]
+
+
+# ── /giveadminpepe ────────────────────────────────────────────────────────────
+
+async def cmd_giveadminpepe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    if update.effective_user.id != config.OWNER_ID:
+        return
+
+    if not ctx.args:
+        await msg.reply_text("Usage: `/giveadminpepe @username`", parse_mode="Markdown")
+        return
+
+    target_row = await db.get_user_by_username(config.DB_PATH, msg.chat.id, ctx.args[0])
+    if not target_row:
+        await msg.reply_text("❌ User not found in this chat's activity log.")
+        return
+
+    target_id = target_row["user_id"]
+    name = target_row.get("full_name") or ctx.args[0]
+
+    import sqlite3 as _sqlite3
+    con = _sqlite3.connect(config.DB_PATH)
+    con.row_factory = _sqlite3.Row
+    try:
+        COLLECTION = "Admin's Plush Pepe"
+        model = con.execute(
+            "SELECT id FROM gift_models WHERE collection = ? LIMIT 1", (COLLECTION,)
+        ).fetchone()
+        if not model:
+            await msg.reply_text(
+                "❌ Admin's Plush Pepe gift model not seeded yet.\n"
+                "Run `python3 scripts/seed_admin_plush_pepe.py` on the Pi first.",
+                parse_mode="Markdown"
+            )
+            return
+        count_row = con.execute(
+            "SELECT COUNT(*) FROM gift_instances WHERE model_id = ? AND is_admin_gift = 1",
+            (model["id"],)
+        ).fetchone()
+        next_number = (count_row[0] or 0) + 1
+        con.execute(
+            "INSERT INTO gift_instances (model_id, owner_id, background, gift_number, is_admin_gift, staked) "
+            "VALUES (?,?,?,?,1,0)",
+            (model["id"], target_id, "black", next_number)
+        )
+        con.commit()
+    finally:
+        con.close()
+
+    await msg.reply_text(
+        f"🐸 **Admin's Plush Pepe #{next_number}** granted to {name}!\n"
+        f"Non-tradeable • Non-sellable • Black background",
+        parse_mode="Markdown"
+    )
