@@ -1769,24 +1769,35 @@ def work_end(req: WorkEndRequest):
 @app.get("/api/market/collections")
 def market_collections(tier: str = "low"):
     with db_conn() as db:
-        rows = db.execute(
-            """SELECT DISTINCT gm.collection FROM gift_instances gi
-               JOIN gift_models gm ON gm.id = gi.model_id
-               WHERE gi.owner_id IS NULL AND gm.tier = ?
-               ORDER BY gm.collection""",
-            (tier,),
-        ).fetchall()
+        if tier == "all":
+            rows = db.execute(
+                """SELECT DISTINCT gm.collection FROM gift_instances gi
+                   JOIN gift_models gm ON gm.id = gi.model_id
+                   WHERE gi.owner_id IS NULL
+                   ORDER BY gm.collection"""
+            ).fetchall()
+        else:
+            rows = db.execute(
+                """SELECT DISTINCT gm.collection FROM gift_instances gi
+                   JOIN gift_models gm ON gm.id = gi.model_id
+                   WHERE gi.owner_id IS NULL AND gm.tier = ?
+                   ORDER BY gm.collection""",
+                (tier,),
+            ).fetchall()
     return [r["collection"] for r in rows]
 
 
 @app.get("/api/market")
 def market_listings(tier: str = "low", limit: int = 40, offset: int = 0,
                     search: str = "", background: str = "", collection: str = ""):
-    valid_tiers = ("low", "mid", "high")
+    valid_tiers = ("low", "mid", "high", "all")
     if tier not in valid_tiers:
-        raise HTTPException(400, "tier must be low | mid | high")
-    where = ["gi.owner_id IS NULL", "gm.tier = ?"]
-    params: list = [tier]
+        raise HTTPException(400, "tier must be low | mid | high | all")
+    where = ["gi.owner_id IS NULL"]
+    params: list = []
+    if tier != "all":
+        where.append("gm.tier = ?")
+        params.append(tier)
     if search:
         if search.isdigit():
             where.append("(gm.model_name LIKE ? OR gm.collection LIKE ? OR gi.gift_number = ?)")
