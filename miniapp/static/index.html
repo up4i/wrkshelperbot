@@ -5305,7 +5305,7 @@ function _updateMarblesDisplay(msg) {
   // Result
   if (msg.phase === 'finished' && phaseChanged && msg.winner_id) {
     const resEl = document.getElementById('marbleResult');
-    const iWon = _marbleMyColor && msg.players?.find(p => p.color === _marbleMyColor && msg.winner_id);
+    const iWon = _marbleMyColor !== null && msg.winner_id === +state.userId;
     resEl.textContent = iWon ? `🏆 Your marble won!` : `The marble landed elsewhere.`;
     resEl.className = `result-box show ${iWon ? 'win-box' : 'lose-box'}`;
     _marbleMyColor = null;
