@@ -2022,8 +2022,8 @@ def _bj_playing_state(game: dict, balance: int) -> dict:
     can_double = is_first and balance >= game["bet"]
     can_split = (
         is_first
-        and len(game["hands"]) == 1
-        and hand[0][0] == hand[1][0]
+        and len(hand) == 2
+        and _bj_card_val(hand[0][0]) == _bj_card_val(hand[1][0])
         and balance >= game["bet"]
     )
     return {
@@ -2247,12 +2247,21 @@ def blackjack_action(req: BlackjackActionRequest):
             return _bj_resolve_game(db, req.user_id, game)
 
         if req.action == "split":
-            if len(hand) != 2 or len(game["hands"]) > 1 or balance < game["bet"]:
+            if (len(hand) != 2
+                    or _bj_card_val(hand[0][0]) != _bj_card_val(hand[1][0])
+                    or balance < game["bet"]):
                 raise HTTPException(400, "Can't split now")
             c1, c2 = hand
-            game["hands"] = [[c1, game["deck"].pop()], [c2, game["deck"].pop()]]
-            game["doubled"] = [False, False]
-            game["current_hand"] = 0
+            ci = game["current_hand"]
+            # Insert two new hands at current position, replacing current hand
+            new_hands = game["hands"][:ci] + [[c1, game["deck"].pop()], [c2, game["deck"].pop()]] + game["hands"][ci+1:]
+            new_doubled = game["doubled"][:ci] + [False, False] + game["doubled"][ci+1:]
+            game["hands"] = new_hands
+            game["doubled"] = new_doubled
+            game["current_hand"] = ci
+            # Deduct extra bet for split
+            db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (game["bet"], req.user_id))
+            balance -= game["bet"]
             return _bj_playing_state(game, balance)
 
     return _bj_playing_state(game, balance)  # unreachable but satisfies linter
