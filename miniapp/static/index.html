@@ -1926,7 +1926,7 @@
     <div class="modal-title">💸 Send <img src="/emoji/5093898072811898950" style="width:18px;height:18px;vertical-align:middle;margin-left:2px" onerror="this.outerHTML='WRK$'"></div>
     <div>
       <p id="sendWrkTarget" style="margin-bottom:12px;color:var(--muted);text-align:center"></p>
-      <input id="sendWrkAmount" type="number" class="input" placeholder="Amount" min="1">
+      <input id="sendWrkAmount" type="text" inputmode="numeric" class="input bet-input" placeholder="Amount">
       <button class="btn" style="width:100%;margin-top:10px" onclick="submitSendWrk()">Send</button>
     </div>
   </div>
@@ -2489,7 +2489,7 @@ function closeSendWrk() {
   document.getElementById('sendWrkOverlay').style.display = 'none';
 }
 async function submitSendWrk() {
-  const amount = parseInt(document.getElementById('sendWrkAmount').value);
+  const amount = _parseBet('sendWrkAmount');
   if (!amount || amount <= 0) return alert('Enter a valid amount');
   try {
     const data = await api('/api/send-wrk', { method: 'POST', json: {
