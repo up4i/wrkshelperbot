@@ -66,6 +66,7 @@
     flex: 1;
     padding: 16px 16px calc(var(--nav-h) + 16px);
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .page { display: none; flex-direction: column; gap: 16px; }
@@ -2015,6 +2016,7 @@ async function boot() {
 
   if (state.inTelegram) {
     tg.expand();
+    tg.disableVerticalSwipes?.();
     try {
       const auth = await api('/api/auth/telegram', { method: 'POST', json: { init_data: tg.initData } });
       if (auth.photo_url) {
