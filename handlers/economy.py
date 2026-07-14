@@ -1586,16 +1586,20 @@ async def cmd_giveadminpepe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     if not ctx.args:
-        await msg.reply_text("Usage: `/giveadminpepe @username`", parse_mode="Markdown")
+        await msg.reply_text("Usage: `/giveadminpepe @username` or `/giveadminpepe <user_id>`", parse_mode="Markdown")
         return
 
-    target_row = await _resolve_target_user(config.DB_PATH, msg.chat.id, ctx.args[0])
-    if not target_row:
-        await msg.reply_text("❌ User not found. They need to have interacted with the bot at least once.")
-        return
-
-    target_id = target_row["user_id"]
-    name = target_row.get("full_name") or ctx.args[0]
+    arg = ctx.args[0]
+    if arg.lstrip("-").isdigit():
+        target_id = int(arg)
+        name = str(target_id)
+    else:
+        target_row = await _resolve_target_user(config.DB_PATH, msg.chat.id, arg)
+        if not target_row:
+            await msg.reply_text("❌ User not found. Try `/giveadminpepe <user_id>` with their Telegram ID instead.", parse_mode="Markdown")
+            return
+        target_id = target_row["user_id"]
+        name = target_row.get("full_name") or arg
 
     import sqlite3 as _sqlite3
     con = _sqlite3.connect(config.DB_PATH)
