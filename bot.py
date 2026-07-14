@@ -24,7 +24,7 @@ from handlers.protection import (
     cmd_antiraid, cmd_setantiraid,
     on_protection_check, on_antiraid_check,
 )
-from handlers.admin import cmd_id, cmd_info, cmd_setlog, cmd_halos, cmd_help, cmd_econhelp, cmd_setbottopic, cmd_clearbottopic, help_callback, on_any_message, on_service_message
+from handlers.admin import cmd_id, cmd_info, cmd_setlog, cmd_halos, cmd_help, cmd_econhelp, cmd_ownerhelp, cmd_setbottopic, cmd_clearbottopic, help_callback, on_any_message, on_service_message
 from handlers.utility import (
     cmd_admins, cmd_rules, cmd_setrules, cmd_me, cmd_dlog, cmd_cleanservice,
     cmd_givehalo, cmd_removehalo,
@@ -41,6 +41,7 @@ from handlers.economy import (
     cmd_blackjack, blackjack_callback,
     cmd_crash, cmd_cashout,
     cmd_give, cmd_givewrk, cmd_setwrk, cmd_giveadminpepe,
+    cmd_addecoadmin, cmd_removeecoadmin, cmd_listecoadmins,
     cmd_hack, cmd_guess,
     cmd_work, cmd_workreminder, cmd_jobs, work_callback,
     cmd_profile, lb_callback,
@@ -90,6 +91,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("setup",        cmd_setup))
     app.add_handler(CommandHandler("help",         cmd_help))
     app.add_handler(CommandHandler("econhelp",     cmd_econhelp))
+    app.add_handler(CommandHandler("ownerhelp",    cmd_ownerhelp))
     app.add_handler(CommandHandler("id",           cmd_id))
     app.add_handler(CommandHandler("info",         cmd_info))
     app.add_handler(CommandHandler("setlog",       cmd_setlog))
@@ -153,7 +155,10 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("give",           cmd_give))
     app.add_handler(CommandHandler("givewrk",        cmd_givewrk))
     app.add_handler(CommandHandler("setwrk",         cmd_setwrk))
-    app.add_handler(CommandHandler("giveadminpepe",  cmd_giveadminpepe))
+    app.add_handler(CommandHandler("giveadminpepe",    cmd_giveadminpepe))
+    app.add_handler(CommandHandler("addecoadmin",      cmd_addecoadmin))
+    app.add_handler(CommandHandler("removeecoadmin",   cmd_removeecoadmin))
+    app.add_handler(CommandHandler("listecoadmins",    cmd_listecoadmins))
     app.add_handler(CommandHandler("seedgifts",  cmd_seedgifts))
     app.add_handler(CommandHandler("inventory",  cmd_inventory))
     app.add_handler(CommandHandler("inv",        cmd_inventory))

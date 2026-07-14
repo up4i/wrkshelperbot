@@ -119,6 +119,10 @@ CREATE TABLE IF NOT EXISTS game_stats (
     crash_lost      INTEGER NOT NULL DEFAULT 0,
     crash_best_mult REAL    NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS bot_roles (
+    user_id INTEGER PRIMARY KEY,
+    role    TEXT NOT NULL
+);
 """
 
 async def _migrate(db) -> None:
@@ -402,6 +406,57 @@ async def get_user_by_username(db_path: str, chat_id: int, username: str) -> dic
         ) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
+
+
+async def get_user_by_username_global(db_path: str, username: str) -> dict | None:
+    """Fallback lookup in the economy table (not chat-scoped)."""
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT user_id, full_name, username FROM economy WHERE LOWER(username) = LOWER(?)",
+            (username.lstrip("@"),),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
+# --- roles ---
+
+async def is_eco_admin(db_path: str, user_id: int, owner_id: int) -> bool:
+    if user_id == owner_id:
+        return True
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "SELECT 1 FROM bot_roles WHERE user_id = ? AND role = 'ecoadmin'", (user_id,)
+        ) as cur:
+            return await cur.fetchone() is not None
+
+
+async def add_eco_admin(db_path: str, user_id: int) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO bot_roles (user_id, role) VALUES (?, 'ecoadmin')", (user_id,)
+        )
+        await db.commit()
+
+
+async def remove_eco_admin(db_path: str, user_id: int) -> None:
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute(
+            "DELETE FROM bot_roles WHERE user_id = ? AND role = 'ecoadmin'", (user_id,)
+        )
+        await db.commit()
+
+
+async def list_eco_admins(db_path: str) -> list[dict]:
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT br.user_id, COALESCE(e.full_name, e.username, CAST(br.user_id AS TEXT)) AS name
+               FROM bot_roles br LEFT JOIN economy e ON e.user_id = br.user_id
+               WHERE br.role = 'ecoadmin'"""
+        ) as cur:
+            return [dict(r) async for r in cur]
 
 
 async def get_inactives(db_path: str, chat_id: int, since_ts: int) -> list[dict]:

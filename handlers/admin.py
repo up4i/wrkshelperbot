@@ -201,6 +201,26 @@ async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(_MAIN_TEXT, parse_mode="Markdown", reply_markup=_main_kb())
 
 
+_OWNER_HELP = (
+    "🔐 *Owner & EcoAdmin Commands*\n\n"
+    "👑 *Owner only*\n"
+    "`/addecoadmin @user` — grant EcoAdmin role\n"
+    "`/removeecoadmin @user` — revoke EcoAdmin role\n"
+    "`/listecoadmins` — list current EcoAdmins\n"
+    "`/seedgifts` — (re)seed gift catalog to DB\n\n"
+    "🛡 *EcoAdmin* _(+ owner)_\n"
+    "`/givewrk @user <amount>` — add/remove WRK$ from a user\n"
+    "`/setwrk @user <amount>` — set a user's balance directly\n"
+    "`/giveadminpepe @user` — grant an Admin's Plush Pepe NFT\n"
+)
+
+
+async def cmd_ownerhelp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != config.OWNER_ID:
+        return
+    await update.effective_message.reply_text(_OWNER_HELP, parse_mode="Markdown")
+
+
 async def cmd_econhelp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     content = _PAGES["economy"]

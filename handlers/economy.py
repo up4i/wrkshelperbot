@@ -569,7 +569,8 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             gift_icon = f'<tg-emoji emoji-id="{pg["custom_emoji_id"]}">{pg.get("model_emoji", "🎁")}</tg-emoji>'
         else:
             gift_icon = pg.get("model_emoji", "🎁")
-        gift_display = pg["collection"].replace("_", " ").title()
+        col = pg["collection"]
+        gift_display = " ".join(w.capitalize() for w in col.split("_")) if "_" in col else col
         pinned_line = f'\n{gift_icon}{bg_emoji} {escape(gift_display)} #{pg["gift_number"]}'
 
     # job title
@@ -623,18 +624,25 @@ async def cmd_workreminder(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── Economy admin (owner only) ────────────────────────────────────────────────
 
+async def _resolve_target_user(db_path: str, chat_id: int, username_arg: str) -> dict | None:
+    row = await db.get_user_by_username(db_path, chat_id, username_arg)
+    if not row:
+        row = await db.get_user_by_username_global(db_path, username_arg)
+    return row
+
+
 async def cmd_givewrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
-    if update.effective_user.id != config.OWNER_ID:
+    if not await db.is_eco_admin(config.DB_PATH, update.effective_user.id, config.OWNER_ID):
         return
 
     if len(ctx.args) < 2 or not ctx.args[1].lstrip("-").isdigit():
         await msg.reply_text("Usage: `/givewrk @username <amount>`", parse_mode="Markdown")
         return
 
-    target_row = await db.get_user_by_username(config.DB_PATH, msg.chat.id, ctx.args[0])
+    target_row = await _resolve_target_user(config.DB_PATH, msg.chat.id, ctx.args[0])
     if not target_row:
-        await msg.reply_text("❌ User not found in this chat's activity log.")
+        await msg.reply_text("❌ User not found.")
         return
 
     amount = int(ctx.args[1])
@@ -647,16 +655,16 @@ async def cmd_givewrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_setwrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
-    if update.effective_user.id != config.OWNER_ID:
+    if not await db.is_eco_admin(config.DB_PATH, update.effective_user.id, config.OWNER_ID):
         return
 
     if len(ctx.args) < 2 or not ctx.args[1].isdigit():
         await msg.reply_text("Usage: `/setwrk @username <amount>`", parse_mode="Markdown")
         return
 
-    target_row = await db.get_user_by_username(config.DB_PATH, msg.chat.id, ctx.args[0])
+    target_row = await _resolve_target_user(config.DB_PATH, msg.chat.id, ctx.args[0])
     if not target_row:
-        await msg.reply_text("❌ User not found in this chat's activity log.")
+        await msg.reply_text("❌ User not found.")
         return
 
     target_id = target_row["user_id"]
@@ -1574,16 +1582,16 @@ async def _crash_end(bot, chat_id: int, game: dict, crashed_at: float):
 
 async def cmd_giveadminpepe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
-    if update.effective_user.id != config.OWNER_ID:
+    if not await db.is_eco_admin(config.DB_PATH, update.effective_user.id, config.OWNER_ID):
         return
 
     if not ctx.args:
         await msg.reply_text("Usage: `/giveadminpepe @username`", parse_mode="Markdown")
         return
 
-    target_row = await db.get_user_by_username(config.DB_PATH, msg.chat.id, ctx.args[0])
+    target_row = await _resolve_target_user(config.DB_PATH, msg.chat.id, ctx.args[0])
     if not target_row:
-        await msg.reply_text("❌ User not found in this chat's activity log.")
+        await msg.reply_text("❌ User not found. They need to have interacted with the bot at least once.")
         return
 
     target_id = target_row["user_id"]
@@ -1623,3 +1631,57 @@ async def cmd_giveadminpepe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"Non-tradeable • Non-sellable • Black background",
         parse_mode="Markdown"
     )
+
+
+# ── EcoAdmin management (owner only) ──────────────────────────────────────────
+
+async def cmd_addecoadmin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    if update.effective_user.id != config.OWNER_ID:
+        return
+
+    if not ctx.args:
+        await msg.reply_text("Usage: `/addecoadmin @username`", parse_mode="Markdown")
+        return
+
+    target_row = await _resolve_target_user(config.DB_PATH, msg.chat.id, ctx.args[0])
+    if not target_row:
+        await msg.reply_text("❌ User not found. They need to have interacted with the bot at least once.")
+        return
+
+    await db.add_eco_admin(config.DB_PATH, target_row["user_id"])
+    name = target_row.get("full_name") or ctx.args[0]
+    await msg.reply_text(f"✅ {name} is now an EcoAdmin.")
+
+
+async def cmd_removeecoadmin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    if update.effective_user.id != config.OWNER_ID:
+        return
+
+    if not ctx.args:
+        await msg.reply_text("Usage: `/removeecoadmin @username`", parse_mode="Markdown")
+        return
+
+    target_row = await _resolve_target_user(config.DB_PATH, msg.chat.id, ctx.args[0])
+    if not target_row:
+        await msg.reply_text("❌ User not found.")
+        return
+
+    await db.remove_eco_admin(config.DB_PATH, target_row["user_id"])
+    name = target_row.get("full_name") or ctx.args[0]
+    await msg.reply_text(f"✅ {name} removed from EcoAdmins.")
+
+
+async def cmd_listecoadmins(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    msg = update.effective_message
+    if update.effective_user.id != config.OWNER_ID:
+        return
+
+    admins = await db.list_eco_admins(config.DB_PATH)
+    if not admins:
+        await msg.reply_text("No EcoAdmins set.")
+        return
+
+    lines = "\n".join(f"• {a['name']} ({a['user_id']})" for a in admins)
+    await msg.reply_text(f"🛡 EcoAdmins:\n{lines}")

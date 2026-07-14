@@ -1327,11 +1327,6 @@
             <div class="gname">Roulette</div>
             <div class="gdesc">Red, Black, or Green — up to 14×</div>
           </div>
-          <div class="game-card" onclick="openHighLow()">
-            <div class="gicon">🃏</div>
-            <div class="gname">High-Low</div>
-            <div class="gdesc">Chain multipliers by reading the cards</div>
-          </div>
           <div class="game-card" onclick="openCraps()">
             <div class="gicon">🎲</div>
             <div class="gname">Street Craps</div>
@@ -1562,38 +1557,6 @@
     </div>
     <div class="balance-display">Balance: <span class="b" id="rouletteBal">—</span> WRK$</div>
     <div class="error-msg" id="rouletteErr"></div>
-  </div>
-</div>
-
-<!-- HIGH-LOW MODAL -->
-<div class="modal-bg" id="hlModal" onclick="closeModal('hlModal',event)">
-  <div class="modal" style="position:relative">
-    <button class="modal-close" onclick="closeModal('hlModal')">✕</button>
-    <div class="modal-title">🃏 High-Low</div>
-    <div id="hlStatus" style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:8px"></div>
-    <div id="hlBetWrap">
-      <div class="card-title">Bet amount</div>
-      <div class="bet-presets" id="hlPresets"></div>
-      <div class="bet-row">
-        <input class="input bet-input" id="hlBet" type="text" inputmode="numeric" value="100">
-        <button class="btn" id="hlStartBtn" onclick="startHighLow()">DEAL</button>
-      </div>
-    </div>
-    <div id="hlGameWrap" style="display:none;flex-direction:column;gap:12px;align-items:center">
-      <div style="font-size:64px;font-weight:900;letter-spacing:-2px" id="hlCard">—</div>
-      <div style="font-size:13px;color:var(--muted)">Current card</div>
-      <div style="font-size:18px;font-weight:700;color:var(--gold)">
-        Multiplier: <span id="hlMult">1.00</span>× · Potential: <span id="hlPotential">—</span> WRK$
-      </div>
-      <div class="cf-choice" style="gap:12px">
-        <button class="btn" id="hlHigherBtn" onclick="guessHighLow('higher')" style="flex:1;background:var(--green)">▲ Higher</button>
-        <button class="btn" id="hlLowerBtn" onclick="guessHighLow('lower')" style="flex:1;background:var(--red)">▼ Lower</button>
-      </div>
-      <button class="btn outline" id="hlCashoutBtn" onclick="cashoutHighLow()" style="width:100%">💰 Cash Out</button>
-    </div>
-    <div class="result-box" id="hlResult"></div>
-    <div class="balance-display">Balance: <span class="b" id="hlBal">—</span> WRK$</div>
-    <div class="error-msg" id="hlErr"></div>
   </div>
 </div>
 
@@ -3187,99 +3150,6 @@ function rlPlayAgain(bet) {
 }
 
 // ── High-Low ──────────────────────────────────────────────────────────────────
-async function openHighLow() {
-  if (!state.userId) return alert('Open in Telegram to play.');
-  document.getElementById('hlResult').className = 'result-box';
-  document.getElementById('hlErr').textContent = '';
-  document.getElementById('hlBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
-  buildPresets('hlPresets', 'hlBet');
-  document.getElementById('hlModal').classList.add('open');
-  try {
-    const status = await api(`/api/play/highlow/status/${state.userId}`);
-    if (status.active) {
-      _hlEnterGame(status.card_label, status.multiplier, status.potential_win);
-    } else {
-      _hlShowBet();
-    }
-  } catch { _hlShowBet(); }
-}
-
-function _hlShowBet() {
-  document.getElementById('hlBetWrap').style.display = '';
-  document.getElementById('hlGameWrap').style.display = 'none';
-  document.getElementById('hlStatus').textContent = '';
-  document.getElementById('hlCashoutBtn').disabled = true;
-}
-
-function _hlEnterGame(cardLabel, mult, potential) {
-  document.getElementById('hlBetWrap').style.display = 'none';
-  document.getElementById('hlGameWrap').style.display = 'flex';
-  document.getElementById('hlCard').textContent = cardLabel;
-  document.getElementById('hlMult').textContent = parseFloat(mult).toFixed(2);
-  document.getElementById('hlPotential').textContent = fmt(potential);
-  document.getElementById('hlCashoutBtn').disabled = parseFloat(mult) <= 1.0;
-}
-
-async function startHighLow() {
-  const bet = _parseBet('hlBet');
-  document.getElementById('hlErr').textContent = '';
-  document.getElementById('hlStartBtn').disabled = true;
-  try {
-    const data = await api('/api/play/highlow/start', { method:'POST', json:{ user_id:+state.userId, bet } });
-    state.balance = data.new_balance;
-    document.getElementById('hlBal').textContent = fmt(state.balance);
-    refreshHeaderBal();
-    _hlEnterGame(data.card_label, 1.0, bet);
-  } catch (e) {
-    document.getElementById('hlErr').textContent = e.message || 'Error';
-  } finally {
-    document.getElementById('hlStartBtn').disabled = false;
-  }
-}
-
-async function guessHighLow(direction) {
-  document.getElementById('hlHigherBtn').disabled = true;
-  document.getElementById('hlLowerBtn').disabled = true;
-  document.getElementById('hlErr').textContent = '';
-  try {
-    const data = await api('/api/play/highlow/guess', { method:'POST', json:{ user_id:+state.userId, direction } });
-    if (data.result === 'correct') {
-      _hlEnterGame(data.next_card_label, data.multiplier, data.potential_win);
-      document.getElementById('hlStatus').textContent = `✅ Correct! Card was ${data.next_card_label}` + (data.cards_left !== undefined ? ` — ${data.cards_left} left` : '');
-    } else {
-      state.balance = data.new_balance;
-      document.getElementById('hlBal').textContent = fmt(state.balance);
-      refreshHeaderBal();
-      const resEl = document.getElementById('hlResult');
-      resEl.textContent = `❌ Wrong! Card was ${data.next_card_label}. Lost ${fmt(data.lost)} WRK$.`;
-      resEl.className = 'result-box show lose-box';
-      _hlShowBet();
-    }
-  } catch (e) {
-    document.getElementById('hlErr').textContent = e.message || 'Error';
-  } finally {
-    document.getElementById('hlHigherBtn').disabled = false;
-    document.getElementById('hlLowerBtn').disabled = false;
-  }
-}
-
-async function cashoutHighLow() {
-  document.getElementById('hlCashoutBtn').disabled = true;
-  try {
-    const data = await api('/api/play/highlow/cashout', { method:'POST', json:{ user_id:+state.userId } });
-    state.balance = data.new_balance;
-    document.getElementById('hlBal').textContent = fmt(state.balance);
-    refreshHeaderBal();
-    const resEl = document.getElementById('hlResult');
-    resEl.textContent = `💰 Cashed out at ${parseFloat(data.multiplier).toFixed(2)}×! +${fmt(data.winnings)} WRK$`;
-    resEl.className = 'result-box show win-box';
-    _hlShowBet();
-  } catch (e) {
-    document.getElementById('hlErr').textContent = e.message || 'Error';
-    document.getElementById('hlCashoutBtn').disabled = false;
-  }
-}
-
 // ── Street Craps ──────────────────────────────────────────────────────────────
 const _DICE_EMOJI = ['','⚀','⚁','⚂','⚃','⚄','⚅'];
 
