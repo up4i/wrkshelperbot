@@ -1197,7 +1197,11 @@ def play_case(req: CaseRequest):
             cases_win_val = gift_val_row["base_price"] if gift_val_row else 50_000
         else:
             cases_win_val = wrk_reward
-        _record_stats(db, req.user_id, cases_won=cases_win_val, cases_lost=_CASE_PRICE)
+        net = cases_win_val - _CASE_PRICE
+        if net >= 0:
+            _record_stats(db, req.user_id, cases_won=net)
+        else:
+            _record_stats(db, req.user_id, cases_lost=-net)
         db.commit()
         return {
             "tier": tier_name,
@@ -3237,9 +3241,10 @@ async def _marble_loop():
                 for gid in _marble.pot_gifts:
                     db.execute("UPDATE gift_instances SET owner_id = ?, staked = 0 WHERE id = ?", (winner_id, gid))
                 # Record stats
+                winner_bet = _marble.bets[winner_id]["wrk"] if winner_id in _marble.bets else 0
                 for uid, b in _marble.bets.items():
                     if uid == winner_id:
-                        _record_stats(db, uid, marbles_won=_marble.pot_wrk)  # approximate, WRK only
+                        _record_stats(db, uid, marbles_won=max(0, _marble.pot_wrk - winner_bet))
                     else:
                         _record_stats(db, uid, marbles_lost=b["wrk"])
                 db.commit()
