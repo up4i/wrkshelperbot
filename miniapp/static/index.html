@@ -4829,11 +4829,15 @@ function openProfileGiftModal(giftId) {
   }
 
   document.getElementById('giftDetailTitle').textContent = `${g.model_name} #${g.gift_number || g.id}`;
+  const priceRow = g.current_price > 0
+    ? `<div class="gift-detail-row"><span class="lbl">Market Price</span><span class="val gold">${fmt(g.current_price)} WRK$</span></div>`
+    : '';
   document.getElementById('giftDetailRows').innerHTML = `
     <div class="gift-detail-row"><span class="lbl">Collection</span><span class="val">${esc(fmtCollection(g.collection || g.model_name))}</span></div>
     <div class="gift-detail-row"><span class="lbl">Background</span><span class="val">${esc(BG_LABEL[g.background] || g.background || '—')}</span></div>
     <div class="gift-detail-row"><span class="lbl">Tier</span><span class="val">${esc(g.tier || '—')}</span></div>
     <div class="gift-detail-row"><span class="lbl">Gift #</span><span class="val">#${g.gift_number || g.id}</span></div>
+    ${priceRow}
   `;
 
   const buyBtn = document.getElementById('giftDetailBuyBtn');

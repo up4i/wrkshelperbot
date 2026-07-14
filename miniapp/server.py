@@ -186,8 +186,10 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
 
     gifts = db.execute(
         "SELECT gi.id, gi.gift_number, gi.background, gi.acquired_at, "
-        "gm.model_name, gm.model_emoji, gm.tier, gm.collection, gm.custom_emoji_id "
+        "gm.model_name, gm.model_emoji, gm.tier, gm.collection, gm.custom_emoji_id, "
+        "COALESCE(gp.current_price, 0) AS current_price "
         "FROM gift_instances gi JOIN gift_models gm ON gm.id = gi.model_id "
+        "LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background "
         "WHERE gi.owner_id = ? "
         "ORDER BY COALESCE(gi.sort_index, 999999) ASC, gi.acquired_at DESC "
         "LIMIT ? OFFSET ?", (user_id, gifts_limit, gifts_offset)
@@ -212,8 +214,10 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
     if row["pinned_gift_id"]:
         pg = db.execute(
             "SELECT gi.id, gi.gift_number, gi.background, "
-            "gm.model_name, gm.model_emoji, gm.custom_emoji_id "
+            "gm.model_name, gm.model_emoji, gm.custom_emoji_id, "
+            "COALESCE(gp.current_price, 0) AS current_price "
             "FROM gift_instances gi JOIN gift_models gm ON gm.id = gi.model_id "
+            "LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background "
             "WHERE gi.id = ? AND gi.owner_id = ?",
             (row["pinned_gift_id"], user_id),
         ).fetchone()
