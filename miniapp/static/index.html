@@ -4188,7 +4188,9 @@ function _buildCaseReel(wonTier, wonEmoji, wonName, wonWrk) {
 async function _animateCaseReel() {
   const reel = document.getElementById('caseReel');
   if (!reel) return;
-  const finalShift = _CASE_REVEAL_IDX * _CASE_ITEM_W - (140 - 42);
+  const REEL_PADDING = 6;
+  const halfViewport = reel.parentElement.clientWidth / 2;
+  const finalShift = Math.round(REEL_PADDING + _CASE_REVEAL_IDX * _CASE_ITEM_W - (halfViewport - _CASE_ITEM_W / 2));
   await sleep(50);
   reel.style.transition = 'transform 6s cubic-bezier(0.02, 0.01, 0.21, 1)';
   reel.style.transform = `translateX(-${finalShift}px)`;
