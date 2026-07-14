@@ -3084,7 +3084,7 @@ async def duck_ws(ws: WebSocket):
 
 # ── Marbles ───────────────────────────────────────────────────────────────────
 
-_MARBLE_OPEN_SECS = 20
+_MARBLE_OPEN_SECS = 15
 _MARBLE_EXTEND_SECS = 10
 _MARBLE_LAUNCH_SECS = 6
 _MARBLE_FINISHED_SECS = 5
@@ -3301,7 +3301,7 @@ async def marbles_ws(ws: WebSocket):
 
 # ── Live Blackjack ────────────────────────────────────────────────────────────
 
-_LBJ_BETTING_SECS = 10
+_LBJ_BETTING_SECS = 15
 _LBJ_TURN_SECS = 30
 _LBJ_RESULTS_SECS = 5
 

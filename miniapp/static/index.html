@@ -5267,8 +5267,12 @@ function _handleMarbleMsg(msg) {
       `<div class="crash-bet-info">✅ You're in! <span style="color:${msg.color}">●</span></div>`;
   } else if (msg.type === 'refund') {
     document.getElementById('marblePhase').textContent = msg.message;
-    document.getElementById('marbleBetArea').innerHTML = '';
     _marbleMyColor = null;
+    setTimeout(() => {
+      if (_marbleLastPhase === 'open') {
+        _marbleLastPhase = null; // force phaseChanged = true on next state message
+      }
+    }, 2200);
   } else if (msg.type === 'error') {
     const el = document.getElementById('marbleErr');
     if (el) { el.textContent = msg.message; setTimeout(() => el.textContent = '', 3000); }
@@ -5651,6 +5655,7 @@ function _handleLbjMsg(msg) {
     const el = document.getElementById('lbjPhase');
     if (el) el.textContent = msg.message;
     state.balance += msg.bet || 0;
+    _lbjSeated = false;
     refreshHeaderBal();
   } else if (msg.type === 'error') {
     const el = document.getElementById('lbjErr');
