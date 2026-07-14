@@ -2328,13 +2328,17 @@ def create_trade(req: TradeCreateRequest):
         raise HTTPException(400, "Trade must have at least one item on either side")
     with db_conn() as db:
         if req.offer_gift_id:
-            row = db.execute("SELECT owner_id FROM gift_instances WHERE id=?", (req.offer_gift_id,)).fetchone()
+            row = db.execute("SELECT owner_id, is_admin_gift FROM gift_instances WHERE id=?", (req.offer_gift_id,)).fetchone()
             if not row or row["owner_id"] != req.from_user_id:
                 raise HTTPException(400, "You don't own that gift")
+            if row["is_admin_gift"]:
+                raise HTTPException(400, "Admin gifts cannot be traded")
         if req.request_gift_id:
-            row = db.execute("SELECT owner_id FROM gift_instances WHERE id=?", (req.request_gift_id,)).fetchone()
+            row = db.execute("SELECT owner_id, is_admin_gift FROM gift_instances WHERE id=?", (req.request_gift_id,)).fetchone()
             if not row or row["owner_id"] != req.to_user_id:
                 raise HTTPException(400, "Target doesn't own that gift")
+            if row["is_admin_gift"]:
+                raise HTTPException(400, "Admin gifts cannot be traded")
         if req.offer_wrk > 0:
             bal = db.execute("SELECT balance FROM economy WHERE user_id=?", (req.from_user_id,)).fetchone()
             if not bal or bal["balance"] < req.offer_wrk:
@@ -2732,6 +2736,32 @@ def admin_poker_reset():
     return {"ok": True, "message": "Poker table reset, chips refunded"}
 
 
+class AdminGiftGrantRequest(BaseModel):
+    user_id: int
+    collection: str = "Plush Pepe"
+
+@app.post("/api/admin/grant-admin-gift")
+def grant_admin_gift(req: AdminGiftGrantRequest):
+    with db_conn() as db:
+        model = db.execute(
+            "SELECT id FROM gift_models WHERE collection = ? LIMIT 1",
+            (req.collection,)
+        ).fetchone()
+        if not model:
+            raise HTTPException(404, f"No model found for collection '{req.collection}'")
+        bg_row = db.execute(
+            "SELECT background FROM gift_prices WHERE collection = ? LIMIT 1",
+            (req.collection,)
+        ).fetchone()
+        bg = bg_row["background"] if bg_row else "default"
+        db.execute(
+            "INSERT INTO gift_instances (model_id, owner_id, background, is_admin_gift, staked) VALUES (?,?,?,1,0)",
+            (model["id"], req.user_id, bg)
+        )
+        db.commit()
+    return {"ok": True, "message": f"Admin gift granted to user {req.user_id}"}
+
+
 @app.post("/api/friends/request")
 def send_friend_request(req: FriendRequestCreate):
     import time as _time
@@ -2858,6 +2888,11 @@ async def _startup():
             pass
         try:
             db.execute("ALTER TABLE gift_instances ADD COLUMN staked INTEGER DEFAULT 0")
+            db.commit()
+        except Exception:
+            pass
+        try:
+            db.execute("ALTER TABLE gift_instances ADD COLUMN is_admin_gift INTEGER DEFAULT 0")
             db.commit()
         except Exception:
             pass
