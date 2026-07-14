@@ -5939,13 +5939,15 @@ function connectLobbyWs() {
 function showLobbyToast(data) {
   const toast = document.getElementById('lobbyToast');
   document.getElementById('lobbyToastIcon').textContent = _GAME_ICONS[data.game] || '🎮';
-  document.getElementById('lobbyToastTitle').textContent = `${data.user} joined ${data.game_label}`;
+  document.getElementById('lobbyToastTitle').textContent = `${data.user} bet on ${data.game_label}`;
   document.getElementById('lobbyToastSub').textContent = 'Tap to join';
+  toast.classList.remove('show');
   toast.style.display = 'flex';
-  requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('show')));
+  void toast.offsetHeight; // force reflow so CSS transition fires
+  toast.classList.add('show');
   toast.onclick = () => { hideLobbyToast(); navigateToGame(data.game); };
   clearTimeout(_lobbyToastTimer);
-  _lobbyToastTimer = setTimeout(hideLobbyToast, 2500);
+  _lobbyToastTimer = setTimeout(hideLobbyToast, 3000);
 }
 
 function hideLobbyToast() {
