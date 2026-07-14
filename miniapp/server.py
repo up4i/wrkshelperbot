@@ -558,6 +558,29 @@ def get_emoji_animation(emoji_id: str):
 
 # ── Avatar proxy ─────────────────────────────────────────────────────────────
 
+@app.get("/api/user/badges/{user_id}")
+def get_user_badges(user_id: int):
+    owner_id = config.OWNER_ID
+    with db_conn() as db:
+        badges = []
+        if user_id == owner_id:
+            badges.append("owner")
+        role_row = db.execute(
+            "SELECT role FROM bot_roles WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if role_row:
+            badges.append(role_row["role"])
+        pepe_row = db.execute(
+            """SELECT gi.owner_id FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               WHERE gm.collection = 'plush_pepe' AND gi.gift_number = 1
+               LIMIT 1"""
+        ).fetchone()
+        if pepe_row and pepe_row["owner_id"] == user_id:
+            badges.append("plush_pepe_1")
+    return {"badges": badges}
+
+
 @app.get("/api/avatar/{user_id}")
 def get_avatar(user_id: int):
     cached = _AVATAR_CACHE / f"{user_id}.jpg"

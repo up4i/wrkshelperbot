@@ -448,6 +448,29 @@ async def remove_eco_admin(db_path: str, user_id: int) -> None:
         await db.commit()
 
 
+async def get_user_badges(db_path: str, user_id: int, owner_id: int) -> list[str]:
+    badges = []
+    if user_id == owner_id:
+        badges.append("owner")
+    async with aiosqlite.connect(db_path) as db:
+        async with db.execute(
+            "SELECT role FROM bot_roles WHERE user_id = ?", (user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+            if row:
+                badges.append(row[0])
+        async with db.execute(
+            """SELECT gi.owner_id FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               WHERE gm.collection = 'plush_pepe' AND gi.gift_number = 1
+               LIMIT 1"""
+        ) as cur:
+            row = await cur.fetchone()
+            if row and row[0] == user_id:
+                badges.append("plush_pepe_1")
+    return badges
+
+
 async def list_eco_admins(db_path: str) -> list[dict]:
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row

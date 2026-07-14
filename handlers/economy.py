@@ -10,6 +10,7 @@ from telegram.ext import ContextTypes
 
 import config
 import db
+import emojis
 from utils import display_name
 
 log = logging.getLogger(__name__)
@@ -109,7 +110,7 @@ def _new_deck() -> list[tuple[str, str]]:
 
 
 def _fmt(wallet: dict) -> str:
-    return f"💰 {wallet['balance']:,} WRK$"
+    return f"💰 {wallet['balance']:,} {emojis.WRK}"
 
 
 def _resolve_bet(arg: str, balance: int) -> int | None:
@@ -163,7 +164,7 @@ async def cmd_balance(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if mult > 1:
         streak_line += f" (daily bonus: {mult}x)"
     await update.effective_message.reply_text(
-        f"{_fmt(wallet)}\n{streak_line}"
+        f"{_fmt(wallet)}\n{streak_line}", parse_mode="HTML"
     )
 
 
@@ -221,9 +222,9 @@ async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             )
 
     await update.effective_message.reply_text(
-        f"✅ Daily claimed! +{earned:,} WRK${bonus_note}\n"
+        f"✅ Daily claimed! +{earned:,} {emojis.WRK}{bonus_note}\n"
         f"🔥 Streak: {streak} day(s)\n"
-        f"💰 {new_balance:,} WRK${next_milestone}{gift_line}",
+        f"💰 {new_balance:,} {emojis.WRK}{next_milestone}{gift_line}",
         parse_mode="HTML"
     )
 
@@ -560,6 +561,11 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     username = p.get("username")
     name_html = f'<a href="https://t.me/{username.lstrip("@")}">{escape(name)}</a>' if username else f'<b>{escape(name)}</b>'
 
+    # badges
+    badge_list = await db.get_user_badges(config.DB_PATH, target_id, config.OWNER_ID)
+    badge_str = " ".join(emojis.BADGE_MAP[b] for b in badge_list if b in emojis.BADGE_MAP)
+    badge_line = f" {badge_str}" if badge_str else ""
+
     # pinned gift line
     pinned_line = ""
     pg = p.get("pinned_gift")
@@ -587,11 +593,11 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     net_str = f"+{net:,}" if net >= 0 else f"{net:,}"
 
     text = (
-        f'<b>{name_html}</b>'
+        f'<b>{name_html}</b>{badge_line}'
         f'{pinned_line}\n'
         f'{escape(job_title)}\n\n'
-        f'💰 <b>{p["balance"]:,} WRK$</b> — rank #{p["balance_rank"]}\n'
-        f'💎 <b>Net Worth: {net_worth:,} WRK$</b> — rank #{nw_rank}\n'
+        f'💰 <b>{p["balance"]:,} {emojis.WRK}</b> — rank #{p["balance_rank"]}\n'
+        f'💎 <b>Net Worth: {net_worth:,} {emojis.WRK}</b> — rank #{nw_rank}\n'
         f'🔥 <b>{p["streak"]} day streak</b> — rank #{p["streak_rank"]}\n'
         f'🎁 <b>{p["gift_count"]} gifts</b> — rank #{p["gift_rank"]}\n\n'
         f'🎰 Gambling: +{p["total_won"]:,} won · -{p["total_lost"]:,} lost · net {net_str}\n'
