@@ -2625,6 +2625,23 @@ def send_wrk(req: SendWrkRequest):
     return {"ok": True, "new_balance": new_bal}
 
 
+@app.post("/api/admin/poker-reset")
+def admin_poker_reset():
+    with db_conn() as db:
+        for seat in _poker.seats:
+            db.execute(
+                "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                (seat.get("chips", 0), seat["user_id"])
+            )
+        db.commit()
+    _poker.seats.clear()
+    _poker.connections.clear()
+    _poker.phase = "lobby"
+    _poker.pot = 0
+    _poker.community = []
+    return {"ok": True, "message": "Poker table reset, chips refunded"}
+
+
 @app.post("/api/friends/request")
 def send_friend_request(req: FriendRequestCreate):
     import time as _time
@@ -3954,14 +3971,38 @@ async def poker_ws(ws: WebSocket):
                     seat["_acted"] = True
                     seat["_raised"] = True
 
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
         uid = uid_ref[0]
-        if uid:
-            _poker.connections.pop(uid, None)
-    except Exception:
-        uid = uid_ref[0]
-        if uid:
-            _poker.connections.pop(uid, None)
+        _poker.connections.pop(uid, None)
+        if uid and _poker.phase not in ("lobby", "waiting"):
+            seated_ids = [s["user_id"] for s in _poker.seats]
+            if uid in seated_ids:
+                # Refund the disconnecting player's chips
+                dc_seat = next((s for s in _poker.seats if s["user_id"] == uid), None)
+                if dc_seat:
+                    with db_conn() as db:
+                        db.execute(
+                            "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                            (dc_seat.get("chips", 0), uid)
+                        )
+                        db.commit()
+                _poker.seats = [s for s in _poker.seats if s["user_id"] != uid]
+                # If fewer than 2 players remain, reset table
+                if len(_poker.seats) < 2:
+                    with db_conn() as db:
+                        for s in _poker.seats:
+                            db.execute(
+                                "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                                (s.get("chips", 0), s["user_id"])
+                            )
+                        db.commit()
+                    _poker.seats.clear()
+                    _poker.phase = "lobby"
+                    _poker.pot = 0
+                    _poker.community = []
+        await _poker_broadcast({"type": "state", **_poker_snapshot()})
 
 
 @app.websocket("/ws/lobby")
