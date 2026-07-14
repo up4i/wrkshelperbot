@@ -2085,6 +2085,8 @@ async function refreshBalance() {
   try {
     const data = await api(`/api/profile/${state.userId}`);
     state.balance = data.balance;
+    state.username = data.username || '';
+    state.full_name = data.full_name || '';
     const pill = document.getElementById('headerBal');
     pill.textContent = `${fmt(data.balance)} WRK$`;
     pill.classList.add('visible');
@@ -2502,7 +2504,11 @@ async function submitSendWrk() {
   if (!amount || amount <= 0) return alert('Enter a valid amount');
   try {
     const data = await api('/api/send-wrk', { method: 'POST', json: {
-      from_user_id: +state.userId, to_user_id: _sendWrkTargetId, amount
+      from_user_id: +state.userId,
+      to_user_id: _sendWrkTargetId,
+      amount,
+      from_display: state.username || state.full_name || '',
+      to_display: document.getElementById('sendWrkTarget').textContent.replace('Sending to ', '')
     }});
     state.balance = data.new_balance;
     refreshHeaderBal();

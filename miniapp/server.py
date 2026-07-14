@@ -2613,6 +2613,8 @@ class SendWrkRequest(BaseModel):
     from_user_id: int
     to_user_id: int
     amount: int
+    from_display: str = ""
+    to_display: str = ""
 
 @app.post("/api/send-wrk")
 def send_wrk(req: SendWrkRequest):
@@ -2621,16 +2623,30 @@ def send_wrk(req: SendWrkRequest):
     if req.amount <= 0:
         raise HTTPException(400, "Amount must be positive")
     with db_conn() as db:
-        sender = db.execute("SELECT balance FROM economy WHERE user_id=?", (req.from_user_id,)).fetchone()
+        sender = db.execute("SELECT balance, username, full_name FROM economy WHERE user_id=?", (req.from_user_id,)).fetchone()
         if not sender or sender["balance"] < req.amount:
             raise HTTPException(400, "Insufficient balance")
-        target = db.execute("SELECT user_id FROM economy WHERE user_id=?", (req.to_user_id,)).fetchone()
+        target = db.execute("SELECT user_id, username, full_name FROM economy WHERE user_id=?", (req.to_user_id,)).fetchone()
         if not target:
             raise HTTPException(404, "Recipient not found")
         db.execute("UPDATE economy SET balance=balance-? WHERE user_id=?", (req.amount, req.from_user_id))
         db.execute("UPDATE economy SET balance=balance+? WHERE user_id=?", (req.amount, req.to_user_id))
         new_bal = db.execute("SELECT balance FROM economy WHERE user_id=?", (req.from_user_id,)).fetchone()["balance"]
         db.commit()
+
+    # Send DM confirmations
+    from_name = req.from_display or sender.get("username") or sender.get("full_name") or f"User {req.from_user_id}"
+    to_name = req.to_display or target.get("username") or target.get("full_name") or f"User {req.to_user_id}"
+    amt_fmt = f"{req.amount:,}"
+    _send_telegram_dm(
+        req.from_user_id,
+        f"✅ You sent {amt_fmt} WRK$ to {to_name}.\nBalance left: {new_bal:,} WRK$"
+    )
+    _send_telegram_dm(
+        req.to_user_id,
+        f"💸 {from_name} sent you {amt_fmt} WRK$!"
+    )
+
     return {"ok": True, "new_balance": new_bal}
 
 
