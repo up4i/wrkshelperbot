@@ -2843,7 +2843,7 @@ function buildProfileHtml(d, isOwn) {
   `;
 }
 
-function toggleReorderMode() {
+async function toggleReorderMode() {
   const btn = document.getElementById('reorderBtn');
   const grid = document.getElementById('giftsGrid');
   if (!grid || !btn) return;
@@ -2865,10 +2865,8 @@ function toggleReorderMode() {
     return;
   }
 
-  // Can't reorder partial load — all gifts must be loaded first
   if (_giftsHasMore || _giftsObserver) {
-    alert('Scroll to load all your gifts before reordering.');
-    return;
+    await _loadAllGiftsForReorder(grid);
   }
 
   btn.textContent = '✓ Done';
@@ -2921,6 +2919,32 @@ async function _saveGiftOrder() {
     await api('/api/profile/reorder', { method: 'POST', json: { user_id: +state.userId, gift_ids: giftIds } });
   } catch(e) {
     console.error('reorder save failed', e);
+  }
+}
+
+async function _loadAllGiftsForReorder(grid) {
+  const btn = document.getElementById('reorderBtn');
+  if (btn) btn.textContent = 'Loading…';
+  if (_giftsObserver) { _giftsObserver.disconnect(); _giftsObserver = null; }
+  document.getElementById('giftSentinel')?.remove();
+  const isOwn = window._profileIsOwn || false;
+  const pinnedId = window._profilePinnedId || null;
+  try {
+    while (_giftsHasMore) {
+      _giftsHasMore = false;
+      const d = await api(`/api/profile/${_giftsProfileId}?gifts_offset=${_giftsOffset}&gifts_limit=50`);
+      d.gifts.forEach(g => {
+        if (window._profileGifts) window._profileGifts[g.id] = g;
+        grid.insertAdjacentHTML('beforeend', _buildGiftCardHtml(g, isOwn, pinnedId));
+        const newCard = grid.lastElementChild;
+        if (newCard && newCard.dataset.hasAnim) initAnimatedGift(newCard, newCard.dataset.emojiId);
+      });
+      _giftsOffset += d.gifts.length;
+      _giftsHasMore = d.has_more || false;
+    }
+  } catch(e) {
+    console.error('load all gifts failed', e);
+    _giftsHasMore = true;
   }
 }
 
