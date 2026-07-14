@@ -1,8 +1,10 @@
 import logging
 import os
+import traceback
 from logging.handlers import RotatingFileHandler
 
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram import Update
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 import config
 from db import init_db
@@ -209,7 +211,21 @@ def build_app() -> Application:
     app.job_queue.run_repeating(sweep_work_reminders, interval=60, first=30)
     app.job_queue.run_daily(daily_price_update, time=datetime.time(hour=0, minute=0))
 
+    app.add_error_handler(error_handler)
     return app
+
+
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    tb = "".join(traceback.format_exception(None, context.error, context.error.__traceback__))
+    log.error("Unhandled exception:\n%s", tb)
+    try:
+        await context.bot.send_message(
+            chat_id=config.OWNER_ID,
+            text=f"⚠️ Bot error:\n<code>{tb[-3000:]}</code>",
+            parse_mode="HTML",
+        )
+    except Exception:
+        pass
 
 
 async def post_init(app: Application) -> None:

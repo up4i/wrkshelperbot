@@ -7,12 +7,11 @@ BADGE_PLUSH1_ID   = "5093839648371771344"
 BADGE_ECOADMIN_ID = "5093713423577909638"
 BADGE_ADMIN_ID    = "5093944660322158424"
 
-# Bot messages — plain text/unicode (bots can't use arbitrary custom emoji IDs)
-WRK          = "WRK$"
-BADGE_OWNER  = "👑"
-BADGE_PLUSH1 = "🐸"
-BADGE_ECOADMIN = "🛡"
-BADGE_ADMIN  = "⚔️"
+WRK           = tge(WRK_SYMBOL_ID,      "WRK$")
+BADGE_OWNER   = tge(BADGE_OWNER_ID,     "👑")
+BADGE_PLUSH1  = tge(BADGE_PLUSH1_ID,    "🐸")
+BADGE_ECOADMIN = tge(BADGE_ECOADMIN_ID, "🛡")
+BADGE_ADMIN   = tge(BADGE_ADMIN_ID,     "⚔️")
 
 BADGE_MAP = {
     "owner":        BADGE_OWNER,
