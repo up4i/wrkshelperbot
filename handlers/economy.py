@@ -564,7 +564,8 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     pinned_line = ""
     pg = p.get("pinned_gift")
     if pg:
-        bg_emoji = _BG_EMOJI.get(pg.get("background", ""), "")
+        _raw_bg = pg.get("background", "")
+        bg_emoji = _BG_EMOJI.get(_raw_bg, _BG_EMOJI.get(_raw_bg.split("_")[0], ""))
         if pg.get("custom_emoji_id"):
             gift_icon = f'<tg-emoji emoji-id="{pg["custom_emoji_id"]}">{pg.get("model_emoji", "🎁")}</tg-emoji>'
         else:
@@ -1621,12 +1622,18 @@ async def cmd_giveadminpepe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             (model["id"],)
         ).fetchone()
         next_number = (count_row[0] or 0) + 1
+        # Each admin pepe gets a unique background key to avoid the UNIQUE(model_id, background)
+        # constraint — visually still displayed as black
+        bg_key = f"black_{next_number}"
         con.execute(
             "INSERT INTO gift_instances (model_id, owner_id, background, gift_number, is_admin_gift, staked) "
             "VALUES (?,?,?,?,1,0)",
-            (model["id"], target_id, "black", next_number)
+            (model["id"], target_id, bg_key, next_number)
         )
         con.commit()
+    except Exception as e:
+        await msg.reply_text(f"❌ DB error: {e}")
+        return
     finally:
         con.close()
 
