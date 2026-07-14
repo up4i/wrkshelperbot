@@ -1582,7 +1582,7 @@ async def _crash_end(bot, chat_id: int, game: dict, crashed_at: float):
 
 async def cmd_giveadminpepe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
-    if not await db.is_eco_admin(config.DB_PATH, update.effective_user.id, config.OWNER_ID):
+    if update.effective_user.id != config.OWNER_ID:
         return
 
     if not ctx.args:

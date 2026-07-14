@@ -207,11 +207,11 @@ _OWNER_HELP = (
     "`/addecoadmin @user` — grant EcoAdmin role\n"
     "`/removeecoadmin @user` — revoke EcoAdmin role\n"
     "`/listecoadmins` — list current EcoAdmins\n"
+    "`/giveadminpepe @user` — grant an Admin's Plush Pepe NFT\n"
     "`/seedgifts` — (re)seed gift catalog to DB\n\n"
     "🛡 *EcoAdmin* _(+ owner)_\n"
     "`/givewrk @user <amount>` — add/remove WRK$ from a user\n"
     "`/setwrk @user <amount>` — set a user's balance directly\n"
-    "`/giveadminpepe @user` — grant an Admin's Plush Pepe NFT\n"
 )
 
 
