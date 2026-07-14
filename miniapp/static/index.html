@@ -2867,6 +2867,7 @@ async function toggleReorderMode() {
 
   if (_giftsHasMore || _giftsObserver) {
     await _loadAllGiftsForReorder(grid);
+    if (_giftsHasMore) return; // load failed — don't enter reorder mode
   }
 
   btn.textContent = '✓ Done';
@@ -2945,6 +2946,8 @@ async function _loadAllGiftsForReorder(grid) {
   } catch(e) {
     console.error('load all gifts failed', e);
     _giftsHasMore = true;
+    const btn2 = document.getElementById('reorderBtn');
+    if (btn2) btn2.textContent = '⠿ Reorder';
   }
 }
 
