@@ -2302,16 +2302,47 @@
   .game-modal--slider .slider-handle { width: 8px; box-shadow: 0 0 18px white; }
   .game-modal--slider .slider-arrow { font-size: 22px; color: #fff; filter: drop-shadow(0 0 8px rgba(255,255,255,.5)); }
   .game-modal--plinko .plinko-board-wrap {
-    padding: 9px;
+    position: relative;
+    flex: none;
+    padding: 7px;
     border: 1px solid rgba(103,232,249,.22);
     border-radius: 21px;
     background:
       radial-gradient(circle at 50% 0, rgba(103,232,249,.12), transparent 40%),
       linear-gradient(180deg, #11182c, #090b15);
-    box-shadow: inset 0 0 40px rgba(0,0,0,.34);
+    box-shadow:
+      inset 0 0 40px rgba(0,0,0,.34),
+      0 14px 34px rgba(0,0,0,.24);
   }
-  .game-modal--plinko .plinko-board-wrap canvas { max-height: 300px; image-rendering: auto; }
-  .game-modal--plinko .plinko-risk-btn { min-height: 40px; display: grid; place-items: center; }
+  .game-modal--plinko .plinko-board-wrap::before {
+    content: "";
+    position: absolute;
+    inset: 7px;
+    z-index: 1;
+    pointer-events: none;
+    border: 1px solid rgba(255,255,255,.04);
+    border-radius: 14px;
+    box-shadow: inset 0 0 24px rgba(103,232,249,.035);
+  }
+  .game-modal--plinko .plinko-board-wrap canvas {
+    position: relative;
+    z-index: 2;
+    width: min(100%, 320px);
+    height: auto;
+    max-height: none;
+    margin: 0 auto;
+    image-rendering: auto;
+  }
+  .game-modal--plinko .plinko-risk-btn {
+    min-height: 40px;
+    display: grid;
+    place-items: center;
+    transition: border-color .18s ease, background .18s ease, color .18s ease, transform .18s ease;
+  }
+  .game-modal--plinko .plinko-risk-btn.selected {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(34,211,238,.14);
+  }
   .game-modal--wheel .wheel-wrap {
     width: min(270px, 78vw);
     height: min(270px, 78vw);
@@ -2909,14 +2940,14 @@
 <div class="modal-bg" id="plinkoModal" onclick="closeModal('plinkoModal',event)">
   <div class="modal game-modal game-modal--plinko" style="position:relative">
     <button class="modal-close" onclick="closeModal('plinkoModal')">✕</button>
-    <div class="modal-title" data-subtitle="Neon drop · choose your risk">🎯 Plinko</div>
+    <div class="modal-title" data-subtitle="Physics drop · choose your risk">🎯 Plinko</div>
     <div class="plinko-risk-row">
       <div class="plinko-risk-btn" id="plinkoLow"    onclick="setPlinkoRisk('low')">Low</div>
       <div class="plinko-risk-btn" id="plinkoMedium" onclick="setPlinkoRisk('medium')">Medium</div>
       <div class="plinko-risk-btn" id="plinkoHigh"   onclick="setPlinkoRisk('high')">High</div>
     </div>
     <div class="plinko-board-wrap">
-      <canvas id="plinkoCanvas" width="280" height="250"></canvas>
+      <canvas id="plinkoCanvas" width="320" height="390" aria-label="Plinko ball drop board"></canvas>
     </div>
     <div class="result-box" id="plinkoResult"></div>
     <div class="card-title" style="margin-top:8px">Bet amount</div>
@@ -5118,9 +5149,14 @@ const _PLINKO_MULTS = {
   high:   [17,   3.5, 1.5, 0.5, 0.20, 0.5, 1.5, 3.5,  17 ],
 };
 
-// Board geometry (canvas 280×250)
-const _PL = { W:280, H:250, XC:140, XS:28, Y0:40, RH:24, PR:4, BR:6.5, SY:218, SH:22 };
-const _PL_COLORS = ['#1e3a8a','#1d4ed8','#2563eb','#3b82f6','#10b981','#3b82f6','#2563eb','#1d4ed8','#1e3a8a'];
+// A taller chamber gives the ball enough room to visibly fall, rebound, and settle.
+const _PL = {
+  W: 320, H: 390, XC: 160,
+  XS: 32, Y0: 56, RH: 34,
+  PR: 3.8, BR: 5.6,
+  SY: 337, SH: 42,
+};
+const _PL_COLORS = ['#172554','#1e3a8a','#1d4ed8','#2563eb','#059669','#2563eb','#1d4ed8','#1e3a8a','#172554'];
 
 function _plCtx() { const c = document.getElementById('plinkoCanvas'); return c ? c.getContext('2d') : null; }
 
@@ -5132,82 +5168,296 @@ function _plRoundRect(ctx, x, y, w, h, r) {
   ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
 }
 
-function _plDraw(litX, litY, ballX, ballY, hitSlot) {
+function _plDraw(scene = {}) {
   const ctx = _plCtx(); if (!ctx) return;
   const ms = _PLINKO_MULTS[_plinkoRisk];
+  const {
+    litPeg = null,
+    ball = null,
+    trail = [],
+    impact = null,
+    hitSlot,
+    slotPulse = 0,
+  } = scene;
   ctx.clearRect(0, 0, _PL.W, _PL.H);
+
+  // Drop chute and subtle depth guides.
+  const chamberGlow = ctx.createRadialGradient(_PL.XC, 18, 2, _PL.XC, 170, 205);
+  chamberGlow.addColorStop(0, 'rgba(103,232,249,.09)');
+  chamberGlow.addColorStop(1, 'rgba(8,12,26,0)');
+  ctx.fillStyle = chamberGlow;
+  ctx.fillRect(0, 0, _PL.W, _PL.H);
+  ctx.strokeStyle = 'rgba(103,232,249,.07)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 7]);
+  ctx.beginPath();
+  ctx.moveTo(_PL.XC, 16);
+  ctx.lineTo(_PL.XC, 35);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(165,243,252,.55)';
+  ctx.font = '800 7px system-ui';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('DROP ZONE', _PL.XC, 11);
 
   // Pegs
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c <= r+1; c++) {
       const x = _PL.XC - (r+1)*(_PL.XS/2) + c*_PL.XS;
       const y = _PL.Y0 + r*_PL.RH;
-      const lit = litX !== null && Math.abs(x-litX) < 1 && Math.abs(y-litY) < 1;
-      ctx.beginPath(); ctx.arc(x, y, _PL.PR, 0, Math.PI*2);
-      if (lit) { ctx.fillStyle='#f59e0b'; ctx.shadowColor='rgba(245,158,11,.9)'; ctx.shadowBlur=10; }
-      else { ctx.fillStyle='#4b5563'; ctx.shadowBlur=0; }
-      ctx.fill(); ctx.shadowBlur=0;
+      const lit = litPeg && Math.abs(x-litPeg.x) < 1 && Math.abs(y-litPeg.y) < 1;
+      ctx.beginPath();
+      ctx.arc(x, y, _PL.PR + 2.2, 0, Math.PI*2);
+      ctx.fillStyle = lit ? 'rgba(251,191,36,.22)' : 'rgba(148,163,184,.08)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x, y, _PL.PR, 0, Math.PI*2);
+      if (lit) {
+        ctx.fillStyle = '#fde68a';
+        ctx.shadowColor = 'rgba(245,158,11,.95)';
+        ctx.shadowBlur = 14;
+      } else {
+        const pegGrad = ctx.createRadialGradient(x-1.2, y-1.2, .4, x, y, _PL.PR);
+        pegGrad.addColorStop(0, '#e2e8f0');
+        pegGrad.addColorStop(.4, '#94a3b8');
+        pegGrad.addColorStop(1, '#475569');
+        ctx.fillStyle = pegGrad;
+        ctx.shadowColor = 'rgba(103,232,249,.14)';
+        ctx.shadowBlur = 3;
+      }
+      ctx.fill();
+      ctx.shadowBlur = 0;
     }
   }
 
-  // Slots
+  // Catcher shelf and payout slots.
+  ctx.fillStyle = 'rgba(2,6,23,.72)';
+  ctx.fillRect(12, _PL.SY-10, _PL.W-24, _PL.SH+16);
+  ctx.strokeStyle = 'rgba(148,163,184,.14)';
+  ctx.beginPath();
+  ctx.moveTo(13, _PL.SY-10);
+  ctx.lineTo(_PL.W-13, _PL.SY-10);
+  ctx.stroke();
   for (let s = 0; s < 9; s++) {
-    const sx = 28 + s*_PL.XS;
+    const sx = _PL.XS + s*_PL.XS;
     const isHit = hitSlot === s;
-    if (isHit) { ctx.shadowColor='rgba(245,158,11,.7)'; ctx.shadowBlur=12; }
-    ctx.fillStyle = isHit ? '#f59e0b' : _PL_COLORS[s];
-    _plRoundRect(ctx, sx-12, _PL.SY, 24, _PL.SH, 3); ctx.fill();
-    ctx.shadowBlur=0;
+    const pulse = isHit ? Math.max(.45, slotPulse) : 0;
+    if (isHit) {
+      ctx.shadowColor = `rgba(251,191,36,${.35 + pulse*.4})`;
+      ctx.shadowBlur = 10 + pulse*12;
+    }
+    const slotGrad = ctx.createLinearGradient(0, _PL.SY, 0, _PL.SY+_PL.SH);
+    slotGrad.addColorStop(0, isHit ? '#fbbf24' : _PL_COLORS[s]);
+    slotGrad.addColorStop(1, isHit ? '#b45309' : '#0f172a');
+    ctx.fillStyle = slotGrad;
+    _plRoundRect(ctx, sx-14, _PL.SY, 28, _PL.SH, 5);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = isHit ? 'rgba(254,243,199,.82)' : 'rgba(255,255,255,.09)';
+    ctx.lineWidth = isHit ? 1.5 : 1;
+    ctx.stroke();
     const label = `${ms[s]}×`;
-    ctx.fillStyle='#fff';
-    ctx.font = `bold ${label.length>=5?6:label.length>=4?7:8}px system-ui`;
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillText(label, sx, _PL.SY + _PL.SH/2);
+    ctx.fillStyle = '#fff';
+    ctx.font = `900 ${label.length>=5?7:label.length>=4?8:9}px system-ui`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, sx, _PL.SY + _PL.SH - 10);
   }
 
-  // Ball
-  if (ballX !== null) {
-    ctx.beginPath(); ctx.arc(ballX, ballY, _PL.BR, 0, Math.PI*2);
-    ctx.fillStyle='#f59e0b'; ctx.shadowColor='rgba(245,158,11,.85)'; ctx.shadowBlur=14;
-    ctx.fill(); ctx.shadowBlur=0;
+  // A short fading trail makes speed and direction legible on small screens.
+  trail.forEach((p, i) => {
+    const alpha = ((i + 1) / (trail.length + 1)) * .2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, Math.max(1.2, _PL.BR * (i+1)/(trail.length+2)), 0, Math.PI*2);
+    ctx.fillStyle = `rgba(251,191,36,${alpha})`;
+    ctx.fill();
+  });
+
+  // Collision flash and tiny directional sparks.
+  if (impact && impact.progress < 1) {
+    const fade = 1 - impact.progress;
+    ctx.strokeStyle = `rgba(253,230,138,${fade*.75})`;
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < 6; i++) {
+      const a = (Math.PI*2*i/6) + (impact.direction > 0 ? .14 : -.14);
+      const inner = 6 + impact.progress*2;
+      const outer = inner + 5*fade;
+      ctx.beginPath();
+      ctx.moveTo(impact.x + Math.cos(a)*inner, impact.y + Math.sin(a)*inner);
+      ctx.lineTo(impact.x + Math.cos(a)*outer, impact.y + Math.sin(a)*outer);
+      ctx.stroke();
+    }
+  }
+
+  // Ball: shaded and slightly squashed at impact to sell the rebound.
+  if (ball) {
+    const squash = Math.max(0, Math.min(.24, ball.squash || 0));
+    ctx.save();
+    ctx.translate(ball.x, ball.y);
+    ctx.scale(1+squash, 1-squash);
+    ctx.beginPath();
+    ctx.arc(0, 0, _PL.BR, 0, Math.PI*2);
+    const ballGrad = ctx.createRadialGradient(-2, -2.5, .4, 0, 0, _PL.BR+1);
+    ballGrad.addColorStop(0, '#fff7c2');
+    ballGrad.addColorStop(.32, '#fcd34d');
+    ballGrad.addColorStop(.72, '#f59e0b');
+    ballGrad.addColorStop(1, '#92400e');
+    ctx.fillStyle = ballGrad;
+    ctx.shadowColor = 'rgba(245,158,11,.9)';
+    ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 }
 
-function _buildPlinkoBoard(highlightSlot) { _plDraw(null, null, null, null, highlightSlot); }
-
-function _plWaypoints(path) {
-  // Start above board → peg at each row → slot center
-  const pts = [{ x: _PL.XC, y: 8 }];
-  let x = _PL.XC;
-  for (let r = 0; r < path.length; r++) {
-    x += path[r] ? _PL.XS/2 : -_PL.XS/2;
-    pts.push({ x, y: _PL.Y0 + r*_PL.RH });
-  }
-  pts.push({ x, y: _PL.SY + _PL.SH/2 });
-  return pts;
+function _buildPlinkoBoard(highlightSlot) {
+  _plDraw({ hitSlot: highlightSlot, slotPulse: highlightSlot === undefined ? 0 : .7 });
 }
 
-async function _animatePlinkoBall(path) {
-  const wps = _plWaypoints(path);
-  const STEP_MS = 145;
+function _plPathPegs(path) {
+  let rights = 0;
+  return path.map((goRight, row) => {
+    if (goRight) rights++;
+    const peg = {
+      x: _PL.XC - (row+1)*(_PL.XS/2) + rights*_PL.XS,
+      y: _PL.Y0 + row*_PL.RH,
+    };
+    return {
+      peg,
+      ball: { x: peg.x, y: peg.y - _PL.PR - _PL.BR - 1 },
+      direction: goRight ? 1 : -1,
+      row,
+    };
+  });
+}
+
+function _plSegmentPoint(segment, t) {
+  const x = segment.from.x + (segment.to.x-segment.from.x)*t;
+  if (segment.type === 'drop') {
+    // Constant acceleration feel: most of the vertical travel happens late.
+    const gravityT = t*t;
+    return {
+      x: segment.from.x + (segment.to.x-segment.from.x)*(t*(2-t)),
+      y: segment.from.y + (segment.to.y-segment.from.y)*gravityT,
+    };
+  }
+  // A ballistic arc: upward velocity just after impact, then gravity takes over.
+  return {
+    x,
+    y: segment.from.y + (segment.to.y-segment.from.y)*t - 4*segment.lift*t*(1-t),
+  };
+}
+
+async function _animatePlinkoBall(path, paidSlot) {
+  if (!Array.isArray(path) || path.length !== 8) throw new Error('Invalid Plinko drop result.');
+  const safePath = path.map(Boolean);
+  const hits = _plPathPegs(safePath);
+  const calculatedSlot = safePath.reduce((sum, right) => sum + (right ? 1 : 0), 0);
+  const slot = Number.isInteger(paidSlot) && paidSlot >= 0 && paidSlot <= 8
+    ? paidSlot
+    : calculatedSlot;
+  const segments = [{
+    from: { x:_PL.XC, y:25 },
+    to: hits[0].ball,
+    duration: 400,
+    type: 'drop',
+    lift: 0,
+    launch: null,
+    target: hits[0],
+  }];
+  for (let i = 1; i < hits.length; i++) {
+    segments.push({
+      from: hits[i-1].ball,
+      to: hits[i].ball,
+      duration: 215,
+      type: 'bounce',
+      lift: 18,
+      launch: hits[i-1],
+      target: hits[i],
+    });
+  }
+  segments.push({
+    from: hits[hits.length-1].ball,
+    to: { x:_PL.XS + slot*_PL.XS, y:_PL.SY+11 },
+    duration: 350,
+    type: 'bounce',
+    lift: 26,
+    launch: hits[hits.length-1],
+    target: null,
+  });
+
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    _plDraw({
+      ball: { x:_PL.XS + slot*_PL.XS, y:_PL.SY+11 },
+      hitSlot: slot,
+      slotPulse: 1,
+    });
+    return;
+  }
+
+  const starts = [];
+  let total = 0;
+  segments.forEach(segment => {
+    starts.push(total);
+    total += segment.duration;
+  });
+
   return new Promise(resolve => {
     const t0 = performance.now();
-    const total = (wps.length - 1) * STEP_MS;
+    const trail = [];
+    let lastTrailAt = -Infinity;
+
     function frame(now) {
       const elapsed = Math.min(now - t0, total);
-      const raw = elapsed / STEP_MS;
-      const si = Math.min(Math.floor(raw), wps.length - 2);
-      // ease-out per step: starts fast (leaves peg with momentum), slows to land
-      let t = raw - si; t = t*(2-t);
-      const f = wps[si], to = wps[si+1];
-      // Bezier: control point stays at from.x to give late sideways swing
-      const cpx = f.x, cpy = f.y + (to.y - f.y)*0.7;
-      const bx = (1-t)*(1-t)*f.x + 2*(1-t)*t*cpx + t*t*to.x;
-      const by = (1-t)*(1-t)*f.y + 2*(1-t)*t*cpy + t*t*to.y;
-      // Light up peg the ball is AT (waypoints 1-8 are pegs)
-      const lit = (si >= 1 && si <= wps.length-2) ? f : null;
-      _plDraw(lit?.x??null, lit?.y??null, bx, by, undefined);
-      if (elapsed < total) requestAnimationFrame(frame); else resolve();
+      let si = segments.length - 1;
+      for (let i = 0; i < segments.length; i++) {
+        if (elapsed <= starts[i] + segments[i].duration) { si = i; break; }
+      }
+      const segment = segments[si];
+      const localElapsed = elapsed - starts[si];
+      const t = Math.max(0, Math.min(1, localElapsed/segment.duration));
+      const pos = _plSegmentPoint(segment, t);
+
+      if (now-lastTrailAt > 26) {
+        trail.push(pos);
+        if (trail.length > 9) trail.shift();
+        lastTrailAt = now;
+      }
+
+      const impact = segment.launch && localElapsed < 125 ? {
+        x: segment.launch.peg.x,
+        y: segment.launch.peg.y,
+        progress: localElapsed/125,
+        direction: segment.launch.direction,
+      } : null;
+      const litPeg = t > .82 && segment.target
+        ? segment.target.peg
+        : (impact ? segment.launch.peg : null);
+      const landing = si === segments.length-1;
+      const landingProgress = landing ? Math.max(0, (t-.68)/.32) : 0;
+      const squash = t > .9 ? Math.sin((t-.9)*Math.PI/.1)*.2 : 0;
+
+      _plDraw({
+        litPeg,
+        ball: { x:pos.x, y:pos.y, squash },
+        trail,
+        impact,
+        hitSlot: landingProgress > 0 ? slot : undefined,
+        slotPulse: landingProgress,
+      });
+
+      if (elapsed < total) {
+        requestAnimationFrame(frame);
+      } else {
+        _plDraw({
+          ball: { x:_PL.XS + slot*_PL.XS, y:_PL.SY+11 },
+          hitSlot: slot,
+          slotPulse: 1,
+        });
+        window.setTimeout(resolve, 240);
+      }
     }
     requestAnimationFrame(frame);
   });
@@ -5246,7 +5496,7 @@ async function playPlinko() {
   _buildPlinkoBoard();
   try {
     const data = await api('/api/play/plinko', { method: 'POST', json: { user_id: +state.userId, bet, risk: _plinkoRisk } });
-    await _animatePlinkoBall(data.path);
+    await _animatePlinkoBall(data.path, data.slot);
     _buildPlinkoBoard(data.slot);
     const resEl = document.getElementById('plinkoResult');
     resEl.innerHTML = `${data.multiplier}× — ${data.delta>=0?'+':''}${fmt(data.delta)} ${WRK}`;
