@@ -3379,8 +3379,39 @@
     border-color: #52aeeb;
     box-shadow: 0 0 0 1px rgba(82,174,235,.35), 0 8px 20px rgba(17,120,190,.16);
   }
+  .profile-collection .gift-card.admin-gift {
+    border-color: rgba(251,191,36,.5);
+    box-shadow: inset 0 0 18px rgba(245,158,11,.08);
+  }
+  .profile-admin-gift-label {
+    margin: 5px auto 0;
+    padding: 2px 5px;
+    border: 1px solid rgba(251,191,36,.28);
+    border-radius: 6px;
+    background: rgba(245,158,11,.11);
+    color: #fcd58a;
+    font-size: 7px;
+    font-weight: 900;
+    letter-spacing: .45px;
+    text-transform: uppercase;
+  }
   .profile-collection .gift-card .gname { font-size: 10px; }
   .profile-collection .gift-card .gtier { font-size: 9px; text-transform: capitalize; }
+  .profile-gift-loader {
+    grid-column: 1/-1;
+    width: 100%;
+    min-height: 40px;
+    border: 1px solid rgba(82,174,235,.18);
+    border-radius: 12px;
+    background: rgba(82,174,235,.06);
+    color: #89cffa;
+    font: 800 11px system-ui;
+    cursor: pointer;
+  }
+  .profile-gift-loader[data-loading="true"] {
+    color: var(--muted);
+    cursor: wait;
+  }
 
   @media (min-width: 721px) {
     #app { border-inline: 1px solid var(--border); }
@@ -4526,7 +4557,10 @@ function goProfile() {
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 function showPage(id, btn) {
-  if (id !== 'profile' && _giftsObserver) { _giftsObserver.disconnect(); _giftsObserver = null; }
+  if (id !== 'profile') {
+    _profileLoadVersion++;
+    if (_giftsObserver) { _giftsObserver.disconnect(); _giftsObserver = null; }
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   const page = document.getElementById('page-' + id);
@@ -4666,14 +4700,21 @@ function setProfileTab(tab, btn) {
 
 function viewUser(id) {
   showPage('profile', document.querySelector('[data-page="profile"]'));
+  // showPage starts the signed-in user's profile. A visited profile supersedes
+  // that render so its slower response cannot steal the gift paginator.
+  document.getElementById('ownProfileWrap').style.display = 'none';
   document.getElementById('profileSearchWrap').style.display = 'flex';
   document.getElementById('profileInput').value = id;
   loadProfile();
 }
 
 // ── Profile ───────────────────────────────────────────────────────────────────
+let _profileLoadVersion = 0;
+
 function openProfilePage() {
   if (state.userId) {
+    document.getElementById('profileSearchWrap').style.display = 'none';
+    document.getElementById('profileContent').style.display = 'none';
     document.getElementById('ownProfileWrap').style.display = 'flex';
     document.getElementById('profileLoginPrompt').style.display = 'none';
     loadOwnProfile();
@@ -4693,10 +4734,17 @@ function togglePlayerSearch() {
   const wrap = document.getElementById('profileSearchWrap');
   const visible = wrap.style.display === 'flex';
   wrap.style.display = visible ? 'none' : 'flex';
-  if (!visible) document.getElementById('profileInput').focus();
+  if (visible && state.userId) {
+    document.getElementById('profileContent').style.display = 'none';
+    document.getElementById('ownProfileWrap').style.display = 'flex';
+    loadOwnProfile();
+  } else if (!visible) {
+    document.getElementById('profileInput').focus();
+  }
 }
 
 async function loadOwnProfile() {
+  const loadVersion = ++_profileLoadVersion;
   const el = document.getElementById('ownProfileContent');
   // Clean up stale Sortable instance and pending debounce on re-render
   if (_sortableInstance) { _sortableInstance.destroy(); _sortableInstance = null; }
@@ -4710,15 +4758,18 @@ async function loadOwnProfile() {
   if (socialBtn) socialBtn.style.display = 'block';
   try {
     const d = await api(`/api/profile/${state.userId}`);
+    if (loadVersion !== _profileLoadVersion) return;
     el.innerHTML = buildProfileHtml(d, true);
     _loadProfileBadges(state.userId, el);
     _setupGiftsObserver(el.querySelector('.gifts-grid'));
     initAnimatedGiftsInGrid(el.querySelector('.gifts-grid'));
     const onlineData = await api('/api/presence/online').catch(()=>({online:[]}));
+    if (loadVersion !== _profileLoadVersion) return;
     const isOnline = onlineData.online.includes(+d.user_id);
     const dot = el.querySelector('[data-profile-online]');
     if (dot) dot.style.display = isOnline ? 'inline-block' : 'none';
   } catch(e) {
+    if (loadVersion !== _profileLoadVersion) return;
     el.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
   }
 }
@@ -4728,18 +4779,23 @@ async function loadProfile() {
   if (!raw) return;
   const errEl = document.getElementById('profileErr');
   const content = document.getElementById('profileContent');
+  const loadVersion = ++_profileLoadVersion;
   errEl.textContent = '';
-  content.style.display = 'none';
+  content.innerHTML = '<div class="loading">Loading profile…</div>';
+  content.style.display = 'flex';
   const url = /^\d+$/.test(raw) ? `/api/profile/${raw}` : `/api/profile/username/${raw.replace(/^@/,'')}`;
   try {
     const d = await api(url);
+    if (loadVersion !== _profileLoadVersion) return;
     const isOwnProfile = state.userId && +state.userId === +d.user_id;
+    document.getElementById('ownProfileWrap').style.display = 'none';
     content.innerHTML = buildProfileHtml(d, isOwnProfile);
     content.style.display = 'flex';
     _loadProfileBadges(d.user_id, content);
     _setupGiftsObserver(content.querySelector('.gifts-grid'));
     initAnimatedGiftsInGrid(content.querySelector('.gifts-grid'));
     const onlineData = await api('/api/presence/online').catch(()=>({online:[]}));
+    if (loadVersion !== _profileLoadVersion) return;
     const isOnline = onlineData.online.includes(+d.user_id);
     const dot = content.querySelector('[data-profile-online]');
     if (dot) dot.style.display = isOnline ? 'inline-block' : 'none';
@@ -4755,6 +4811,8 @@ async function loadProfile() {
       }
     }
   } catch(e) {
+    if (loadVersion !== _profileLoadVersion) return;
+    content.style.display = 'none';
     errEl.textContent = e.message;
   }
 }
@@ -5323,13 +5381,15 @@ function _buildGiftCardHtml(g, isOwn, pinnedGiftId) {
   const isPinned = pinnedGiftId === g.id;
   const ownCls = isOwn ? ' own-gift' : '';
   const pinnedCls = isPinned ? ' pinned-gift' : '';
+  const adminCls = g.is_admin_gift ? ' admin-gift' : '';
   const bgColor = (g.background && BG_HEX[g.background]) || 'var(--card2)';
   const animAttrs = hasAnim ? ` data-has-anim="true" data-emoji-id="${g.custom_emoji_id}"` : '';
   return `
-        <div class="gift-card${ownCls}${pinnedCls}"${animAttrs} style="cursor:pointer;background:${bgColor}" onclick="openProfileGiftModal(${g.id})">
+        <div class="gift-card${ownCls}${pinnedCls}${adminCls}"${animAttrs} style="cursor:pointer;background:${bgColor}" onclick="openProfileGiftModal(${g.id})">
           ${gemHtml}
           <div class="gname">${esc(g.model_name)}</div>
           <div class="gtier ${tierColor[g.tier]||''}">${g.tier} #${g.gift_number||g.id}</div>
+          ${g.is_admin_gift ? '<div class="profile-admin-gift-label">Admin gift · locked</div>' : ''}
           ${isPinned ? '<div style="font-size:10px;color:var(--primary);margin-top:2px">📌 pinned</div>' : ''}
         </div>`;
 }
@@ -5394,7 +5454,7 @@ function buildProfileHtml(d, isOwn) {
     : '<div class="empty" style="grid-column:1/-1">No gifts yet</div>';
 
   const sentinelHtml = _giftsHasMore
-    ? `<div id="giftSentinel" style="grid-column:1/-1;text-align:center;padding:12px;color:var(--muted);font-size:13px">Loading…</div>`
+    ? '<button type="button" class="profile-gift-loader" onclick="_loadNextProfileGiftPage(this)">Load more gifts</button>'
     : '';
 
   return `
@@ -5469,11 +5529,18 @@ function buildProfileHtml(d, isOwn) {
         <div class="profile-collection-copy">
           <div class="profile-collection-kicker">Collectibles</div>
           <div class="profile-collection-title">Gift collection · ${fmt(d.gift_count)}</div>
-          <div class="profile-collection-sub">${isOwn ? 'Tap a gift to view or pin it' : 'Tap a gift to view its details'}</div>
+          <div class="profile-collection-sub">
+            ${isOwn ? 'Tap a gift to view or pin it' : 'Tap a gift to view its details'}
+            ${d.admin_gift_count ? ` · 🔒 ${fmt(d.admin_gift_count)} admin-issued` : ''}
+          </div>
         </div>
         ${isOwn ? `<button class="btn outline" id="reorderBtn" onclick="toggleReorderMode()" style="font-size:12px;padding:4px 10px">⠿ Reorder</button>` : ''}
       </div>
-      <div class="gifts-grid" id="giftsGrid">${giftHtml}${sentinelHtml}</div>
+      <div class="gifts-grid" id="giftsGrid"
+           data-profile-id="${d.user_id}"
+           data-gifts-offset="${d.gifts.length}"
+           data-is-own="${isOwn ? '1' : '0'}"
+           data-pinned-id="${d.pinned_gift_id || ''}">${giftHtml}${sentinelHtml}</div>
     </section>
   `;
 }
@@ -5562,74 +5629,104 @@ async function _loadAllGiftsForReorder(grid) {
   const btn = document.getElementById('reorderBtn');
   if (btn) btn.textContent = 'Loading…';
   if (_giftsObserver) { _giftsObserver.disconnect(); _giftsObserver = null; }
-  document.getElementById('giftSentinel')?.remove();
-  const isOwn = window._profileIsOwn || false;
-  const pinnedId = window._profilePinnedId || null;
+  grid.querySelector('.profile-gift-loader')?.remove();
+  const profileId = +grid.dataset.profileId;
+  const isOwn = grid.dataset.isOwn === '1';
+  const pinnedId = +(grid.dataset.pinnedId || 0) || null;
+  let offset = +(grid.dataset.giftsOffset || 0);
   try {
     while (_giftsHasMore) {
       _giftsHasMore = false;
-      const d = await api(`/api/profile/${_giftsProfileId}?gifts_offset=${_giftsOffset}&gifts_limit=50`);
+      const d = await api(
+        `/api/profile/${profileId}/gifts?offset=${offset}&limit=50`
+      );
       d.gifts.forEach(g => {
         if (window._profileGifts) window._profileGifts[g.id] = g;
         grid.insertAdjacentHTML('beforeend', _buildGiftCardHtml(g, isOwn, pinnedId));
         const newCard = grid.lastElementChild;
         if (newCard && newCard.dataset.hasAnim) initAnimatedGift(newCard, newCard.dataset.emojiId);
       });
-      _giftsOffset += d.gifts.length;
-      _giftsHasMore = d.has_more || false;
+      offset = d.next_offset;
+      grid.dataset.giftsOffset = String(offset);
+      _giftsOffset = offset;
+      _giftsHasMore = !!d.has_more && d.gifts.length > 0;
     }
   } catch(e) {
     console.error('load all gifts failed', e);
     _giftsHasMore = true;
+    if (!grid.querySelector('.profile-gift-loader')) {
+      grid.insertAdjacentHTML(
+        'beforeend',
+        '<button type="button" class="profile-gift-loader" onclick="_loadNextProfileGiftPage(this)">Couldn’t load more · tap to retry</button>',
+      );
+    }
     const btn2 = document.getElementById('reorderBtn');
     if (btn2) btn2.textContent = '⠿ Reorder';
   }
 }
 
-function _setupGiftsObserver(gridEl) {
-  if (_giftsObserver) { _giftsObserver.disconnect(); _giftsObserver = null; }
-  if (!_giftsHasMore) return;
-  // Use passed-in grid, or fall back to finding sentinel's parent
-  const sentinel = gridEl
-    ? gridEl.querySelector('#giftSentinel')
-    : document.getElementById('giftSentinel');
-  if (!sentinel) return;
-  const capturedGrid = gridEl || sentinel.parentElement;
-  const profileId = _giftsProfileId;
-  const isOwn = window._profileIsOwn || false;
-  const pinnedId = window._profilePinnedId || null;
-  let localOffset = _giftsOffset;
-  _giftsObserver = new IntersectionObserver(async entries => {
-    if (!entries[0].isIntersecting || !_giftsHasMore) return;
-    _giftsHasMore = false; // prevent double-fire while loading
-    try {
-      const d = await api(`/api/profile/${profileId}?gifts_offset=${localOffset}&gifts_limit=20`);
-      if (!capturedGrid.isConnected) return;
-      const old = capturedGrid.querySelector('#giftSentinel');
-      if (old) old.remove();
-      d.gifts.forEach(g => {
-        if (window._profileGifts) window._profileGifts[g.id] = g;
-        capturedGrid.insertAdjacentHTML('beforeend', _buildGiftCardHtml(g, isOwn, pinnedId));
-        const newCard = capturedGrid.lastElementChild;
-        if (newCard && newCard.dataset.hasAnim) initAnimatedGift(newCard, newCard.dataset.emojiId);
-      });
-      localOffset += d.gifts.length;
-      _giftsOffset = localOffset;
-      _giftsHasMore = d.has_more || false;
-      if (_giftsHasMore) {
-        capturedGrid.insertAdjacentHTML('beforeend',
-          `<div id="giftSentinel" style="grid-column:1/-1;text-align:center;padding:12px;color:var(--muted);font-size:13px">Loading…</div>`);
-        _setupGiftsObserver(capturedGrid);
-      } else {
-        _giftsObserver.disconnect();
-        _giftsObserver = null;
+async function _loadNextProfileGiftPage(trigger) {
+  if (!trigger || trigger.dataset.loading === 'true') return;
+  const grid = trigger.closest('.gifts-grid');
+  if (!grid || !grid.isConnected) return;
+  const profileId = +grid.dataset.profileId;
+  const offset = +(grid.dataset.giftsOffset || 0);
+  const isOwn = grid.dataset.isOwn === '1';
+  const pinnedId = +(grid.dataset.pinnedId || 0) || null;
+  trigger.dataset.loading = 'true';
+  trigger.textContent = 'Loading gifts…';
+  if (_giftsObserver) {
+    _giftsObserver.disconnect();
+    _giftsObserver = null;
+  }
+  try {
+    const d = await api(
+      `/api/profile/${profileId}/gifts?offset=${offset}&limit=20`
+    );
+    if (!grid.isConnected) return;
+    trigger.remove();
+    d.gifts.forEach(g => {
+      if (window._profileGifts) window._profileGifts[g.id] = g;
+      grid.insertAdjacentHTML(
+        'beforeend',
+        _buildGiftCardHtml(g, isOwn, pinnedId),
+      );
+      const newCard = grid.lastElementChild;
+      if (newCard?.dataset.hasAnim) {
+        initAnimatedGift(newCard, newCard.dataset.emojiId);
       }
-    } catch(e) {
-      console.error('gift scroll error', e);
-      _giftsHasMore = true; // allow retry on next intersection
+    });
+    const hasMore = !!d.has_more && d.gifts.length > 0;
+    grid.dataset.giftsOffset = String(d.next_offset);
+    if (+_giftsProfileId === profileId) {
+      _giftsOffset = d.next_offset;
+      _giftsHasMore = hasMore;
     }
-  }, { threshold: 0.1 });
-  _giftsObserver.observe(sentinel);
+    if (hasMore) {
+      grid.insertAdjacentHTML(
+        'beforeend',
+        '<button type="button" class="profile-gift-loader" onclick="_loadNextProfileGiftPage(this)">Load more gifts</button>',
+      );
+      _setupGiftsObserver(grid);
+    }
+  } catch(e) {
+    console.error('gift scroll error', e);
+    trigger.dataset.loading = 'false';
+    trigger.textContent = 'Couldn’t load more · tap to retry';
+  }
+}
+
+function _setupGiftsObserver(gridEl) {
+  if (_giftsObserver) {
+    _giftsObserver.disconnect();
+    _giftsObserver = null;
+  }
+  const trigger = gridEl?.querySelector('.profile-gift-loader');
+  if (!trigger || !('IntersectionObserver' in window)) return;
+  _giftsObserver = new IntersectionObserver(entries => {
+    if (entries[0]?.isIntersecting) _loadNextProfileGiftPage(trigger);
+  }, { threshold: 0, rootMargin: '180px 0px' });
+  _giftsObserver.observe(trigger);
 }
 
 const _lottieInstances = new Map();

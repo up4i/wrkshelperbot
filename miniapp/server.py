@@ -276,6 +276,27 @@ def leaderboard(tab: str = "balance", limit: int = 20):
 
 # ── Profile ───────────────────────────────────────────────────────────────────
 
+def _profile_gift_page(
+    db,
+    user_id: int,
+    gifts_offset: int = 0,
+    gifts_limit: int = 20,
+) -> list:
+    gifts_offset = max(0, gifts_offset)
+    gifts_limit = max(1, min(gifts_limit, 200))
+    return db.execute(
+        "SELECT gi.id, gi.gift_number, gi.background, gi.acquired_at, gi.is_admin_gift, "
+        "gm.model_name, gm.model_emoji, gm.tier, gm.collection, gm.custom_emoji_id, "
+        "COALESCE(gp.current_price, 0) AS current_price "
+        "FROM gift_instances gi JOIN gift_models gm ON gm.id = gi.model_id "
+        "LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background "
+        "WHERE gi.owner_id = ? "
+        "ORDER BY COALESCE(gi.sort_index, 999999) ASC, gi.acquired_at DESC "
+        "LIMIT ? OFFSET ?",
+        (user_id, gifts_limit, gifts_offset),
+    ).fetchall()
+
+
 def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20) -> dict:
     row = db.execute(
         """SELECT e.user_id,
@@ -297,16 +318,9 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
     full_name = row["a_full_name"] or row["e_full_name"]
     display   = f"@{username}" if username else (full_name or f"User {user_id}")
 
-    gifts = db.execute(
-        "SELECT gi.id, gi.gift_number, gi.background, gi.acquired_at, gi.is_admin_gift, "
-        "gm.model_name, gm.model_emoji, gm.tier, gm.collection, gm.custom_emoji_id, "
-        "COALESCE(gp.current_price, 0) AS current_price "
-        "FROM gift_instances gi JOIN gift_models gm ON gm.id = gi.model_id "
-        "LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background "
-        "WHERE gi.owner_id = ? "
-        "ORDER BY COALESCE(gi.sort_index, 999999) ASC, gi.acquired_at DESC "
-        "LIMIT ? OFFSET ?", (user_id, gifts_limit, gifts_offset)
-    ).fetchall()
+    gifts_offset = max(0, gifts_offset)
+    gifts_limit = max(1, min(gifts_limit, 200))
+    gifts = _profile_gift_page(db, user_id, gifts_offset, gifts_limit)
 
     balance_rank = db.execute(
         "SELECT COUNT(*) + 1 FROM economy WHERE balance > ?", (row["balance"],)
@@ -314,9 +328,15 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
     streak_rank = db.execute(
         "SELECT COUNT(*) + 1 FROM economy WHERE streak > ?", (row["streak"],)
     ).fetchone()[0]
-    gift_count = db.execute(
-        "SELECT COUNT(*) FROM gift_instances WHERE owner_id = ?", (user_id,)
-    ).fetchone()[0]
+    gift_summary = db.execute(
+        "SELECT COUNT(*) AS gift_count, "
+        "COALESCE(SUM(CASE WHEN COALESCE(is_admin_gift, 0) = 1 THEN 1 ELSE 0 END), 0) "
+        "AS admin_gift_count "
+        "FROM gift_instances WHERE owner_id = ?",
+        (user_id,),
+    ).fetchone()
+    gift_count = gift_summary["gift_count"]
+    admin_gift_count = gift_summary["admin_gift_count"]
     gift_rank = db.execute(
         "SELECT COUNT(*) + 1 FROM ("
         "SELECT owner_id, COUNT(*) AS c FROM gift_instances "
@@ -494,6 +514,7 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         "balance_rank": balance_rank,
         "streak_rank": streak_rank,
         "gift_count": gift_count,
+        "admin_gift_count": admin_gift_count,
         "gift_rank": gift_rank,
         "gift_value": gift_value,
         "anon_count": anon_count,
@@ -533,6 +554,30 @@ def profile_by_username(username: str, gifts_offset: int = 0, gifts_limit: int =
         if not row:
             raise HTTPException(404, "Username not found")
         return _load_profile(db, row["user_id"], gifts_offset, gifts_limit)
+
+
+@app.get("/api/profile/{user_id}/gifts")
+def profile_gifts_page(user_id: int, offset: int = 0, limit: int = 20):
+    offset = max(0, offset)
+    limit = max(1, min(limit, 100))
+    with db_conn() as db:
+        exists = db.execute(
+            "SELECT 1 FROM economy WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if not exists:
+            raise HTTPException(404, "User not found")
+        gifts = _profile_gift_page(db, user_id, offset, limit)
+        gift_count = db.execute(
+            "SELECT COUNT(*) FROM gift_instances WHERE owner_id = ?", (user_id,)
+        ).fetchone()[0]
+    next_offset = offset + len(gifts)
+    return {
+        "gifts": [dict(gift) for gift in gifts],
+        "offset": offset,
+        "next_offset": next_offset,
+        "gift_count": gift_count,
+        "has_more": next_offset < gift_count,
+    }
 
 
 # ── Pin gift ─────────────────────────────────────────────────────────────────

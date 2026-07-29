@@ -286,3 +286,67 @@ def test_trade_migration_makes_offered_gift_optional(tmp_path):
             "(from_user_id,to_user_id,offer_anon_id,status,created_at) "
             "VALUES (1,2,124,'pending',1)"
         )
+
+
+def test_large_profile_gift_pages_include_all_450_items(tmp_path, monkeypatch):
+    path = tmp_path / "large-profile.db"
+    asyncio.run(database.init_db(str(path)))
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "INSERT INTO economy (user_id,username,full_name,balance) "
+            "VALUES (99,'nic','Nic',1000)"
+        )
+        conn.executemany(
+            "INSERT INTO gift_models "
+            "(id,collection,model_number,model_name,model_emoji,"
+            "model_rarity_pct,tier) VALUES (?,'plush_pepe',?,?,'🐸',1.0,'high')",
+            [
+                (number, number, f"Pepe {number}")
+                for number in range(1, 451)
+            ],
+        )
+        conn.executemany(
+            "INSERT INTO gift_instances "
+            "(id,model_id,background,gift_number,owner_id,acquired_at,is_admin_gift) "
+            "VALUES (?,?, 'black',?,99,?,?)",
+            [
+                (
+                    10_000 + number,
+                    number,
+                    number,
+                    1_000 + number,
+                    1 if number == 449 else 0,
+                )
+                for number in range(1, 451)
+            ],
+        )
+        conn.execute(
+            "INSERT INTO gift_prices "
+            "(collection,background,base_price,current_price,demand_pressure,last_updated) "
+            "VALUES ('plush_pepe','black',100,100,0,1)"
+        )
+        conn.commit()
+    monkeypatch.setattr(server, "DB_PATH", str(path))
+
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        initial = server._load_profile(conn, 99)
+    assert initial["gift_count"] == 450
+    assert initial["admin_gift_count"] == 1
+    assert len(initial["gifts"]) == 20
+    assert initial["has_more"] is True
+
+    offset = 0
+    all_gifts = []
+    while True:
+        page = server.profile_gifts_page(99, offset=offset, limit=20)
+        all_gifts.extend(page["gifts"])
+        offset = page["next_offset"]
+        if not page["has_more"]:
+            break
+
+    assert len(all_gifts) == 450
+    assert len({gift["id"] for gift in all_gifts}) == 450
+    admin_gift = next(gift for gift in all_gifts if gift["gift_number"] == 449)
+    assert admin_gift["is_admin_gift"] == 1
+    assert offset == 450
