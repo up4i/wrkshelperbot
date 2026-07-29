@@ -2,6 +2,7 @@ import time
 import aiosqlite
 
 from collectibles import (
+    ANON_FIREWALL_COOLDOWN,
     ANON_MAX_SUFFIX,
     ANON_MIN_SUFFIX,
     anon_number_price,
@@ -61,12 +62,17 @@ CREATE TABLE IF NOT EXISTS blocklist (
     UNIQUE(chat_id, pattern)
 );
 CREATE TABLE IF NOT EXISTS economy (
-    user_id     INTEGER PRIMARY KEY,
-    username    TEXT,
-    full_name   TEXT,
-    balance     INTEGER NOT NULL DEFAULT 1000,
-    streak      INTEGER NOT NULL DEFAULT 0,
-    last_daily  INTEGER NOT NULL DEFAULT 0
+    user_id                    INTEGER PRIMARY KEY,
+    username                   TEXT,
+    full_name                  TEXT,
+    balance                    INTEGER NOT NULL DEFAULT 1000,
+    streak                     INTEGER NOT NULL DEFAULT 0,
+    last_daily                 INTEGER NOT NULL DEFAULT 0,
+    secure_vault_balance       INTEGER NOT NULL DEFAULT 0,
+    vault_pending_amount       INTEGER NOT NULL DEFAULT 0,
+    vault_withdraw_available_at INTEGER NOT NULL DEFAULT 0,
+    anon_mask_enabled          INTEGER NOT NULL DEFAULT 0,
+    anon_firewall_used_at      INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS gift_models (
     id               INTEGER PRIMARY KEY,
@@ -129,6 +135,17 @@ CREATE TABLE IF NOT EXISTS anon_numbers (
     owner_id    INTEGER,
     acquired_at INTEGER
 );
+CREATE TABLE IF NOT EXISTS anon_security_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    detail     TEXT NOT NULL,
+    amount     INTEGER NOT NULL DEFAULT 0,
+    actor_id   INTEGER,
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_anon_security_events_user
+ON anon_security_events(user_id, created_at DESC);
 CREATE TABLE IF NOT EXISTS work_sessions (
     user_id         INTEGER PRIMARY KEY,
     taps            INTEGER NOT NULL DEFAULT 0,
@@ -169,6 +186,11 @@ async def _migrate(db) -> None:
         "pinned_anon_id":      "INTEGER",
         "pinned_stat":         "TEXT NOT NULL DEFAULT 'crash_mult'",
         "photo_url":           "TEXT",
+        "secure_vault_balance": "INTEGER NOT NULL DEFAULT 0",
+        "vault_pending_amount": "INTEGER NOT NULL DEFAULT 0",
+        "vault_withdraw_available_at": "INTEGER NOT NULL DEFAULT 0",
+        "anon_mask_enabled":    "INTEGER NOT NULL DEFAULT 0",
+        "anon_firewall_used_at": "INTEGER NOT NULL DEFAULT 0",
     }
     for col, typedef in econ_new.items():
         if col not in econ_cols:
@@ -281,6 +303,17 @@ async def _migrate(db) -> None:
         owner_id    INTEGER,
         acquired_at INTEGER
     )""")
+    await db.execute("""CREATE TABLE IF NOT EXISTS anon_security_events (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL,
+        event_type TEXT NOT NULL,
+        detail     TEXT NOT NULL,
+        amount     INTEGER NOT NULL DEFAULT 0,
+        actor_id   INTEGER,
+        created_at INTEGER NOT NULL
+    )""")
+    await db.execute("""CREATE INDEX IF NOT EXISTS idx_anon_security_events_user
+        ON anon_security_events(user_id, created_at DESC)""")
     await db.executemany(
         "INSERT OR IGNORE INTO anon_numbers (id, suffix, price) VALUES (?, ?, ?)",
         [
@@ -780,9 +813,29 @@ async def get_stats_leaderboard(db_path: str, tab: str, limit: int = 10) -> list
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(sql, params) as cur:
-            return [{"user_id": r["user_id"], "value": r["value"],
-                     "username": r["username"], "full_name": r["full_name"], "unit": unit}
-                    async for r in cur]
+            rows = await cur.fetchall()
+        result = []
+        for row in rows:
+            item = {
+                "user_id": row["user_id"],
+                "value": row["value"],
+                "username": row["username"],
+                "full_name": row["full_name"],
+                "unit": unit,
+            }
+            async with db.execute(
+                """SELECT a.suffix FROM economy e
+                   JOIN anon_numbers a
+                     ON a.id = e.pinned_anon_id AND a.owner_id = e.user_id
+                   WHERE e.user_id = ? AND e.anon_mask_enabled = 1""",
+                (row["user_id"],),
+            ) as alias_cur:
+                alias = await alias_cur.fetchone()
+            if alias:
+                item["username"] = None
+                item["full_name"] = format_anon_number(alias["suffix"])
+            result.append(item)
+        return result
 
 
 async def get_profile(db_path: str, user_id: int) -> dict | None:
@@ -791,6 +844,8 @@ async def get_profile(db_path: str, user_id: int) -> dict | None:
         async with db.execute(
             """SELECT e.user_id, e.balance, e.streak, e.work_count,
                       e.pinned_gift_id, e.pinned_anon_id,
+                      e.secure_vault_balance, e.vault_pending_amount,
+                      e.anon_mask_enabled,
                       COALESCE(e.pinned_stat, 'crash_mult') AS pinned_stat,
                       COALESCE(a.username, e.username) AS username,
                       COALESCE(a.full_name, e.full_name) AS full_name
@@ -850,6 +905,9 @@ async def get_profile(db_path: str, user_id: int) -> dict | None:
                     pinned_anon = dict(pa)
                     pinned_anon["number"] = format_anon_number(pinned_anon["suffix"])
         d["pinned_anon"] = pinned_anon
+        d["identity_masked"] = bool(d.get("anon_mask_enabled")) and bool(
+            pinned_anon
+        )
 
         gs_cols = ("slots_won","slots_lost","coinflip_won","coinflip_lost",
                    "blackjack_won","blackjack_lost","crash_won","crash_lost","crash_best_mult")
@@ -882,12 +940,22 @@ async def get_profile(db_path: str, user_id: int) -> dict | None:
             anon_row = await cur.fetchone()
             d["anon_count"] = anon_row["anon_count"]
             d["anon_value"] = anon_row["anon_value"]
-        d["net_worth"] = d["balance"] + d["gift_value"] + d["anon_value"]
+        d["vault_value"] = (
+            d["secure_vault_balance"] + d["vault_pending_amount"]
+        )
+        d["net_worth"] = (
+            d["balance"]
+            + d["vault_value"]
+            + d["gift_value"]
+            + d["anon_value"]
+        )
 
         async with db.execute(
             """SELECT COUNT(*)+1 FROM (
                    SELECT e.user_id,
                           e.balance
+                          + COALESCE(e.secure_vault_balance, 0)
+                          + COALESCE(e.vault_pending_amount, 0)
                           + COALESCE(gv.gift_value, 0)
                           + COALESCE(av.anon_value, 0) AS nw
                    FROM economy e
@@ -1388,6 +1456,60 @@ async def set_rob_cooldown(db_path: str, user_id: int, timestamp: int) -> None:
             "UPDATE economy SET last_rob = ? WHERE user_id = ?", (timestamp, user_id)
         )
         await db.commit()
+
+
+async def consume_anon_firewall(
+    db_path: str,
+    user_id: int,
+    actor_id: int | None = None,
+    *,
+    now: int | None = None,
+) -> dict:
+    """Consume the user's active number firewall if its daily charge is ready."""
+    timestamp = int(time.time()) if now is None else int(now)
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        await db.execute("BEGIN IMMEDIATE")
+        row = await (
+            await db.execute(
+                """SELECT e.anon_firewall_used_at, a.suffix
+                   FROM economy e
+                   JOIN anon_numbers a
+                     ON a.id = e.pinned_anon_id AND a.owner_id = e.user_id
+                   WHERE e.user_id = ?""",
+                (user_id,),
+            )
+        ).fetchone()
+        if not row:
+            await db.rollback()
+            return {"blocked": False, "active": False, "remaining": 0}
+        elapsed = timestamp - (row["anon_firewall_used_at"] or 0)
+        remaining = max(0, ANON_FIREWALL_COOLDOWN - elapsed)
+        if remaining:
+            await db.rollback()
+            return {
+                "blocked": False,
+                "active": True,
+                "remaining": remaining,
+                "suffix": row["suffix"],
+            }
+        await db.execute(
+            "UPDATE economy SET anon_firewall_used_at = ? WHERE user_id = ?",
+            (timestamp, user_id),
+        )
+        await db.execute(
+            """INSERT INTO anon_security_events
+               (user_id, event_type, detail, amount, actor_id, created_at)
+               VALUES (?, 'firewall', 'Blocked an incoming robbery', 0, ?, ?)""",
+            (user_id, actor_id, timestamp),
+        )
+        await db.commit()
+        return {
+            "blocked": True,
+            "active": True,
+            "remaining": ANON_FIREWALL_COOLDOWN,
+            "suffix": row["suffix"],
+        }
 
 
 async def get_hack_cooldown(db_path: str, user_id: int) -> int:

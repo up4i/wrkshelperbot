@@ -1480,6 +1480,129 @@
   .wallet-gift-actions .sell { border-color:rgba(167,139,250,.2); color:#cabaff; }
   .wallet-gift-actions .list { border-color:rgba(82,174,235,.2); color:#9bd8ff; }
   .wallet-gift-actions .cancel { grid-column:1/-1; border-color:rgba(251,113,133,.22); color:#fda4af; }
+  .security-center {
+    overflow: hidden;
+    border: 1px solid rgba(82,174,235,.2);
+    border-radius: 19px;
+    background:
+      radial-gradient(circle at 100% 0, rgba(82,174,235,.16), transparent 44%),
+      linear-gradient(155deg, #151925, #0c0f17);
+  }
+  .security-center-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px;
+    border-bottom: 1px solid rgba(255,255,255,.065);
+  }
+  .security-kicker {
+    color: #76c9ff;
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .security-title { margin-top: 3px; color: #eef8ff; font-size: 16px; font-weight: 900; }
+  .security-number {
+    padding: 6px 9px;
+    border: 1px solid rgba(82,174,235,.28);
+    border-radius: 10px;
+    background: rgba(82,174,235,.1);
+    color: #a9ddff;
+    font-size: 11px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+  .security-center-body { display: grid; gap: 10px; padding: 12px; }
+  .security-locked {
+    padding: 14px;
+    border: 1px dashed rgba(255,255,255,.12);
+    border-radius: 13px;
+    color: #87939e;
+    font-size: 10px;
+    line-height: 1.5;
+    text-align: center;
+  }
+  .security-status-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+  .security-status-card {
+    min-width: 0;
+    padding: 9px 6px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 12px;
+    background: rgba(255,255,255,.025);
+    text-align: center;
+  }
+  .security-status-card b {
+    display: block;
+    overflow: hidden;
+    color: #edf7fd;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .security-status-card span { display:block; margin-top:3px; color:#74818e; font-size:7px; text-transform:uppercase; }
+  .security-status-card.ready b { color:#86efac; }
+  .security-status-card.cooldown b { color:#fcd58a; }
+  .security-mask-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 13px;
+    background: rgba(255,255,255,.025);
+  }
+  .security-mask-copy { min-width:0; flex:1; }
+  .security-mask-copy b { display:block; color:#e9f2f8; font-size:10px; }
+  .security-mask-copy span { display:block; margin-top:2px; color:#74818e; font-size:8px; line-height:1.35; }
+  .security-toggle {
+    flex:none;
+    min-width:54px;
+    padding:6px 8px;
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:9px;
+    background:rgba(255,255,255,.04);
+    color:#8d99a4;
+    font:850 9px system-ui;
+  }
+  .security-toggle.on { border-color:rgba(52,211,153,.3); background:rgba(52,211,153,.1); color:#86efac; }
+  .security-vault {
+    padding: 11px;
+    border: 1px solid rgba(139,92,246,.16);
+    border-radius: 14px;
+    background: rgba(139,92,246,.045);
+  }
+  .security-vault-balances { display:flex; justify-content:space-between; gap:10px; margin-bottom:9px; }
+  .security-vault-balances span { color:#7f8b97; font-size:8px; }
+  .security-vault-balances b { display:block; margin-top:2px; color:#ded5ff; font-size:13px; }
+  .security-vault-form { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:6px; }
+  .security-vault-form .input { min-width:0; margin:0; padding:8px 9px; font-size:11px; }
+  .security-vault-form button {
+    padding:7px 9px;
+    border:1px solid rgba(139,92,246,.22);
+    border-radius:9px;
+    background:rgba(139,92,246,.1);
+    color:#cabaff;
+    font:850 9px system-ui;
+  }
+  .security-pending {
+    margin-top:9px;
+    padding:9px;
+    border:1px solid rgba(251,191,36,.17);
+    border-radius:10px;
+    background:rgba(251,191,36,.055);
+    color:#a99c75;
+    font-size:9px;
+    line-height:1.45;
+  }
+  .security-pending-actions { display:flex; gap:6px; margin-top:7px; }
+  .security-pending-actions button { flex:1; }
+  .security-log-title { color:#77838f; font-size:8px; font-weight:900; letter-spacing:.8px; text-transform:uppercase; }
+  .security-event { display:grid; grid-template-columns:25px minmax(0,1fr) auto; gap:8px; align-items:center; padding:7px 0; border-top:1px solid rgba(255,255,255,.055); }
+  .security-event-icon { width:25px; height:25px; display:grid; place-items:center; border-radius:8px; background:rgba(82,174,235,.08); font-size:12px; }
+  .security-event b { display:block; overflow:hidden; color:#cbd7df; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+  .security-event span { color:#65717c; font-size:7px; white-space:nowrap; }
   .shop-list-modal { gap: 12px; }
   .shop-list-gift {
     min-height: 58px;
@@ -3833,6 +3956,9 @@
           </div>
           <div class="wallet-balance" id="shopWalletBalance">—</div>
         </div>
+        <div id="walletSecurityCenter">
+          <div class="loading">Loading Secure Number…</div>
+        </div>
         <div class="wallet-section">
           <div class="wallet-section-head">
             <div><b>Gifts</b><span>Sell to Rift or list on MKRT</span></div>
@@ -3842,7 +3968,7 @@
         </div>
         <div class="wallet-section">
           <div class="wallet-section-head">
-            <div><b>Anonymous Numbers</b><span>Pin one number to your profile</span></div>
+            <div><b>Anonymous Numbers</b><span>Activate one Secure Number · benefits never stack</span></div>
             <span id="walletAnonCount">0</span>
           </div>
           <div class="anon-grid wallet-anon-grid" id="walletAnonGrid"></div>
@@ -4652,9 +4778,12 @@ async function loadLeaderboard(tab) {
       const initials = r.name.replace(/^@/,'').slice(0,2).toUpperCase();
       const val = meta.fmt(r.value);
       const sub = meta.sub(r);
+      const avatarSrc = r.identity_masked
+        ? '/emoji/5093898072811898950'
+        : `/api/avatar/${r.user_id}`;
       return `<div class="lb-row ${cls}">
         <div class="lb-rank">${medal}</div>
-        <img class="lb-avatar" src="/api/avatar/${r.user_id}" alt="${initials}" onerror="avatarError(this,'${initials}')">
+        <img class="lb-avatar" src="${avatarSrc}" alt="${initials}" onerror="avatarError(this,'${initials}')">
         <div class="lb-info">
           <div class="lb-name">${esc(r.name)}</div>
           ${sub ? `<div class="lb-sub">${sub}</div>` : ''}
@@ -5084,7 +5213,7 @@ async function openSendWrkWithPicker() {
     const el = document.getElementById('_swrResults');
     if (!el) return;
     if (!res) { el.innerHTML = '<p style="color:var(--muted)">Not found</p>'; return; }
-    const name = res.username ? `@${res.username}` : res.full_name || `User ${res.user_id}`;
+    const name = res.name || (res.username ? `@${res.username}` : `User ${res.user_id}`);
     el.innerHTML = `<div class="friend-card" style="cursor:pointer" onclick="(function(){cleanup_swrPicker();openSendWrk(${res.user_id}, '${name.replace(/'/g,"\\'")}');})()">
       <div class="friend-card-name">${esc(name)}</div>
     </div>`;
@@ -5137,7 +5266,7 @@ async function openTradeWithPicker() {
     if (!el) return;
     if (!res) { el.innerHTML = '<p style="color:var(--muted)">Not found</p>'; return; }
     el.innerHTML = `<div class="friend-card" style="cursor:pointer" onclick="(function(){if(window._tradePickerCleanup)window._tradePickerCleanup();openTradeModal(${res.user_id});})()">
-      <div class="friend-card-name">${esc(res.username ? '@'+res.username : res.full_name || 'User '+res.user_id)}</div>
+      <div class="friend-card-name">${esc(res.name || (res.username ? '@'+res.username : 'User '+res.user_id))}</div>
     </div>`;
   };
   window._tradePickerCleanup = cleanup;
@@ -5427,7 +5556,9 @@ async function _loadProfileBadges(userId, scopeEl = null) {
 
 function buildProfileHtml(d, isOwn) {
   const initials = d.name.replace(/^@/,'').slice(0,2).toUpperCase();
-  const ownPhoto = isOwn && state.photoUrl ? state.photoUrl : `/api/avatar/${d.user_id}`;
+  const ownPhoto = d.identity_masked
+    ? '/emoji/5093898072811898950'
+    : isOwn && state.photoUrl ? state.photoUrl : `/api/avatar/${d.user_id}`;
   const avatarHtml = `<img class="avatar" src="${ownPhoto}" alt="${initials}" onerror="avatarError(this,'${initials}')">`;
 
   // store gift data for detail modal
@@ -5470,7 +5601,7 @@ function buildProfileHtml(d, isOwn) {
         <div class="profile-name-wrap">
           <span class="profile-name">${esc(d.name)}</span>
         </div>
-        <div class="profile-id">Telegram ID ${d.user_id}</div>
+        <div class="profile-id">${d.identity_masked ? '🛡 Secure +888 identity' : `Telegram ID ${d.user_id}`}</div>
         ${d.pinned_gift ? `
           <div class="profile-pinned-line">
             <span class="profile-pinned-label">Gift</span>
@@ -6211,8 +6342,8 @@ async function openRob() {
       return;
     }
     list.innerHTML = targets.map(t =>
-      `<div class="card rob-target" data-uid="${t.user_id}" data-name="${t.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 14px">
-        <span>${t.name}</span>
+      `<div class="card rob-target" data-uid="${t.user_id}" data-name="${esc(t.name)}" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 14px">
+        <span>${esc(t.name)}</span>
         <span style="color:var(--gold);font-size:13px;font-weight:600">${fmt(t.balance)} ${WRK}</span>
       </div>`
     ).join('');
@@ -7739,8 +7870,12 @@ function _anonCardHtml(item, walletMode = false) {
     select:'rgba(99,102,241,.3)',
     standard:'rgba(82,174,235,.24)',
   }[rarity];
+  const vaultLocked = item.is_pinned && (
+    (_shopWallet?.security?.vault_balance || 0) > 0
+    || (_shopWallet?.security?.pending_amount || 0) > 0
+  );
   const action = walletMode
-    ? `<button class="anon-action-btn ${item.is_pinned ? 'pinned' : ''}" onclick="pinAnonNumber(${item.is_pinned ? 'null' : item.id})">${item.is_pinned ? '📌 Pinned · tap to unpin' : '📌 Pin to profile'}</button>`
+    ? `<button class="anon-action-btn ${item.is_pinned ? 'pinned' : ''}" ${vaultLocked ? 'disabled' : `onclick="pinAnonNumber(${item.is_pinned ? 'null' : item.id})"`}>${vaultLocked ? '🔐 Active · securing vault' : item.is_pinned ? '🛡️ Active security number' : '🛡️ Activate Secure Number'}</button>`
     : `<button class="anon-action-btn" onclick="confirmAnonBuy(${item.id})">Buy number</button>`;
   return `
     <article class="anon-card" style="--anon-glow:${glow}">
@@ -7825,6 +7960,180 @@ function confirmAnonBuy(anonId) {
   );
 }
 
+function _securityDuration(seconds) {
+  seconds = Math.max(0, Math.ceil(seconds || 0));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours) return `${hours}h ${minutes}m`;
+  return `${Math.max(1, minutes)}m`;
+}
+
+function _securityEventHtml(event) {
+  const icon = {
+    firewall:'🛡️',
+    vault_deposit:'↓',
+    withdraw_requested:'⏳',
+    withdraw_claimed:'↑',
+    withdraw_cancelled:'↩',
+    identity_mask:'◉',
+    number_activated:'✦',
+    number_deactivated:'○',
+  }[event.event_type] || '•';
+  const timeLabel = new Date(event.created_at * 1000).toLocaleString([], {
+    month:'short', day:'numeric', hour:'numeric', minute:'2-digit',
+  });
+  return `<div class="security-event">
+    <div class="security-event-icon">${icon}</div>
+    <div><b>${esc(event.detail)}</b>${event.amount ? `<span>${fmt(event.amount)} ${WRK}</span>` : ''}</div>
+    <span>${esc(timeLabel)}</span>
+  </div>`;
+}
+
+function renderSecurityCenter(security) {
+  const el = document.getElementById('walletSecurityCenter');
+  if (!el) return;
+  if (!security.active) {
+    el.innerHTML = `<section class="security-center">
+      <div class="security-center-head">
+        <div><div class="security-kicker">Anonymous Number utility</div><div class="security-title">Secure Number</div></div>
+        <div class="security-number">Locked</div>
+      </div>
+      <div class="security-center-body">
+        <div class="security-locked">Activate one of your +888 numbers below to unlock the Secure Vault, public identity mask, and daily robbery firewall.</div>
+      </div>
+    </section>`;
+    return;
+  }
+  const pending = security.pending_amount > 0;
+  const remaining = Math.max(
+    0,
+    security.withdraw_available_at - Math.floor(Date.now() / 1000),
+  );
+  const pendingHtml = pending ? `<div class="security-pending">
+    <b>${fmt(security.pending_amount)} ${WRK}</b> is ${
+      security.withdraw_ready ? 'ready to claim.' : `locked for ${_securityDuration(remaining)}.`
+    }
+    <div class="security-pending-actions">
+      <button onclick="claimVaultWithdrawal()" ${security.withdraw_ready ? '' : 'disabled'}>Claim</button>
+      <button onclick="cancelVaultWithdrawal()">Cancel withdrawal</button>
+    </div>
+  </div>` : '';
+  const events = (security.events || []).length
+    ? security.events.map(_securityEventHtml).join('')
+    : '<div style="color:#65717c;font-size:9px;padding:7px 0">No security activity yet.</div>';
+  el.innerHTML = `<section class="security-center">
+    <div class="security-center-head">
+      <div><div class="security-kicker">Protected by WRK$</div><div class="security-title">Secure Number</div></div>
+      <div class="security-number">${esc(security.active_number)}</div>
+    </div>
+    <div class="security-center-body">
+      <div class="security-status-grid">
+        <div class="security-status-card ready"><b>Protected</b><span>Vault</span></div>
+        <div class="security-status-card ${security.firewall_ready ? 'ready' : 'cooldown'}"><b>${security.firewall_ready ? 'Ready' : _securityDuration(security.firewall_remaining)}</b><span>Firewall</span></div>
+        <div class="security-status-card ${security.mask_enabled ? 'ready' : ''}"><b>${security.mask_enabled ? '+888' : 'Public'}</b><span>Identity</span></div>
+      </div>
+      <div class="security-mask-row">
+        <div class="security-mask-copy">
+          <b>Public +888 identity</b>
+          <span>Use ${esc(security.active_number)} on profiles, leaderboards, MKRT, trades, friends, and game lobbies.</span>
+        </div>
+        <button class="security-toggle ${security.mask_enabled ? 'on' : ''}" onclick="toggleSecurityMask(${security.mask_enabled ? 'false' : 'true'})">${security.mask_enabled ? 'On' : 'Off'}</button>
+      </div>
+      <div class="security-vault">
+        <div class="security-vault-balances">
+          <span>Secure Vault<b>${fmt(security.vault_balance)} ${WRK}</b></span>
+          <span>Spendable<b>${fmt(security.balance)} ${WRK}</b></span>
+        </div>
+        <div class="security-vault-form">
+          <input class="input" id="securityVaultAmount" inputmode="numeric" placeholder="Amount">
+          <button onclick="depositToVault()">Deposit</button>
+          <button onclick="requestVaultWithdrawal()" ${pending ? 'disabled' : ''}>Withdraw</button>
+        </div>
+        ${pendingHtml}
+      </div>
+      <div>
+        <div class="security-log-title">Security activity</div>
+        ${events}
+      </div>
+    </div>
+  </section>`;
+}
+
+function _securityInputAmount() {
+  const el = document.getElementById('securityVaultAmount');
+  const amount = Number((el?.value || '').replace(/[^\d]/g, ''));
+  return Number.isSafeInteger(amount) ? amount : 0;
+}
+
+function depositToVault() {
+  const amount = _securityInputAmount();
+  if (amount < 100) return _shopToast('Minimum vault deposit is 100 WRK$', 'error');
+  _shopConfirm(
+    `Secure ${fmt(amount)} WRK$?`,
+    'Vaulted funds cannot be robbed, gambled, traded, or spent. Any withdrawal must complete a 24-hour security lock.',
+    'Deposit',
+    async () => {
+      const data = await api('/api/security/vault/deposit', {
+        method:'POST', json:{ user_id:+state.userId, amount },
+      });
+      state.balance = data.balance;
+      refreshHeaderBal();
+      _shopToast('Funds secured in your vault');
+      loadShopWallet();
+    },
+  );
+}
+
+function requestVaultWithdrawal() {
+  const amount = _securityInputAmount();
+  if (amount < 100) return _shopToast('Minimum withdrawal is 100 WRK$', 'error');
+  _shopConfirm(
+    `Unlock ${fmt(amount)} WRK$?`,
+    'The funds leave your protected vault now and become spendable after the 24-hour security lock.',
+    'Start unlock',
+    async () => {
+      await api('/api/security/vault/withdraw', {
+        method:'POST', json:{ user_id:+state.userId, amount },
+      });
+      _shopToast('24-hour vault unlock started');
+      loadShopWallet();
+    },
+  );
+}
+
+async function claimVaultWithdrawal() {
+  try {
+    const data = await api('/api/security/vault/claim', {
+      method:'POST', json:{ user_id:+state.userId },
+    });
+    state.balance = data.balance;
+    refreshHeaderBal();
+    _shopToast('Vault withdrawal claimed');
+    loadShopWallet();
+  } catch (e) { _shopToast(e.message, 'error'); }
+}
+
+async function cancelVaultWithdrawal() {
+  try {
+    await api('/api/security/vault/cancel', {
+      method:'POST', json:{ user_id:+state.userId },
+    });
+    _shopToast('Withdrawal cancelled; funds re-secured');
+    loadShopWallet();
+  } catch (e) { _shopToast(e.message, 'error'); }
+}
+
+async function toggleSecurityMask(enabled) {
+  try {
+    await api('/api/security/mask', {
+      method:'POST', json:{ user_id:+state.userId, enabled },
+    });
+    _shopToast(enabled ? '+888 public identity enabled' : 'Public identity restored');
+    loadShopWallet();
+    refreshBalance();
+  } catch (e) { _shopToast(e.message, 'error'); }
+}
+
 async function loadShopWallet() {
   const giftGrid = document.getElementById('walletGiftGrid');
   const anonGrid = document.getElementById('walletAnonGrid');
@@ -7835,6 +8144,7 @@ async function loadShopWallet() {
   }
   giftGrid.innerHTML = '<div class="loading">Loading gifts…</div>';
   anonGrid.innerHTML = '<div class="loading">Loading numbers…</div>';
+  document.getElementById('walletSecurityCenter').innerHTML = '<div class="loading">Loading Secure Number…</div>';
   try {
     const data = await api(`/api/wallet?user_id=${state.userId}`);
     _shopWallet = data;
@@ -7843,6 +8153,7 @@ async function loadShopWallet() {
     document.getElementById('shopWalletBalance').innerHTML = `${fmtK(data.balance)} ${WRK}`;
     document.getElementById('walletGiftCount').textContent = fmt(data.gifts.length);
     document.getElementById('walletAnonCount').textContent = fmt(data.anon_numbers.length);
+    renderSecurityCenter(data.security);
     giftGrid.innerHTML = data.gifts.length
       ? data.gifts.map(g => {
           const listed = !!g.listing_id;
@@ -7879,6 +8190,7 @@ async function loadShopWallet() {
   } catch (e) {
     giftGrid.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
     anonGrid.innerHTML = '';
+    document.getElementById('walletSecurityCenter').innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
   }
 }
 
@@ -7954,7 +8266,7 @@ async function pinAnonNumber(anonId) {
       method:'POST',
       json:{ user_id:+state.userId, anon_id:anonId },
     });
-    _shopToast(anonId === null ? 'Anonymous number unpinned' : 'Anonymous number pinned');
+    _shopToast(anonId === null ? 'Secure Number deactivated' : 'Secure Number activated');
     loadShopWallet();
     if (document.getElementById('page-profile').classList.contains('active')) loadOwnProfile();
   } catch (e) {

@@ -557,8 +557,12 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❓ That user hasn't started a wallet yet.")
         return
 
-    name = p.get("full_name") or (f"@{p['username']}" if p.get("username") else f"User {p['user_id']}")
-    username = p.get("username")
+    if p.get("identity_masked") and p.get("pinned_anon"):
+        name = p["pinned_anon"]["number"]
+        username = None
+    else:
+        name = p.get("full_name") or (f"@{p['username']}" if p.get("username") else f"User {p['user_id']}")
+        username = p.get("username")
     name_html = f'<a href="https://t.me/{username.lstrip("@")}">{escape(name)}</a>' if username else f'<b>{escape(name)}</b>'
 
     # badges
@@ -600,6 +604,7 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f'{pinned_line}\n'
         f'{escape(job_title)}\n\n'
         f'💰 <b>{p["balance"]:,} {emojis.WRK}</b> — rank #{p["balance_rank"]}\n'
+        f'🔐 <b>{p.get("vault_value", 0):,} {emojis.WRK}</b> secured in vault\n'
         f'💎 <b>Net Worth: {net_worth:,} {emojis.WRK}</b> — rank #{nw_rank}\n'
         f'🔥 <b>{p["streak"]} day streak</b> — rank #{p["streak_rank"]}\n'
         f'🎁 <b>{p["gift_count"]} gifts</b> — rank #{p["gift_rank"]}\n\n'
@@ -984,6 +989,21 @@ async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     target_wallet = await db.get_wallet(config.DB_PATH, target_id)
     if not target_wallet or target_wallet["balance"] < 500:
         await msg.reply_text(f"❌ {target_name} doesn't have enough WRK$ to rob (minimum 500).")
+        return
+
+    firewall = await db.consume_anon_firewall(
+        config.DB_PATH,
+        target_id,
+        robber.id,
+        now=int(now),
+    )
+    if firewall["blocked"]:
+        await db.set_rob_cooldown(config.DB_PATH, robber.id, int(now))
+        protected_number = f"+888 {firewall['suffix']:03d}"
+        await msg.reply_text(
+            f"🛡️ {protected_number}'s firewall intercepted the robbery.\n"
+            f"No WRK$ moved. Your rob cooldown has been used."
+        )
         return
 
     await db.set_rob_cooldown(config.DB_PATH, robber.id, int(now))

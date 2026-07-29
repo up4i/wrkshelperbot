@@ -22,8 +22,10 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
 from collectibles import (
+    ANON_FIREWALL_COOLDOWN,
     ANON_MAX_SUFFIX,
     ANON_MIN_SUFFIX,
+    ANON_VAULT_WITHDRAW_DELAY,
     anon_number_price,
     anon_number_rarity,
     format_anon_number,
@@ -147,10 +149,179 @@ def _display_name(row) -> str:
     return row["full_name"] or f"User {row['user_id']}"
 
 
+def _active_security_number(db, user_id: int):
+    return db.execute(
+        """SELECT a.id, a.suffix
+           FROM economy e
+           JOIN anon_numbers a
+             ON a.id = e.pinned_anon_id AND a.owner_id = e.user_id
+           WHERE e.user_id = ?""",
+        (user_id,),
+    ).fetchone()
+
+
+def _public_identity(db, user_id: int, fallback: str | None = None) -> str:
+    row = db.execute(
+        """SELECT e.username, e.full_name, e.anon_mask_enabled, a.suffix
+           FROM economy e
+           LEFT JOIN anon_numbers a
+             ON a.id = e.pinned_anon_id AND a.owner_id = e.user_id
+           WHERE e.user_id = ?""",
+        (user_id,),
+    ).fetchone()
+    if not row:
+        return fallback or f"User {user_id}"
+    if row["anon_mask_enabled"] and row["suffix"] is not None:
+        return format_anon_number(row["suffix"])
+    if row["username"]:
+        return f"@{row['username']}"
+    return row["full_name"] or fallback or f"User {user_id}"
+
+
+def _record_security_event(
+    db,
+    user_id: int,
+    event_type: str,
+    detail: str,
+    *,
+    amount: int = 0,
+    actor_id: int | None = None,
+    created_at: int | None = None,
+) -> None:
+    db.execute(
+        """INSERT INTO anon_security_events
+           (user_id, event_type, detail, amount, actor_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (
+            user_id,
+            event_type,
+            detail,
+            amount,
+            actor_id,
+            int(time.time()) if created_at is None else created_at,
+        ),
+    )
+
+
+def _security_status(db, user_id: int, *, event_limit: int = 8) -> dict:
+    row = db.execute(
+        """SELECT e.balance, e.pinned_anon_id, e.secure_vault_balance,
+                  e.vault_pending_amount, e.vault_withdraw_available_at,
+                  e.anon_mask_enabled, e.anon_firewall_used_at,
+                  a.suffix
+           FROM economy e
+           LEFT JOIN anon_numbers a
+             ON a.id = e.pinned_anon_id AND a.owner_id = e.user_id
+           WHERE e.user_id = ?""",
+        (user_id,),
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "User not found — use the bot first")
+    now = int(time.time())
+    active = row["suffix"] is not None
+    firewall_remaining = (
+        max(
+            0,
+            ANON_FIREWALL_COOLDOWN
+            - (now - (row["anon_firewall_used_at"] or 0)),
+        )
+        if active
+        else 0
+    )
+    events = db.execute(
+        """SELECT id, event_type, detail, amount, actor_id, created_at
+           FROM anon_security_events
+           WHERE user_id = ?
+           ORDER BY created_at DESC, id DESC LIMIT ?""",
+        (user_id, max(0, min(event_limit, 50))),
+    ).fetchall()
+    return {
+        "active": active,
+        "active_anon_id": row["pinned_anon_id"] if active else None,
+        "active_number": (
+            format_anon_number(row["suffix"]) if active else None
+        ),
+        "mask_enabled": bool(row["anon_mask_enabled"]) and active,
+        "balance": row["balance"],
+        "vault_balance": row["secure_vault_balance"],
+        "pending_amount": row["vault_pending_amount"],
+        "withdraw_available_at": row["vault_withdraw_available_at"],
+        "withdraw_ready": bool(row["vault_pending_amount"])
+        and now >= row["vault_withdraw_available_at"],
+        "withdraw_delay": ANON_VAULT_WITHDRAW_DELAY,
+        "firewall_ready": active and firewall_remaining == 0,
+        "firewall_remaining": firewall_remaining,
+        "events": [dict(event) for event in events],
+    }
+
+
+def _consume_anon_firewall(
+    db,
+    user_id: int,
+    actor_id: int,
+    *,
+    now: int,
+) -> dict:
+    row = db.execute(
+        """SELECT e.anon_firewall_used_at, a.suffix
+           FROM economy e
+           JOIN anon_numbers a
+             ON a.id = e.pinned_anon_id AND a.owner_id = e.user_id
+           WHERE e.user_id = ?""",
+        (user_id,),
+    ).fetchone()
+    if not row:
+        return {"blocked": False, "active": False, "remaining": 0}
+    remaining = max(
+        0,
+        ANON_FIREWALL_COOLDOWN
+        - (now - (row["anon_firewall_used_at"] or 0)),
+    )
+    if remaining:
+        return {
+            "blocked": False,
+            "active": True,
+            "remaining": remaining,
+        }
+    db.execute(
+        "UPDATE economy SET anon_firewall_used_at = ? WHERE user_id = ?",
+        (now, user_id),
+    )
+    _record_security_event(
+        db,
+        user_id,
+        "firewall",
+        "Blocked an incoming robbery",
+        actor_id=actor_id,
+        created_at=now,
+    )
+    return {
+        "blocked": True,
+        "active": True,
+        "remaining": ANON_FIREWALL_COOLDOWN,
+        "number": format_anon_number(row["suffix"]),
+    }
+
+
+def _assert_anon_transferable(db, user_id: int, anon_id: int) -> None:
+    secured = db.execute(
+        """SELECT 1 FROM economy
+           WHERE user_id = ? AND pinned_anon_id = ?
+             AND (secure_vault_balance > 0 OR vault_pending_amount > 0)""",
+        (user_id, anon_id),
+    ).fetchone()
+    if secured:
+        raise HTTPException(
+            400,
+            "This number secures vault funds and cannot be traded yet",
+        )
+
+
 # ── Leaderboard ───────────────────────────────────────────────────────────────
 
 @app.get("/api/leaderboard")
 def leaderboard(tab: str = "balance", limit: int = 20):
+    masked_aliases: dict[int, str] = {}
     _name_subquery = """
         LEFT JOIN (
             SELECT user_id,
@@ -164,6 +335,8 @@ def leaderboard(tab: str = "balance", limit: int = 20):
     """
 
     def _merged_name(r) -> str:
+        if r["user_id"] in masked_aliases:
+            return masked_aliases[r["user_id"]]
         username = r["a_username"] or r["e_username"]
         full_name = r["a_full_name"] or r["e_full_name"]
         if username:
@@ -171,6 +344,16 @@ def leaderboard(tab: str = "balance", limit: int = 20):
         return full_name or f"User {r['user_id']}"
 
     with db_conn() as db:
+        masked_aliases.update({
+            row["user_id"]: format_anon_number(row["suffix"])
+            for row in db.execute(
+                """SELECT e.user_id, a.suffix
+                   FROM economy e
+                   JOIN anon_numbers a
+                     ON a.id = e.pinned_anon_id AND a.owner_id = e.user_id
+                   WHERE e.anon_mask_enabled = 1"""
+            ).fetchall()
+        })
         if tab == "balance":
             rows = db.execute(
                 f"""SELECT e.user_id,
@@ -181,6 +364,7 @@ def leaderboard(tab: str = "balance", limit: int = 20):
                     ORDER BY e.balance DESC LIMIT ?""", (limit,)
             ).fetchall()
             return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
+                     "identity_masked": r["user_id"] in masked_aliases,
                      "value": r["balance"], "streak": r["streak"]} for i, r in enumerate(rows)]
 
         if tab == "streak":
@@ -193,6 +377,7 @@ def leaderboard(tab: str = "balance", limit: int = 20):
                     ORDER BY e.streak DESC LIMIT ?""", (limit,)
             ).fetchall()
             return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
+                     "identity_masked": r["user_id"] in masked_aliases,
                      "value": r["streak"], "balance": r["balance"]} for i, r in enumerate(rows)]
 
         if tab == "gifts":
@@ -207,6 +392,7 @@ def leaderboard(tab: str = "balance", limit: int = 20):
                     GROUP BY e.user_id ORDER BY gift_count DESC LIMIT ?""", (limit,)
             ).fetchall()
             return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
+                     "identity_masked": r["user_id"] in masked_aliases,
                      "value": r["gift_count"], "balance": r["balance"]} for i, r in enumerate(rows)]
 
         if tab == "networth":
@@ -215,6 +401,8 @@ def leaderboard(tab: str = "balance", limit: int = 20):
                            e.username AS e_username, e.full_name AS e_full_name,
                            a.username AS a_username, a.full_name AS a_full_name,
                            e.balance
+                           + COALESCE(e.secure_vault_balance, 0)
+                           + COALESCE(e.vault_pending_amount, 0)
                            + COALESCE(gv.gift_value, 0)
                            + COALESCE(av.anon_value, 0) AS value
                     FROM economy e
@@ -233,6 +421,7 @@ def leaderboard(tab: str = "balance", limit: int = 20):
                     ORDER BY value DESC LIMIT ?""", (limit,)
             ).fetchall()
             return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
+                     "identity_masked": r["user_id"] in masked_aliases,
                      "value": r["value"]} for i, r in enumerate(rows)]
 
         # ── Game stat tabs ────────────────────────────────────────────────────
@@ -271,6 +460,7 @@ def leaderboard(tab: str = "balance", limit: int = 20):
                 ORDER BY ({col}) DESC LIMIT ?""", (limit,)
         ).fetchall()
         return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
+                 "identity_masked": r["user_id"] in masked_aliases,
                  "value": r["value"]} for i, r in enumerate(rows)]
 
 
@@ -302,8 +492,13 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         """SELECT e.user_id,
                   e.username  AS e_username,  e.full_name  AS e_full_name,
                   a.username  AS a_username,  a.full_name  AS a_full_name,
-                  e.balance, e.streak, e.last_daily, e.pinned_gift_id, e.pinned_anon_id
+                  e.balance, e.streak, e.last_daily, e.pinned_gift_id, e.pinned_anon_id,
+                  e.secure_vault_balance, e.vault_pending_amount,
+                  e.anon_mask_enabled, security_anon.suffix AS security_suffix
            FROM economy e
+           LEFT JOIN anon_numbers security_anon
+             ON security_anon.id = e.pinned_anon_id
+            AND security_anon.owner_id = e.user_id
            LEFT JOIN (
                SELECT user_id, username, full_name FROM user_activity
                WHERE (user_id, last_seen) IN (
@@ -316,7 +511,12 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         raise HTTPException(404, "User not found")
     username  = row["a_username"]  or row["e_username"]
     full_name = row["a_full_name"] or row["e_full_name"]
-    display   = f"@{username}" if username else (full_name or f"User {user_id}")
+    identity_masked = bool(row["anon_mask_enabled"]) and row["security_suffix"] is not None
+    display = (
+        format_anon_number(row["security_suffix"])
+        if identity_masked
+        else f"@{username}" if username else (full_name or f"User {user_id}")
+    )
 
     gifts_offset = max(0, gifts_offset)
     gifts_limit = max(1, min(gifts_limit, 200))
@@ -387,11 +587,14 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         "WHERE owner_id = ? ORDER BY suffix",
         (user_id,),
     ).fetchall()
-    net_worth = row["balance"] + gift_value + anon_value
+    vault_value = row["secure_vault_balance"] + row["vault_pending_amount"]
+    net_worth = row["balance"] + vault_value + gift_value + anon_value
     networth_rank = db.execute(
         """SELECT COUNT(*)+1 FROM (
                SELECT e.user_id,
                       e.balance
+                      + COALESCE(e.secure_vault_balance, 0)
+                      + COALESCE(e.vault_pending_amount, 0)
                       + COALESCE(gv.gift_value, 0)
                       + COALESCE(av.anon_value, 0) AS nw
                FROM economy e
@@ -418,6 +621,8 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         """SELECT COUNT(*)+1 FROM (
                SELECT e.user_id,
                       e.balance
+                      + COALESCE(e.secure_vault_balance, 0)
+                      + COALESCE(e.vault_pending_amount, 0)
                       + COALESCE(gv.gift_value, 0)
                       + COALESCE(av.anon_value, 0) AS nw
                FROM economy e
@@ -507,8 +712,15 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
     return {
         "user_id": row["user_id"],
         "name": display,
-        "username": username,
+        "username": None if identity_masked else username,
+        "identity_masked": identity_masked,
+        "security_alias": (
+            format_anon_number(row["security_suffix"])
+            if row["security_suffix"] is not None
+            else None
+        ),
         "balance": row["balance"],
+        "vault_value": vault_value,
         "streak": row["streak"],
         "last_daily": row["last_daily"],
         "balance_rank": balance_rank,
@@ -919,7 +1131,10 @@ def auth_session(authenticated_user: AuthenticatedUser):
 def stats():
     with db_conn() as db:
         users = db.execute("SELECT COUNT(*) FROM economy").fetchone()[0]
-        total_wrk = db.execute("SELECT COALESCE(SUM(balance), 0) FROM economy").fetchone()[0]
+        total_wrk = db.execute(
+            "SELECT COALESCE(SUM(balance + secure_vault_balance "
+            "+ vault_pending_amount), 0) FROM economy"
+        ).fetchone()[0]
         gifts_owned = db.execute(
             "SELECT COUNT(*) FROM gift_instances WHERE owner_id IS NOT NULL"
         ).fetchone()[0]
@@ -1783,9 +1998,16 @@ def rob_targets(user_id: int, authenticated_user: AuthenticatedUser, limit: int 
     with db_conn() as db:
         rows = db.execute(
             """SELECT e.user_id,
-                      COALESCE(a.full_name, e.full_name, 'User ' || e.user_id) AS name,
+                      CASE
+                        WHEN e.anon_mask_enabled = 1 AND security_anon.suffix IS NOT NULL
+                        THEN printf('+888 %03d', security_anon.suffix)
+                        ELSE COALESCE(a.full_name, e.full_name, 'User ' || e.user_id)
+                      END AS name,
                       e.balance
                FROM economy e
+               LEFT JOIN anon_numbers security_anon
+                 ON security_anon.id = e.pinned_anon_id
+                AND security_anon.owner_id = e.user_id
                LEFT JOIN (
                    SELECT user_id, full_name FROM user_activity
                    WHERE (user_id, last_seen) IN (
@@ -1805,6 +2027,7 @@ def rob_attempt(req: RobAttemptRequest, authenticated_user: AuthenticatedUser):
     if req.user_id == req.target_id:
         raise HTTPException(400, "You can't rob yourself")
     with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
         robber_row = db.execute(
             """SELECT e.balance, e.last_rob,
                       COALESCE(a.username, e.username) AS username,
@@ -1828,8 +2051,15 @@ def rob_attempt(req: RobAttemptRequest, authenticated_user: AuthenticatedUser):
 
         target_row = db.execute(
             """SELECT e.user_id, e.balance,
-                      COALESCE(a.full_name, e.full_name, 'User ' || e.user_id) AS name
+                      CASE
+                        WHEN e.anon_mask_enabled = 1 AND security_anon.suffix IS NOT NULL
+                        THEN printf('+888 %03d', security_anon.suffix)
+                        ELSE COALESCE(a.full_name, e.full_name, 'User ' || e.user_id)
+                      END AS name
                FROM economy e
+               LEFT JOIN anon_numbers security_anon
+                 ON security_anon.id = e.pinned_anon_id
+                AND security_anon.owner_id = e.user_id
                LEFT JOIN (
                    SELECT user_id, full_name FROM user_activity
                    WHERE (user_id, last_seen) IN (
@@ -1843,14 +2073,33 @@ def rob_attempt(req: RobAttemptRequest, authenticated_user: AuthenticatedUser):
             raise HTTPException(400, "Target doesn't have enough WRK$ (minimum 500)")
 
         db.execute("UPDATE economy SET last_rob = ? WHERE user_id = ?", (now, req.user_id))
+        firewall = _consume_anon_firewall(
+            db, req.target_id, req.user_id, now=now
+        )
+        target_name = target_row["name"]
+        robber_display = _public_identity(db, req.user_id)
+        if firewall["blocked"]:
+            new_bal = robber_row["balance"]
+            db.commit()
+            _send_telegram_dm(
+                req.target_id,
+                f"🛡️ {firewall['number']} blocked a robbery attempt from "
+                f"{robber_display}. Your WRK$ is safe.",
+            )
+            return {
+                "outcome": "firewall",
+                "emoji": "🛡️",
+                "flavor": (
+                    f"{target_name}'s +888 firewall intercepted the robbery. "
+                    "No WRK$ moved."
+                ),
+                "amount": 0,
+                "new_balance": new_bal,
+                "firewall_remaining": firewall["remaining"],
+            }
 
         success = random.random() < 0.50
         result = _rob_outcome(success, robber_row["balance"], target_row["balance"])
-        target_name = target_row["name"]
-        robber_display = (
-            f"@{robber_row['username']}" if robber_row["username"]
-            else robber_row["full_name"]
-        )
 
         if result["outcome"] == "success":
             amount = result["amount"]
@@ -2160,6 +2409,20 @@ class AnonPinRequest(BaseModel):
     anon_id: int | None = None
 
 
+class SecurityAmountRequest(BaseModel):
+    user_id: int
+    amount: int
+
+
+class SecurityActorRequest(BaseModel):
+    user_id: int
+
+
+class SecurityMaskRequest(BaseModel):
+    user_id: int
+    enabled: bool
+
+
 def _anon_item(row) -> dict:
     item = dict(row)
     item["number"] = format_anon_number(item["suffix"])
@@ -2199,6 +2462,7 @@ def shop_wallet(user_id: int, authenticated_user: AuthenticatedUser):
             "WHERE owner_id = ? ORDER BY suffix",
             (user_id,),
         ).fetchall()
+        security = _security_status(db, user_id)
 
     gift_items = []
     for row in gifts:
@@ -2214,7 +2478,191 @@ def shop_wallet(user_id: int, authenticated_user: AuthenticatedUser):
         "gifts": gift_items,
         "anon_numbers": anon_items,
         "pinned_anon_id": wallet["pinned_anon_id"],
+        "security": security,
     }
+
+
+@app.get("/api/security")
+def security_status(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
+    with db_conn() as db:
+        return _security_status(db, user_id, event_limit=20)
+
+
+@app.post("/api/security/vault/deposit")
+def security_vault_deposit(
+    req: SecurityAmountRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    if req.amount < 100:
+        raise HTTPException(400, "Minimum vault deposit is 100 WRK$")
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        if not _active_security_number(db, req.user_id):
+            raise HTTPException(400, "Activate an Anonymous Number first")
+        row = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if not row or row["balance"] < req.amount:
+            raise HTTPException(400, "Insufficient spendable balance")
+        db.execute(
+            "UPDATE economy SET balance = balance - ?, "
+            "secure_vault_balance = secure_vault_balance + ? WHERE user_id = ?",
+            (req.amount, req.amount, req.user_id),
+        )
+        _record_security_event(
+            db,
+            req.user_id,
+            "vault_deposit",
+            "Deposited WRK$ into Secure Vault",
+            amount=req.amount,
+        )
+        result = _security_status(db, req.user_id)
+        db.commit()
+        return result
+
+
+@app.post("/api/security/vault/withdraw")
+def security_vault_withdraw(
+    req: SecurityAmountRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    if req.amount < 100:
+        raise HTTPException(400, "Minimum withdrawal is 100 WRK$")
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        if not _active_security_number(db, req.user_id):
+            raise HTTPException(400, "Activate an Anonymous Number first")
+        row = db.execute(
+            "SELECT secure_vault_balance, vault_pending_amount FROM economy "
+            "WHERE user_id = ?",
+            (req.user_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(404, "User not found")
+        if row["vault_pending_amount"] > 0:
+            raise HTTPException(400, "A vault withdrawal is already pending")
+        if row["secure_vault_balance"] < req.amount:
+            raise HTTPException(400, "Insufficient Secure Vault balance")
+        available_at = int(time.time()) + ANON_VAULT_WITHDRAW_DELAY
+        db.execute(
+            "UPDATE economy SET secure_vault_balance = secure_vault_balance - ?, "
+            "vault_pending_amount = ?, vault_withdraw_available_at = ? "
+            "WHERE user_id = ?",
+            (req.amount, req.amount, available_at, req.user_id),
+        )
+        _record_security_event(
+            db,
+            req.user_id,
+            "withdraw_requested",
+            "Started the 24-hour vault withdrawal lock",
+            amount=req.amount,
+        )
+        result = _security_status(db, req.user_id)
+        db.commit()
+        return result
+
+
+@app.post("/api/security/vault/claim")
+def security_vault_claim(
+    req: SecurityActorRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        if not _active_security_number(db, req.user_id):
+            raise HTTPException(400, "Activate an Anonymous Number first")
+        row = db.execute(
+            "SELECT vault_pending_amount, vault_withdraw_available_at "
+            "FROM economy WHERE user_id = ?",
+            (req.user_id,),
+        ).fetchone()
+        if not row or row["vault_pending_amount"] <= 0:
+            raise HTTPException(400, "No pending vault withdrawal")
+        now = int(time.time())
+        if now < row["vault_withdraw_available_at"]:
+            remaining = row["vault_withdraw_available_at"] - now
+            raise HTTPException(400, f"Vault remains locked for {remaining}s")
+        amount = row["vault_pending_amount"]
+        db.execute(
+            "UPDATE economy SET balance = balance + ?, vault_pending_amount = 0, "
+            "vault_withdraw_available_at = 0 WHERE user_id = ?",
+            (amount, req.user_id),
+        )
+        _record_security_event(
+            db,
+            req.user_id,
+            "withdraw_claimed",
+            "Claimed a matured vault withdrawal",
+            amount=amount,
+        )
+        result = _security_status(db, req.user_id)
+        db.commit()
+        return result
+
+
+@app.post("/api/security/vault/cancel")
+def security_vault_cancel(
+    req: SecurityActorRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute(
+            "SELECT vault_pending_amount FROM economy WHERE user_id = ?",
+            (req.user_id,),
+        ).fetchone()
+        if not row or row["vault_pending_amount"] <= 0:
+            raise HTTPException(400, "No pending vault withdrawal")
+        amount = row["vault_pending_amount"]
+        db.execute(
+            "UPDATE economy SET secure_vault_balance = secure_vault_balance + ?, "
+            "vault_pending_amount = 0, vault_withdraw_available_at = 0 "
+            "WHERE user_id = ?",
+            (amount, req.user_id),
+        )
+        _record_security_event(
+            db,
+            req.user_id,
+            "withdraw_cancelled",
+            "Cancelled a pending vault withdrawal",
+            amount=amount,
+        )
+        result = _security_status(db, req.user_id)
+        db.commit()
+        return result
+
+
+@app.post("/api/security/mask")
+def security_mask(
+    req: SecurityMaskRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        active = _active_security_number(db, req.user_id)
+        if req.enabled and not active:
+            raise HTTPException(400, "Activate an Anonymous Number first")
+        db.execute(
+            "UPDATE economy SET anon_mask_enabled = ? WHERE user_id = ?",
+            (1 if req.enabled else 0, req.user_id),
+        )
+        _record_security_event(
+            db,
+            req.user_id,
+            "identity_mask",
+            "Enabled +888 public identity"
+            if req.enabled
+            else "Disabled +888 public identity",
+        )
+        result = _security_status(db, req.user_id)
+        db.commit()
+        return result
 
 
 @app.post("/api/rift/sell")
@@ -2303,11 +2751,16 @@ def mkrt_listings(limit: int = 40, offset: int = 0, search: str = ""):
                        gi.id AS gift_id, gi.gift_number, gi.background,
                        gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
                        gm.tier, gm.custom_emoji_id,
-                       e.username AS seller_username, e.full_name AS seller_full_name
+                       e.username AS seller_username, e.full_name AS seller_full_name,
+                       e.anon_mask_enabled AS seller_mask_enabled,
+                       security_anon.suffix AS seller_mask_suffix
                 FROM gift_market_listings l
                 JOIN gift_instances gi ON gi.id = l.gift_id
                 JOIN gift_models gm ON gm.id = gi.model_id
                 LEFT JOIN economy e ON e.user_id = l.seller_id
+                LEFT JOIN anon_numbers security_anon
+                  ON security_anon.id = e.pinned_anon_id
+                 AND security_anon.owner_id = e.user_id
                 WHERE {where_sql}
                 ORDER BY l.created_at DESC, l.id DESC LIMIT ? OFFSET ?""",
             params + [limit, offset],
@@ -2324,7 +2777,9 @@ def mkrt_listings(limit: int = 40, offset: int = 0, search: str = ""):
     for row in rows:
         item = dict(row)
         item["seller_name"] = (
-            f"@{item['seller_username']}" if item["seller_username"]
+            format_anon_number(item["seller_mask_suffix"])
+            if item["seller_mask_enabled"] and item["seller_mask_suffix"] is not None
+            else f"@{item['seller_username']}" if item["seller_username"]
             else item["seller_full_name"] or f"User {item['seller_id']}"
         )
         items.append(item)
@@ -2539,16 +2994,43 @@ def fragsmint_buy(req: AnonBuyRequest, authenticated_user: AuthenticatedUser):
 def pin_anon_number(req: AnonPinRequest, authenticated_user: AuthenticatedUser):
     _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
         if req.anon_id is not None:
             owned = db.execute(
-                "SELECT id FROM anon_numbers WHERE id = ? AND owner_id = ?",
+                "SELECT id, suffix FROM anon_numbers WHERE id = ? AND owner_id = ?",
                 (req.anon_id, req.user_id),
             ).fetchone()
             if not owned:
                 raise HTTPException(403, "You do not own that anonymous number")
+        else:
+            secured = db.execute(
+                "SELECT secure_vault_balance, vault_pending_amount "
+                "FROM economy WHERE user_id = ?",
+                (req.user_id,),
+            ).fetchone()
+            if secured and (
+                secured["secure_vault_balance"] > 0
+                or secured["vault_pending_amount"] > 0
+            ):
+                raise HTTPException(
+                    400,
+                    "Move all funds out of Secure Vault before deactivating your number",
+                )
         db.execute(
-            "UPDATE economy SET pinned_anon_id = ? WHERE user_id = ?",
-            (req.anon_id, req.user_id),
+            "UPDATE economy SET pinned_anon_id = ?, "
+            "anon_mask_enabled = CASE WHEN ? IS NULL THEN 0 ELSE anon_mask_enabled END "
+            "WHERE user_id = ?",
+            (req.anon_id, req.anon_id, req.user_id),
+        )
+        _record_security_event(
+            db,
+            req.user_id,
+            "number_activated" if req.anon_id is not None else "number_deactivated",
+            (
+                f"Activated {format_anon_number(owned['suffix'])} for security"
+                if req.anon_id is not None
+                else "Deactivated Anonymous Number security"
+            ),
         )
         db.commit()
     return {"ok": True, "pinned_anon_id": req.anon_id}
@@ -2854,14 +3336,11 @@ def get_trades(user_id: int, authenticated_user: AuthenticatedUser):
     with db_conn() as db:
         def _offer_row(row) -> dict:
             d = dict(row)
-            name_row = db.execute(
-                "SELECT username, full_name FROM economy WHERE user_id=?",
-                (d.get("from_user_id"),)
-            ).fetchone()
-            if name_row:
-                d["from_display"] = name_row["full_name"] or name_row["username"] or f'User {d["from_user_id"]}'
-            else:
-                d["from_display"] = f'User {d.get("from_user_id", "?")}'
+            d["from_display"] = _public_identity(
+                db,
+                d.get("from_user_id"),
+                f'User {d.get("from_user_id", "?")}',
+            )
             # instance_id is the offered gift column
             offer_gift_col = d.get("instance_id")
             if offer_gift_col:
@@ -2953,6 +3432,9 @@ def create_trade(req: TradeCreateRequest, authenticated_user: AuthenticatedUser)
             ).fetchone()
             if not row or row["owner_id"] != req.from_user_id:
                 raise HTTPException(400, "You don't own that anonymous number")
+            _assert_anon_transferable(
+                db, req.from_user_id, req.offer_anon_id
+            )
         if req.request_gift_id:
             row = db.execute(
                 "SELECT owner_id, COALESCE(is_admin_gift, 0) AS is_admin_gift "
@@ -2970,6 +3452,9 @@ def create_trade(req: TradeCreateRequest, authenticated_user: AuthenticatedUser)
             ).fetchone()
             if not row or row["owner_id"] != req.to_user_id:
                 raise HTTPException(400, "Target doesn't own that anonymous number")
+            _assert_anon_transferable(
+                db, req.to_user_id, req.request_anon_id
+            )
         if req.offer_wrk > 0:
             bal = db.execute("SELECT balance FROM economy WHERE user_id=?", (req.from_user_id,)).fetchone()
             if not bal or bal["balance"] < req.offer_wrk:
@@ -3037,6 +3522,7 @@ def accept_trade(offer_id: int, req: TradeActionRequest, authenticated_user: Aut
                 raise HTTPException(
                     400, "Sender no longer owns the offered anonymous number"
                 )
+            _assert_anon_transferable(db, from_id, offered_anon)
         if requested_anon:
             row = db.execute(
                 "SELECT owner_id FROM anon_numbers WHERE id=?", (requested_anon,)
@@ -3045,6 +3531,7 @@ def accept_trade(offer_id: int, req: TradeActionRequest, authenticated_user: Aut
                 raise HTTPException(
                     400, "You no longer own the requested anonymous number"
                 )
+            _assert_anon_transferable(db, to_id, requested_anon)
         wrk_offered = offer["wrk_offered"]
         if wrk_offered > 0:
             bal = db.execute("SELECT balance FROM economy WHERE user_id=?", (from_id,)).fetchone()
@@ -3089,7 +3576,7 @@ def accept_trade(offer_id: int, req: TradeActionRequest, authenticated_user: Aut
                 (to_id, now, offered_anon),
             )
             db.execute(
-                "UPDATE economy SET pinned_anon_id=NULL "
+                "UPDATE economy SET pinned_anon_id=NULL, anon_mask_enabled=0 "
                 "WHERE user_id=? AND pinned_anon_id=?",
                 (from_id, offered_anon),
             )
@@ -3099,7 +3586,7 @@ def accept_trade(offer_id: int, req: TradeActionRequest, authenticated_user: Aut
                 (from_id, now, requested_anon),
             )
             db.execute(
-                "UPDATE economy SET pinned_anon_id=NULL "
+                "UPDATE economy SET pinned_anon_id=NULL, anon_mask_enabled=0 "
                 "WHERE user_id=? AND pinned_anon_id=?",
                 (to_id, requested_anon),
             )
@@ -3321,12 +3808,10 @@ def get_friends(user_id: int, authenticated_user: AuthenticatedUser):
         def _enrich(row):
             d = dict(row)
             other_id = d["to_user_id"] if d["from_user_id"] == user_id else d["from_user_id"]
-            other = db.execute(
-                "SELECT username, full_name FROM economy WHERE user_id=?", (other_id,)
-            ).fetchone()
             d["other_user_id"] = other_id
-            d["other_display"] = (f"@{other['username']}" if other and other["username"]
-                                  else (other["full_name"] if other else f"User {other_id}"))
+            d["other_display"] = _public_identity(
+                db, other_id, f"User {other_id}"
+            )
             return d
 
         friends = [_enrich(r) for r in db.execute(
@@ -3426,11 +3911,11 @@ def send_wrk(req: SendWrkRequest, authenticated_user: AuthenticatedUser):
         db.execute("UPDATE economy SET balance=balance-? WHERE user_id=?", (req.amount, req.from_user_id))
         db.execute("UPDATE economy SET balance=balance+? WHERE user_id=?", (req.amount, req.to_user_id))
         new_bal = db.execute("SELECT balance FROM economy WHERE user_id=?", (req.from_user_id,)).fetchone()["balance"]
+        from_name = _public_identity(db, req.from_user_id)
+        to_name = _public_identity(db, req.to_user_id)
         db.commit()
 
     # Send DM confirmations
-    from_name = req.from_display or sender["username"] or sender["full_name"] or f"User {req.from_user_id}"
-    to_name = req.to_display or target["username"] or target["full_name"] or f"User {req.to_user_id}"
     amt_fmt = f"{req.amount:,}"
     _send_telegram_dm(
         req.from_user_id,
@@ -3583,7 +4068,16 @@ def game_timers():
 
 async def _startup():
     with db_conn() as db:
-        for col in ("pinned_gift_id INTEGER", "pinned_anon_id INTEGER", "photo_url TEXT"):
+        for col in (
+            "pinned_gift_id INTEGER",
+            "pinned_anon_id INTEGER",
+            "photo_url TEXT",
+            "secure_vault_balance INTEGER NOT NULL DEFAULT 0",
+            "vault_pending_amount INTEGER NOT NULL DEFAULT 0",
+            "vault_withdraw_available_at INTEGER NOT NULL DEFAULT 0",
+            "anon_mask_enabled INTEGER NOT NULL DEFAULT 0",
+            "anon_firewall_used_at INTEGER NOT NULL DEFAULT 0",
+        ):
             try:
                 db.execute(f"ALTER TABLE economy ADD COLUMN {col}")
                 db.commit()
@@ -3696,6 +4190,17 @@ async def _startup():
     owner_id    INTEGER,
     acquired_at INTEGER
 )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS anon_security_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    detail     TEXT NOT NULL,
+    amount     INTEGER NOT NULL DEFAULT 0,
+    actor_id   INTEGER,
+    created_at INTEGER NOT NULL
+)""")
+        db.execute("""CREATE INDEX IF NOT EXISTS idx_anon_security_events_user
+    ON anon_security_events(user_id, created_at DESC)""")
         db.executemany(
             "INSERT OR IGNORE INTO anon_numbers (id, suffix, price) VALUES (?, ?, ?)",
             [
@@ -3844,8 +4349,9 @@ async def crash_ws(ws: WebSocket):
                         continue
                     db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (amount, uid))
                     new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
-                    name_row = db.execute("SELECT username, full_name FROM economy WHERE user_id = ?", (uid,)).fetchone()
-                    _crash.names[uid] = (name_row["username"] or name_row["full_name"] or f"Player {uid}") if name_row else f"Player {uid}"
+                    _crash.names[uid] = _public_identity(
+                        db, uid, f"Player {uid}"
+                    )
                     db.commit()
                 _crash.bets[uid] = {"bet": amount, "cashed_out": False}
                 if len(_crash.names) == 1:
@@ -4033,8 +4539,9 @@ async def duck_ws(ws: WebSocket):
                         continue
                     db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (amount, uid))
                     new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
+                    public_name = _public_identity(db, uid, f"Player {uid}")
                     db.commit()
-                _duck.bets[uid] = {"duck_idx": duck_idx, "bet": amount, "name": row["username"] or row["full_name"] or f"Player {uid}"}
+                _duck.bets[uid] = {"duck_idx": duck_idx, "bet": amount, "name": public_name}
                 if len(_duck.bets) == 1:
                     asyncio.create_task(_lobby_broadcast(
                         {"type": "player_joined", "game": "duck", "game_label": "Duck Racing", "user": _duck.bets[uid]["name"]}
@@ -4239,7 +4746,8 @@ async def marbles_ws(ws: WebSocket):
                         new_bal = row["balance"]
                         total_value = gift_value
                         _marble.pot_gifts.append(gift_id)
-                        bet_entry = {"name": row["username"] or row["full_name"] or f"Player {uid}", "wrk": 0, "gift_id": gift_id, "gift_value": gift_value, "color": _marble.next_color(), "total_value": total_value}
+                        public_name = _public_identity(db, uid, f"Player {uid}")
+                        bet_entry = {"name": public_name, "wrk": 0, "gift_id": gift_id, "gift_value": gift_value, "color": _marble.next_color(), "total_value": total_value}
                     else:
                         if amount < 100:
                             await ws.send_json({"type": "error", "message": "Minimum bet is 100 WRK$"})
@@ -4251,7 +4759,8 @@ async def marbles_ws(ws: WebSocket):
                         new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
                         _marble.pot_wrk += amount
                         total_value = amount
-                        bet_entry = {"name": row["username"] or row["full_name"] or f"Player {uid}", "wrk": amount, "gift_id": None, "gift_value": 0, "color": _marble.next_color(), "total_value": total_value}
+                        public_name = _public_identity(db, uid, f"Player {uid}")
+                        bet_entry = {"name": public_name, "wrk": amount, "gift_id": None, "gift_value": 0, "color": _marble.next_color(), "total_value": total_value}
                     db.commit()
 
                 _marble.bets[uid] = bet_entry
@@ -4512,8 +5021,9 @@ async def livebj_ws(ws: WebSocket):
                         continue
                     db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (bet, uid))
                     new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
+                    public_name = _public_identity(db, uid, f"Player {uid}")
                     db.commit()
-                _livebj.seats.append({"user_id": uid, "name": row["username"] or row["full_name"] or f"Player {uid}", "bet": bet, "hand": [], "status": "waiting", "doubled": False})
+                _livebj.seats.append({"user_id": uid, "name": public_name, "bet": bet, "hand": [], "status": "waiting", "doubled": False})
                 if len(_livebj.seats) == 1:
                     asyncio.create_task(_lobby_broadcast(
                         {"type": "player_joined", "game": "livebj", "game_label": "Live Blackjack", "user": _livebj.seats[-1]["name"]}
@@ -4860,9 +5370,10 @@ async def poker_ws(ws: WebSocket):
                         continue
                     db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (_POKER_BUYIN, uid))
                     new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (uid,)).fetchone()["balance"]
+                    public_name = _public_identity(db, uid, f"Player {uid}")
                     db.commit()
                 _poker.connections[uid] = ws
-                _poker.seats.append({"user_id": uid, "name": row["username"] or row["full_name"] or f"Player {uid}", "chips": _POKER_BUYIN, "hole_cards": [], "status": "waiting", "current_bet": 0})
+                _poker.seats.append({"user_id": uid, "name": public_name, "chips": _POKER_BUYIN, "hole_cards": [], "status": "waiting", "current_bet": 0})
                 asyncio.create_task(_lobby_broadcast(
                     {"type": "player_joined", "game": "poker", "game_label": "Poker", "user": _poker.seats[-1]["name"]}
                 ))
