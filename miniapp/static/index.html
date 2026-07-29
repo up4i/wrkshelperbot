@@ -4454,7 +4454,10 @@
 <script>
 const API = '';  // same origin
 
+// WRK contains markup and must only be written through innerHTML/template HTML.
+// Use WRK_TEXT for alerts, textContent, and other plain-text destinations.
 const WRK = '<img src="/emoji/5093898072811898950" style="width:18px;height:18px;vertical-align:middle;margin-left:2px" onerror="this.outerHTML=\'WRK$\'">';
+const WRK_TEXT = 'WRK$';
 const BADGE_OWNER    = '<img src="/badges/owner.png"     class="profile-badge" title="Owner"      onerror="this.outerHTML=\'👑\'">';
 const BADGE_ECOADMIN = '<img src="/badges/ecoadmin.png"  class="profile-badge" title="EcoAdmin"   onerror="this.outerHTML=\'🛡️\'">';
 const BADGE_ADMIN    = '<img src="/badges/admin.png"     class="profile-badge" title="Admin"      onerror="this.outerHTML=\'⚔️\'">';
@@ -5158,7 +5161,7 @@ async function submitSendWrk() {
     state.balance = data.new_balance;
     refreshHeaderBal();
     closeSendWrk();
-    alert(`Sent ${fmt(amount)} ${WRK}!`);
+    alert(`Sent ${fmt(amount)} ${WRK_TEXT}!`);
   } catch(e) { alert(e.message); }
 }
 async function sendFriendRequest(targetId) {
@@ -6053,7 +6056,7 @@ async function spinRoulette() {
     const colorEmoji = { red:'🔴', black:'⚫', green:'🟢' }[data.winning_color];
     const numLabel = data.winning_number;
     const delta = data.delta > 0 ? `+${fmt(data.delta)}` : fmt(data.delta);
-    resEl.textContent = data.won
+    resEl.innerHTML = data.won
       ? `${colorEmoji} ${numLabel} — You win! ${delta} ${WRK}`
       : `${colorEmoji} ${numLabel} — You lose. ${delta} ${WRK}`;
     resEl.className = `result-box show ${data.won ? 'win-box' : 'lose-box'}`;
@@ -6472,7 +6475,7 @@ async function spinSlots() {
     const resEl = document.getElementById('slotsResult');
     const labels = { jackpot: `🎰 JACKPOT! ${data.multiplier}×`, three_match: `🎉 Three of a kind! ${data.multiplier}×`, two_match: `🤝 Push — bet returned`, no_match: '💀 No match' };
     const deltaStr = data.delta > 0 ? `+${fmt(data.delta)} ${WRK}` : data.delta < 0 ? `${fmt(data.delta)} ${WRK}` : '';
-    resEl.textContent = deltaStr ? `${labels[data.result]} — ${deltaStr}` : labels[data.result];
+    resEl.innerHTML = deltaStr ? `${labels[data.result]} — ${deltaStr}` : labels[data.result];
     resEl.className = `result-box show ${isWin ? 'win-box' : isPush ? '' : 'lose-box'}`;
     const _existingSlotsAgain = resEl.nextElementSibling;
     if (_existingSlotsAgain && _existingSlotsAgain.classList.contains('btn')) _existingSlotsAgain.remove();
@@ -7157,7 +7160,7 @@ async function spinWheel() {
 
     const resEl = document.getElementById('wheelResult');
     const sign = data.delta >= 0 ? '+' : '';
-    resEl.textContent = data.multiplier === 0
+    resEl.innerHTML = data.multiplier === 0
       ? `☠ Bankrupt! ${fmt(data.delta)} ${WRK}`
       : `${data.multiplier}× — ${sign}${fmt(data.delta)} ${WRK}`;
     resEl.className = `result-box show ${data.delta >= 0 ? 'win-box' : 'lose-box'}`;
