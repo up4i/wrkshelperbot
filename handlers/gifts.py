@@ -509,6 +509,9 @@ async def cmd_buy(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if instance["owner_id"] is not None:
         await msg.reply_text("❌ That gift is already owned by someone. Use /offer to trade with them.")
         return
+    if instance.get("is_admin_gift"):
+        await msg.reply_text("❌ Admin gifts cannot be bought, sold, or traded.")
+        return
 
     price_row = await db.get_gift_price(config.DB_PATH, collection, instance["background"])
     if not price_row:
@@ -560,6 +563,9 @@ async def cmd_sell(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     instance = await db.get_gift_instance_by_number(config.DB_PATH, collection, gift_number)
     if not instance or instance["owner_id"] != user.id:
         await msg.reply_text("❌ You don't own that gift.")
+        return
+    if instance.get("is_admin_gift"):
+        await msg.reply_text("❌ Admin gifts cannot be sold or traded.")
         return
 
     price_row = await db.get_gift_price(config.DB_PATH, collection, instance["background"])
@@ -628,6 +634,9 @@ async def cmd_offer(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if instance["owner_id"] != target_id:
         await msg.reply_text(f"❌ {target_name} doesn't own that gift.")
         return
+    if instance.get("is_admin_gift"):
+        await msg.reply_text("❌ Admin gifts cannot be sold or traded.")
+        return
 
     wallet = await db.get_wallet(config.DB_PATH, user.id)
     if not wallet or wallet["balance"] < wrk_amount:
@@ -692,9 +701,13 @@ async def gift_offer_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     # Accept
-    if instance["owner_id"] != offer["to_user_id"]:
+    if not instance or instance["owner_id"] != offer["to_user_id"]:
         await db.update_offer_status(config.DB_PATH, offer_id, "declined")
         await query.answer("You no longer own that gift.", show_alert=True)
+        return
+    if instance.get("is_admin_gift"):
+        await db.update_offer_status(config.DB_PATH, offer_id, "declined")
+        await query.answer("Admin gifts cannot be traded.", show_alert=True)
         return
 
     buyer_wallet = await db.get_wallet(config.DB_PATH, from_user_id)

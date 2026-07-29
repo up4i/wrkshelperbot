@@ -292,11 +292,43 @@
   .gift-card .gtier.legendary { color: var(--gold); }
 
   /* ── Trades ── */
-  .trade-card { background: var(--card); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
-  .trade-card-sides { display: flex; gap: 8px; align-items: center; }
-  .trade-side { flex: 1; background: rgba(255,255,255,.04); border-radius: 8px; padding: 8px; font-size: 13px; }
-  .trade-side-label { font-size: 10px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .5px; }
-  .trade-arrow { color: var(--muted); font-size: 18px; flex-shrink: 0; }
+  .trade-card {
+    overflow: hidden;
+    margin-bottom: 10px;
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,.075);
+    border-radius: 16px;
+    background: linear-gradient(155deg, rgba(255,255,255,.055), rgba(255,255,255,.018));
+  }
+  .trade-card-sides { display: grid; grid-template-columns: minmax(0,1fr); gap: 7px; }
+  .trade-side {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 12px;
+    background: rgba(7,9,16,.42);
+    font-size: 13px;
+  }
+  .trade-side-label {
+    margin-bottom: 7px;
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 850;
+    letter-spacing: .8px;
+    text-transform: uppercase;
+  }
+  .trade-arrow {
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    justify-self: center;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 9px;
+    background: rgba(255,255,255,.035);
+    color: #72808e;
+    font-size: 16px;
+  }
   .trade-actions { display: flex; gap: 8px; margin-top: 10px; }
   .trade-actions .btn { flex: 1; font-size: 13px; padding: 8px; }
   /* ── Friends / Social ── */
@@ -306,11 +338,139 @@
   .friend-card-actions .btn { font-size: 12px; padding: 6px 10px; }
   .friend-online { width: 8px; height: 8px; border-radius: 50%; background: #2ecc71; flex-shrink: 0; }
   /* ── Trade modal ── */
-  .trade-modal-sides { display: flex; gap: 8px; margin-bottom: 8px; }
-  .trade-panel { flex: 1; background: rgba(255,255,255,.04); border-radius: 10px; padding: 10px; }
-  .trade-panel-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
-  .trade-gift-pick { border: 1px solid rgba(255,255,255,.1); border-radius: 8px; padding: 8px; cursor: pointer; text-align: center; font-size: 12px; min-height: 60px; display: flex; align-items: center; justify-content: center; }
-  .trade-gift-pick.selected { border-color: var(--primary); }
+  .trade-sheet { width: 100%; max-width: 520px; max-height: min(88dvh,760px); }
+  .trade-subtitle { margin: -2px 32px 13px 0; color: var(--muted); font-size: 11px; line-height: 1.4; }
+  .trade-modal-sides { display: grid; grid-template-columns: minmax(0,1fr); gap: 7px; margin-bottom: 10px; }
+  .trade-panel {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,.075);
+    border-radius: 15px;
+    background:
+      radial-gradient(circle at 100% 0, rgba(139,92,246,.10), transparent 45%),
+      rgba(255,255,255,.03);
+  }
+  .trade-panel-label {
+    margin-bottom: 9px;
+    color: #aab5c0;
+    font-size: 10px;
+    font-weight: 850;
+    letter-spacing: .7px;
+    text-transform: uppercase;
+  }
+  .trade-exchange-mark {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    justify-self: center;
+    border: 1px solid rgba(139,92,246,.22);
+    border-radius: 10px;
+    background: rgba(139,92,246,.09);
+    color: #bca8ff;
+    font-size: 16px;
+  }
+  .trade-gift-pick {
+    width: 100%;
+    min-height: 68px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 9px;
+    border: 1px dashed rgba(255,255,255,.14);
+    border-radius: 12px;
+    background: rgba(4,6,12,.3);
+    color: #8995a1;
+    font: 750 12px system-ui;
+    text-align: left;
+    cursor: pointer;
+  }
+  .trade-gift-pick.selected {
+    justify-content: flex-start;
+    border-style: solid;
+    border-color: rgba(139,92,246,.5);
+    background: rgba(139,92,246,.075);
+    color: #fff;
+  }
+  .trade-pick-copy { min-width: 0; flex: 1; }
+  .trade-pick-name {
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 850;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .trade-pick-meta { margin-top: 2px; color: #77838f; font-size: 9px; }
+  .trade-gift-thumb,
+  .trade-anon-thumb {
+    position: relative;
+    width: 46px;
+    height: 46px;
+    flex: none;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px;
+  }
+  .trade-gift-thumb {
+    display: grid;
+    place-items: center;
+    background: linear-gradient(145deg, rgba(139,92,246,.18), rgba(14,165,233,.1));
+    font-size: 24px;
+  }
+  .trade-gift-thumb img { position: absolute; inset: 4px; width: 38px; height: 38px; object-fit: contain; }
+  .trade-anon-thumb {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 6px;
+    background:
+      radial-gradient(circle at 90% 0, rgba(82,174,235,.35), transparent 50%),
+      linear-gradient(145deg,#252937,#11131b);
+    color: white;
+  }
+  .trade-anon-thumb img { position:absolute; top:5px; left:5px; width:14px; height:14px; object-fit:contain; }
+  .trade-anon-thumb b { font-size: 8px; line-height: 1; }
+  .trade-anon-thumb span { margin-top:2px; font-size: 11px; font-weight: 900; line-height: 1; }
+  .trade-wrk-field { position: relative; margin-top: 7px; }
+  .trade-wrk-field .input { margin: 0; padding: 9px 46px 9px 10px; font-size: 13px; }
+  .trade-wrk-field span {
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    color: #7764ca;
+    font-size: 9px;
+    font-weight: 900;
+    transform: translateY(-50%);
+  }
+  .trade-picker-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .trade-picker-section { grid-column:1/-1; margin-top:5px; color:#7f8b97; font-size:9px; font-weight:850; letter-spacing:.75px; text-transform:uppercase; }
+  .trade-picker-card {
+    min-width:0;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    padding:7px;
+    border:1px solid rgba(255,255,255,.075);
+    border-radius:12px;
+    background:rgba(255,255,255,.025);
+    color:#e8edf2;
+    text-align:left;
+    cursor:pointer;
+  }
+  .trade-picker-card .trade-gift-thumb,
+  .trade-picker-card .trade-anon-thumb { width:42px; height:42px; border-radius:10px; }
+  .trade-picker-card .trade-gift-thumb img { inset:3px; width:36px; height:36px; }
+  .trade-picker-card .trade-pick-name { font-size:10px; }
+  .trade-locked-note {
+    grid-column:1/-1;
+    padding:8px 10px;
+    border-radius:10px;
+    background:rgba(251,191,36,.07);
+    color:#a99c75;
+    font-size:9px;
+    line-height:1.4;
+  }
   .trade-donation-warning { background: rgba(255,200,0,.12); border: 1px solid rgba(255,200,0,.3); border-radius: 8px; padding: 10px; font-size: 13px; margin-bottom: 10px; display: none; }
 
   /* ── Leaderboard ── */
@@ -4070,27 +4230,35 @@
 </div>
 <div class="modal-overlay" id="tradeModalOverlay" onclick="closeTradeModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:99"></div>
 <div class="modal-bg" id="tradeModal" onclick="if(event.target.id==='tradeModal')closeTradeModal()" style="position:fixed;inset:0;z-index:100;display:none;align-items:flex-end;justify-content:center">
-  <div class="modal" style="position:relative;padding:14px 14px 18px;gap:8px;max-height:82vh;overflow-y:auto;width:100%">
+  <div class="modal trade-sheet" style="position:relative;padding:14px 14px 18px;gap:8px;overflow-y:auto">
     <button class="modal-close" onclick="closeTradeModal()">✕</button>
-    <div class="modal-title" style="font-size:17px">Trade Offer</div>
+    <div class="modal-title" style="font-size:18px">Build a trade</div>
+    <div class="trade-subtitle">Choose one collectible and any WRK$ amount on each side.</div>
     <div>
       <div class="trade-modal-sides">
         <div class="trade-panel">
           <div class="trade-panel-label">Your offer</div>
-          <div id="tradeOfferGiftPick" class="trade-gift-pick" onclick="openOfferGiftPicker()">＋ Pick gift</div>
-          <input id="tradeOfferWrk" type="number" class="input" placeholder="WRK$ to add" min="0" style="margin-top:4px;padding:8px 10px;font-size:13px" oninput="checkDonation()">
+          <button type="button" id="tradeOfferGiftPick" class="trade-gift-pick" onclick="openOfferGiftPicker()">＋ Pick gift or number</button>
+          <div class="trade-wrk-field">
+            <input id="tradeOfferWrk" type="text" inputmode="numeric" class="input" placeholder="Add WRK$" oninput="checkDonation()">
+            <span>WRK$</span>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;font-size:20px;color:var(--muted)">⇄</div>
+        <div class="trade-exchange-mark">↓</div>
         <div class="trade-panel">
-          <div class="trade-panel-label">You want</div>
-          <div id="tradeRequestGiftPick" class="trade-gift-pick" onclick="openRequestGiftPicker()">＋ Pick gift</div>
-          <input id="tradeRequestWrk" type="number" class="input" placeholder="WRK$ to request" min="0" style="margin-top:4px;padding:8px 10px;font-size:13px" oninput="checkDonation()">
+          <div class="trade-panel-label">You receive</div>
+          <button type="button" id="tradeRequestGiftPick" class="trade-gift-pick" onclick="openRequestGiftPicker()">＋ Pick gift or number</button>
+          <div class="trade-wrk-field">
+            <input id="tradeRequestWrk" type="text" inputmode="numeric" class="input" placeholder="Request WRK$" oninput="checkDonation()">
+            <span>WRK$</span>
+          </div>
         </div>
       </div>
       <div class="trade-donation-warning" id="tradeDonationWarn">
         ⚠️ You're giving items away for free — you won't receive anything in return. Are you sure?
       </div>
-      <button class="btn" style="width:100%" onclick="submitTradeOffer()">Send Offer</button>
+      <button class="btn" id="tradeSubmitBtn" style="width:100%" onclick="submitTradeOffer()">Send Offer</button>
+      <div class="error-msg" id="tradeOfferErr"></div>
     </div>
   </div>
 </div>
@@ -4595,16 +4763,32 @@ async function loadTrades() {
   if (!state.userId) return;
   const data = await api(`/api/trades?user_id=${state.userId}`);
 
-  function renderSide(gift, wrk, label) {
+  function renderSide(gift, anon, wrk, label) {
     let content = '';
     if (gift) {
-      const img = gift.custom_emoji_id
-        ? `<img src="/emoji/${gift.custom_emoji_id}" style="width:32px;height:32px;vertical-align:middle;border-radius:4px" onerror="this.outerHTML='<span>${gift.model_emoji || '🎁'}</span>'">`
-        : `<span style="font-size:24px">${gift.model_emoji || '🎁'}</span>`;
-      content += `<div style="display:flex;align-items:center;gap:6px">${img}<span>${gift.model_name} #${gift.gift_number}</span></div>`;
+      content += `<div style="display:flex;align-items:center;gap:8px">
+        ${_tradeGiftThumb(gift)}
+        <div class="trade-pick-copy">
+          <div class="trade-pick-name">${esc(gift.model_name)} #${gift.gift_number}</div>
+          <div class="trade-pick-meta">${esc(fmtCollection(gift.collection || 'Gift'))}</div>
+        </div>
+      </div>`;
     }
-    if (wrk > 0) content += `<div>${fmt(wrk)} ${WRK}</div>`;
-    if (!gift && wrk <= 0) content += `<div style="color:var(--muted)">Nothing</div>`;
+    if (anon) {
+      content += `<div style="display:flex;align-items:center;gap:8px">
+        ${_tradeAnonThumb(anon)}
+        <div class="trade-pick-copy">
+          <div class="trade-pick-name">${esc(anon.number)}</div>
+          <div class="trade-pick-meta">Anonymous WRK$ Number · ${esc(anon.rarity || 'standard')}</div>
+        </div>
+      </div>`;
+    }
+    if (wrk > 0) {
+      content += `<div style="margin-top:${gift || anon ? '8px' : '0'};font-weight:800;color:#c7baff">${fmt(wrk)} ${WRK}</div>`;
+    }
+    if (!gift && !anon && wrk <= 0) {
+      content += `<div style="color:var(--muted)">Nothing</div>`;
+    }
     return `<div class="trade-side"><div class="trade-side-label">${label}</div>${content}</div>`;
   }
 
@@ -4622,9 +4806,9 @@ async function loadTrades() {
       data.incoming.map(o => `
         <div class="trade-card">
           <div class="trade-card-sides">
-            ${renderSide(o.offer_gift, o.wrk_offered, `${esc(o.from_display || 'Someone')} offers`)}
-            <div class="trade-arrow">→</div>
-            ${renderSide(o.request_gift, o.request_wrk, 'They want')}
+            ${renderSide(o.offer_gift, o.offer_anon, o.wrk_offered, `${esc(o.from_display || 'Someone')} offers`)}
+            <div class="trade-arrow">↓</div>
+            ${renderSide(o.request_gift, o.request_anon, o.request_wrk, 'They want')}
           </div>
           <div class="trade-actions">
             <button class="btn" onclick="acceptTrade(${o.id})">✅ Accept</button>
@@ -4638,9 +4822,9 @@ async function loadTrades() {
       data.outgoing.map(o => `
         <div class="trade-card">
           <div class="trade-card-sides">
-            ${renderSide(o.offer_gift, o.wrk_offered, 'You offer')}
-            <div class="trade-arrow">→</div>
-            ${renderSide(o.request_gift, o.request_wrk, 'You want')}
+            ${renderSide(o.offer_gift, o.offer_anon, o.wrk_offered, 'You offer')}
+            <div class="trade-arrow">↓</div>
+            ${renderSide(o.request_gift, o.request_anon, o.request_wrk, 'You want')}
           </div>
           <div class="trade-actions">
             <button class="btn outline" onclick="cancelTrade(${o.id})">🗑 Cancel</button>
@@ -4650,17 +4834,31 @@ async function loadTrades() {
 }
 
 async function acceptTrade(id) {
-  await api(`/api/trades/${id}/accept`, { method: 'POST', json: { user_id: +state.userId } });
-  loadTrades();
-  loadOwnProfile();
+  try {
+    await api(`/api/trades/${id}/accept`, { method: 'POST', json: { user_id: +state.userId } });
+    _shopToast('Trade completed');
+    loadTrades();
+    loadOwnProfile();
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    loadTrades();
+  }
 }
 async function rejectTrade(id) {
-  await api(`/api/trades/${id}/reject`, { method: 'POST', json: { user_id: +state.userId } });
-  loadTrades();
+  try {
+    await api(`/api/trades/${id}/reject`, { method: 'POST', json: { user_id: +state.userId } });
+    loadTrades();
+  } catch (e) {
+    _shopToast(e.message, 'error');
+  }
 }
 async function cancelTrade(id) {
-  await api(`/api/trades/${id}/cancel`, { method: 'POST', json: { user_id: +state.userId } });
-  loadTrades();
+  try {
+    await api(`/api/trades/${id}/cancel`, { method: 'POST', json: { user_id: +state.userId } });
+    loadTrades();
+  } catch (e) {
+    _shopToast(e.message, 'error');
+  }
 }
 
 // ── Social tab (friends list + requests) ──────────────────────────────────────
@@ -4741,6 +4939,10 @@ async function removeFriend(id) {
 let _tradeTargetId = null;
 let _tradeOfferGiftId = null;
 let _tradeRequestGiftId = null;
+let _tradeOfferAnonId = null;
+let _tradeRequestAnonId = null;
+let _tradeOfferAsset = null;
+let _tradeRequestAsset = null;
 
 // ── Send WRK$ modal ──────────────────────────────────────────────────────────
 let _sendWrkTargetId = null;
@@ -4885,15 +5087,13 @@ async function openTradeWithPicker() {
 
 function openTradeModal(targetUserId) {
   _tradeTargetId = targetUserId;
-  _tradeOfferGiftId = null;
-  _tradeRequestGiftId = null;
-  document.getElementById('tradeOfferGiftPick').textContent = '＋ Pick gift';
-  document.getElementById('tradeOfferGiftPick').classList.remove('selected');
-  document.getElementById('tradeRequestGiftPick').textContent = '＋ Pick gift';
-  document.getElementById('tradeRequestGiftPick').classList.remove('selected');
+  _setTradePick('offer', null);
+  _setTradePick('request', null);
   document.getElementById('tradeOfferWrk').value = '';
   document.getElementById('tradeRequestWrk').value = '';
   document.getElementById('tradeDonationWarn').style.display = 'none';
+  document.getElementById('tradeOfferErr').textContent = '';
+  document.getElementById('tradeSubmitBtn').disabled = false;
   document.getElementById('tradeModal').style.display = 'flex';
   document.getElementById('tradeModalOverlay').style.display = 'block';
 }
@@ -4904,84 +5104,197 @@ function closeTradeModal() {
 }
 
 function checkDonation() {
-  const offerWrk = parseInt(document.getElementById('tradeOfferWrk').value) || 0;
-  const requestWrk = parseInt(document.getElementById('tradeRequestWrk').value) || 0;
-  const isDonation = !_tradeRequestGiftId && requestWrk === 0;
-  document.getElementById('tradeDonationWarn').style.display = isDonation && (_tradeOfferGiftId || offerWrk > 0) ? 'block' : 'none';
+  const offerWrk = _tradeAmount('tradeOfferWrk');
+  const requestWrk = _tradeAmount('tradeRequestWrk');
+  const isDonation = !_tradeRequestGiftId && !_tradeRequestAnonId && requestWrk === 0;
+  document.getElementById('tradeDonationWarn').style.display =
+    isDonation && (_tradeOfferGiftId || _tradeOfferAnonId || offerWrk > 0)
+      ? 'block'
+      : 'none';
 }
 
 async function openOfferGiftPicker() {
-  const data = await api(`/api/profile/${state.userId}`);
-  const gifts = data.gifts || [];
-  const picked = await showGiftPickerModal(gifts, 'Pick a gift to offer');
-  if (picked) {
-    _tradeOfferGiftId = picked.id;
-    document.getElementById('tradeOfferGiftPick').textContent = `${picked.model_emoji} ${picked.model_name}`;
-    document.getElementById('tradeOfferGiftPick').classList.add('selected');
-    checkDonation();
+  try {
+    const data = await api(`/api/profile/${state.userId}?gifts_limit=200`);
+    const picked = await showGiftPickerModal(
+      data.gifts || [],
+      data.anon_numbers || [],
+      'Choose what you offer',
+      _tradeOfferAsset,
+    );
+    if (picked !== undefined) _setTradePick('offer', picked);
+  } catch (e) {
+    document.getElementById('tradeOfferErr').textContent = e.message;
   }
 }
 
 async function openRequestGiftPicker() {
-  const data = await api(`/api/profile/${_tradeTargetId}`);
-  const gifts = data.gifts || [];
-  const picked = await showGiftPickerModal(gifts, "Pick a gift to request");
-  if (picked) {
-    _tradeRequestGiftId = picked.id;
-    document.getElementById('tradeRequestGiftPick').textContent = `${picked.model_emoji} ${picked.model_name}`;
-    document.getElementById('tradeRequestGiftPick').classList.add('selected');
-    checkDonation();
+  try {
+    const data = await api(`/api/profile/${_tradeTargetId}?gifts_limit=200`);
+    const picked = await showGiftPickerModal(
+      data.gifts || [],
+      data.anon_numbers || [],
+      'Choose what you receive',
+      _tradeRequestAsset,
+    );
+    if (picked !== undefined) _setTradePick('request', picked);
+  } catch (e) {
+    document.getElementById('tradeOfferErr').textContent = e.message;
   }
 }
 
-function showGiftPickerModal(gifts, title) {
+function _tradeAmount(id) {
+  const raw = document.getElementById(id).value.replace(/[^\d]/g, '');
+  return raw ? Number(raw) : 0;
+}
+
+function _tradeGiftThumb(gift) {
+  const fallback = esc(gift.model_emoji || '🎁');
+  const image = gift.custom_emoji_id
+    ? `<img src="/emoji/${esc(gift.custom_emoji_id)}" alt="" onerror="this.remove()">`
+    : '';
+  return `<div class="trade-gift-thumb"><span>${fallback}</span>${image}</div>`;
+}
+
+function _tradeAnonThumb(anon) {
+  const suffix = String(
+    anon.suffix ?? String(anon.number || '').replace(/\D/g, '').slice(-3)
+  ).padStart(3, '0');
+  return `<div class="trade-anon-thumb">
+    <img src="/emoji/5093898072811898950" alt="" onerror="this.remove()">
+    <b>+888</b><span>${esc(suffix)}</span>
+  </div>`;
+}
+
+function _tradeAssetPreview(asset) {
+  if (asset.kind === 'anon') {
+    const item = asset.item;
+    return `${_tradeAnonThumb(item)}
+      <div class="trade-pick-copy">
+        <div class="trade-pick-name">${esc(item.number)}</div>
+        <div class="trade-pick-meta">Anonymous WRK$ Number · ${esc(item.rarity || 'standard')}</div>
+      </div>
+      <span style="color:#6f7a85">›</span>`;
+  }
+  const gift = asset.item;
+  return `${_tradeGiftThumb(gift)}
+    <div class="trade-pick-copy">
+      <div class="trade-pick-name">${esc(gift.model_name)} #${gift.gift_number}</div>
+      <div class="trade-pick-meta">${esc(fmtCollection(gift.collection || 'Gift'))}</div>
+    </div>
+    <span style="color:#6f7a85">›</span>`;
+}
+
+function _setTradePick(side, asset) {
+  const isOffer = side === 'offer';
+  const el = document.getElementById(
+    isOffer ? 'tradeOfferGiftPick' : 'tradeRequestGiftPick'
+  );
+  if (isOffer) {
+    _tradeOfferAsset = asset;
+    _tradeOfferGiftId = asset?.kind === 'gift' ? asset.item.id : null;
+    _tradeOfferAnonId = asset?.kind === 'anon' ? asset.item.id : null;
+  } else {
+    _tradeRequestAsset = asset;
+    _tradeRequestGiftId = asset?.kind === 'gift' ? asset.item.id : null;
+    _tradeRequestAnonId = asset?.kind === 'anon' ? asset.item.id : null;
+  }
+  el.classList.toggle('selected', !!asset);
+  el.innerHTML = asset ? _tradeAssetPreview(asset) : '＋ Pick gift or number';
+  checkDonation();
+}
+
+function showGiftPickerModal(gifts, anonNumbers, title, selectedAsset = null) {
   return new Promise(resolve => {
+    const lockedCount = gifts.filter(g => !!g.is_admin_gift).length;
+    const availableGifts = gifts.filter(g => !g.is_admin_gift);
+    const choices = [
+      ...availableGifts.map(item => ({kind:'gift', item})),
+      ...anonNumbers.map(item => ({kind:'anon', item})),
+    ];
     const overlay = document.createElement('div');
     overlay.className = 'modal-bg';
     overlay.style.cssText = 'display:flex;z-index:1100';
     const inner = document.createElement('div');
     inner.className = 'modal';
-    inner.style.cssText = 'max-height:70vh;overflow-y:auto;position:relative';
+    inner.style.cssText = 'max-height:78dvh;overflow-y:auto;position:relative';
     inner.innerHTML = `<button class="modal-close" id="_giftPickerClose">✕</button>
-      <div class="modal-title">${title}</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-        ${gifts.length === 0 ? '<p style="color:var(--muted);text-align:center;grid-column:1/-1">No gifts</p>' :
-          gifts.map(g => `<div class="gift-card" style="cursor:pointer" data-gift-id="${g.id}" data-gift-emoji="${g.model_emoji || '🎁'}" data-gift-name="${g.model_name}">
-            <div style="font-size:28px;text-align:center">${g.model_emoji || '🎁'}</div>
-            <div style="font-size:11px;text-align:center">${g.model_name} #${g.gift_number}</div>
-          </div>`).join('')}
+      <div class="modal-title">${esc(title)}</div>
+      <div class="trade-picker-grid">
+        ${selectedAsset ? '<button class="trade-picker-card" data-clear="1" style="grid-column:1/-1;justify-content:center;color:#fda4af">Remove selected collectible</button>' : ''}
+        ${availableGifts.length ? `<div class="trade-picker-section">Gifts</div>${
+          availableGifts.map((g, index) => `<button class="trade-picker-card" data-choice="${index}">
+            ${_tradeGiftThumb(g)}
+            <div class="trade-pick-copy">
+              <div class="trade-pick-name">${esc(g.model_name)} #${g.gift_number}</div>
+              <div class="trade-pick-meta">${esc(fmtCollection(g.collection || 'Gift'))}</div>
+            </div>
+          </button>`).join('')
+        }` : ''}
+        ${anonNumbers.length ? `<div class="trade-picker-section">Anonymous numbers</div>${
+          anonNumbers.map((anon, index) => {
+            const choiceIndex = availableGifts.length + index;
+            return `<button class="trade-picker-card" data-choice="${choiceIndex}">
+              ${_tradeAnonThumb(anon)}
+              <div class="trade-pick-copy">
+                <div class="trade-pick-name">${esc(anon.number)}</div>
+                <div class="trade-pick-meta">${esc(anon.rarity || 'standard')}</div>
+              </div>
+            </button>`;
+          }).join('')
+        }` : ''}
+        ${!choices.length ? '<p style="color:var(--muted);text-align:center;grid-column:1/-1;padding:18px 0">No tradeable collectibles</p>' : ''}
+        ${lockedCount ? `<div class="trade-locked-note">${lockedCount} admin-issued gift${lockedCount === 1 ? ' is' : 's are'} locked and cannot be traded.</div>` : ''}
       </div>`;
     overlay.appendChild(inner);
     document.body.appendChild(overlay);
     const cleanup = (result) => { overlay.remove(); resolve(result); };
-    inner.querySelector('#_giftPickerClose').onclick = () => cleanup(null);
-    overlay.onclick = (e) => { if (e.target === overlay) cleanup(null); };
-    inner.querySelectorAll('.gift-card').forEach(el => {
-      el.onclick = (e) => { e.stopPropagation(); cleanup({ id: +el.dataset.giftId, model_emoji: el.dataset.giftEmoji, model_name: el.dataset.giftName }); };
+    inner.querySelector('#_giftPickerClose').onclick = () => cleanup(undefined);
+    overlay.onclick = (e) => {
+      if (e.target === overlay) cleanup(undefined);
+    };
+    inner.querySelector('[data-clear]')?.addEventListener('click', () => cleanup(null));
+    inner.querySelectorAll('[data-choice]').forEach(el => {
+      el.onclick = (e) => {
+        e.stopPropagation();
+        cleanup(choices[+el.dataset.choice]);
+      };
     });
   });
 }
 
 async function submitTradeOffer() {
-  const offerWrk = parseInt(document.getElementById('tradeOfferWrk').value) || 0;
-  const requestWrk = parseInt(document.getElementById('tradeRequestWrk').value) || 0;
-  if (!_tradeOfferGiftId && offerWrk <= 0 && !_tradeRequestGiftId && requestWrk <= 0) {
-    alert('Add at least one item to the trade.');
+  const offerWrk = _tradeAmount('tradeOfferWrk');
+  const requestWrk = _tradeAmount('tradeRequestWrk');
+  const err = document.getElementById('tradeOfferErr');
+  const btn = document.getElementById('tradeSubmitBtn');
+  err.textContent = '';
+  if (
+    !_tradeOfferGiftId && !_tradeOfferAnonId && offerWrk <= 0
+    && !_tradeRequestGiftId && !_tradeRequestAnonId && requestWrk <= 0
+  ) {
+    err.textContent = 'Add at least one item to the trade.';
     return;
   }
+  btn.disabled = true;
   try {
     await api('/api/trades', { method: 'POST', json: {
       from_user_id: +state.userId,
       to_user_id: _tradeTargetId,
       offer_gift_id: _tradeOfferGiftId || null,
+      offer_anon_id: _tradeOfferAnonId || null,
       offer_wrk: offerWrk,
       request_gift_id: _tradeRequestGiftId || null,
+      request_anon_id: _tradeRequestAnonId || null,
       request_wrk: requestWrk,
     }});
     closeTradeModal();
-    alert('Trade offer sent!');
+    _shopToast('Trade offer sent');
+    loadTrades();
   } catch(e) {
-    alert(e.message);
+    err.textContent = e.message;
+  } finally {
+    btn.disabled = false;
   }
 }
 
@@ -7445,11 +7758,15 @@ async function loadShopWallet() {
                   <div class="wallet-gift-sub">${esc(fmtCollection(g.collection))} · ${esc(fmtBackground(g.background))}</div>
                 </div>
               </div>
-              <div class="wallet-gift-value">${listed
+              <div class="wallet-gift-value">${g.is_admin_gift
+                ? 'Admin collectible · <b>locked</b>'
+                : listed
                 ? `Listed for <b>${fmtK(g.listing_price)} ${WRK}</b>`
                 : `Rift buyback <b>${fmtK(g.buyback_price)} ${WRK}</b>`}</div>
               <div class="wallet-gift-actions">
-                ${g.staked
+                ${g.is_admin_gift
+                  ? '<button class="cancel" disabled>Not tradeable or sellable</button>'
+                  : g.staked
                   ? '<button class="cancel" disabled>Staked · unavailable</button>'
                   : listed
                   ? `<button class="cancel" onclick="cancelMkrtListing(${g.listing_id})">Cancel MKRT listing</button>`

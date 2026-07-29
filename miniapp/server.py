@@ -362,6 +362,11 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
     ).fetchone()
     anon_count = anon_value_row["anon_count"]
     anon_value = anon_value_row["anon_value"]
+    owned_anons = db.execute(
+        "SELECT id, suffix, price, acquired_at FROM anon_numbers "
+        "WHERE owner_id = ? ORDER BY suffix",
+        (user_id,),
+    ).fetchall()
     net_worth = row["balance"] + gift_value + anon_value
     networth_rank = db.execute(
         """SELECT COUNT(*)+1 FROM (
@@ -493,6 +498,7 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         "gift_value": gift_value,
         "anon_count": anon_count,
         "anon_value": anon_value,
+        "anon_numbers": [_anon_item(anon) for anon in owned_anons],
         "net_worth": net_worth,
         "networth_rank": networth_rank,
         "gifts": [dict(g) for g in gifts],
@@ -1963,13 +1969,16 @@ def market_collections(tier: str = "low"):
                 """SELECT DISTINCT gm.collection FROM gift_instances gi
                    JOIN gift_models gm ON gm.id = gi.model_id
                    WHERE gi.owner_id IS NULL
+                     AND COALESCE(gi.is_admin_gift, 0) = 0
                    ORDER BY gm.collection"""
             ).fetchall()
         else:
             rows = db.execute(
                 """SELECT DISTINCT gm.collection FROM gift_instances gi
                    JOIN gift_models gm ON gm.id = gi.model_id
-                   WHERE gi.owner_id IS NULL AND gm.tier = ?
+                   WHERE gi.owner_id IS NULL
+                     AND COALESCE(gi.is_admin_gift, 0) = 0
+                     AND gm.tier = ?
                    ORDER BY gm.collection""",
                 (tier,),
             ).fetchall()
@@ -1982,7 +1991,10 @@ def market_listings(tier: str = "low", limit: int = 40, offset: int = 0,
     valid_tiers = ("low", "mid", "high", "all")
     if tier not in valid_tiers:
         raise HTTPException(400, "tier must be low | mid | high | all")
-    where = ["gi.owner_id IS NULL"]
+    where = [
+        "gi.owner_id IS NULL",
+        "COALESCE(gi.is_admin_gift, 0) = 0",
+    ]
     params: list = []
     if tier != "all":
         where.append("gm.tier = ?")
@@ -2040,7 +2052,9 @@ def market_buy(req: MarketBuyRequest, authenticated_user: AuthenticatedUser):
         row = db.execute(
             """SELECT gi.id, gi.gift_number FROM gift_instances gi
                JOIN gift_models gm ON gm.id = gi.model_id
-               WHERE gi.owner_id IS NULL AND gm.collection = ? AND gm.model_number = ? AND gi.background = ?
+               WHERE gi.owner_id IS NULL
+                 AND COALESCE(gi.is_admin_gift, 0) = 0
+                 AND gm.collection = ? AND gm.model_number = ? AND gi.background = ?
                ORDER BY gi.gift_number ASC LIMIT 1""",
             (req.collection, req.model_number, req.background),
         ).fetchone()
@@ -2121,6 +2135,7 @@ def shop_wallet(user_id: int, authenticated_user: AuthenticatedUser):
         gifts = db.execute(
             """SELECT gi.id, gi.gift_number, gi.background, gi.acquired_at,
                       COALESCE(gi.staked, 0) AS staked,
+                      COALESCE(gi.is_admin_gift, 0) AS is_admin_gift,
                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
                       gm.tier, gm.custom_emoji_id, COALESCE(gp.current_price, 0) AS current_price,
                       l.id AS listing_id, l.price AS listing_price
@@ -2164,6 +2179,7 @@ def rift_sell(req: RiftSellRequest, authenticated_user: AuthenticatedUser):
         db.execute("BEGIN IMMEDIATE")
         gift = db.execute(
             """SELECT gi.id, gi.gift_number, gi.background, COALESCE(gi.staked, 0) AS staked,
+                      COALESCE(gi.is_admin_gift, 0) AS is_admin_gift,
                       gm.collection, gm.model_name,
                       COALESCE(gp.current_price, 0) AS current_price,
                       EXISTS(
@@ -2179,6 +2195,8 @@ def rift_sell(req: RiftSellRequest, authenticated_user: AuthenticatedUser):
         ).fetchone()
         if not gift:
             raise HTTPException(404, "You do not own that gift")
+        if gift["is_admin_gift"]:
+            raise HTTPException(400, "Admin gifts cannot be sold")
         if gift["staked"]:
             raise HTTPException(400, "Unstake this gift before selling it")
         if gift["is_listed"]:
@@ -2218,7 +2236,11 @@ def rift_sell(req: RiftSellRequest, authenticated_user: AuthenticatedUser):
 def mkrt_listings(limit: int = 40, offset: int = 0, search: str = ""):
     limit = max(1, min(limit, 100))
     offset = max(0, offset)
-    where = ["l.status = 'active'", "gi.owner_id = l.seller_id"]
+    where = [
+        "l.status = 'active'",
+        "gi.owner_id = l.seller_id",
+        "COALESCE(gi.is_admin_gift, 0) = 0",
+    ]
     params: list = []
     if search:
         if search.isdigit():
@@ -2274,12 +2296,15 @@ def mkrt_create_listing(req: MkrtListRequest, authenticated_user: AuthenticatedU
     with db_conn() as db:
         db.execute("BEGIN IMMEDIATE")
         gift = db.execute(
-            "SELECT id, COALESCE(staked, 0) AS staked FROM gift_instances "
+            "SELECT id, COALESCE(staked, 0) AS staked, "
+            "COALESCE(is_admin_gift, 0) AS is_admin_gift FROM gift_instances "
             "WHERE id = ? AND owner_id = ?",
             (req.gift_id, req.user_id),
         ).fetchone()
         if not gift:
             raise HTTPException(404, "You do not own that gift")
+        if gift["is_admin_gift"]:
+            raise HTTPException(400, "Admin gifts cannot be listed")
         if gift["staked"]:
             raise HTTPException(400, "Unstake this gift before listing it")
         existing = db.execute(
@@ -2328,7 +2353,8 @@ def mkrt_buy_listing(
         db.execute("BEGIN IMMEDIATE")
         listing = db.execute(
             """SELECT l.id, l.gift_id, l.seller_id, l.price, l.status,
-                      gi.owner_id, gi.gift_number
+                      gi.owner_id, gi.gift_number,
+                      COALESCE(gi.is_admin_gift, 0) AS is_admin_gift
                FROM gift_market_listings l
                JOIN gift_instances gi ON gi.id = l.gift_id
                WHERE l.id = ?""",
@@ -2336,6 +2362,13 @@ def mkrt_buy_listing(
         ).fetchone()
         if not listing or listing["status"] != "active":
             raise HTTPException(404, "This MKRT listing is no longer active")
+        if listing["is_admin_gift"]:
+            db.execute(
+                "UPDATE gift_market_listings SET status = 'cancelled' WHERE id = ?",
+                (listing_id,),
+            )
+            db.commit()
+            raise HTTPException(400, "Admin gifts cannot be traded")
         if listing["owner_id"] != listing["seller_id"]:
             db.execute(
                 "UPDATE gift_market_listings SET status = 'cancelled' WHERE id = ?",
@@ -2607,8 +2640,10 @@ class TradeCreateRequest(BaseModel):
     from_user_id: int
     to_user_id: int
     offer_gift_id: int | None = None
+    offer_anon_id: int | None = None
     offer_wrk: int = 0
     request_gift_id: int | None = None
+    request_anon_id: int | None = None
     request_wrk: int = 0
 
 
@@ -2802,6 +2837,22 @@ def get_trades(user_id: int, authenticated_user: AuthenticatedUser):
                 d["request_gift"] = dict(rg) if rg else None
             else:
                 d["request_gift"] = None
+            if d.get("offer_anon_id"):
+                anon = db.execute(
+                    "SELECT id, suffix, price FROM anon_numbers WHERE id=?",
+                    (d["offer_anon_id"],),
+                ).fetchone()
+                d["offer_anon"] = _anon_item(anon) if anon else None
+            else:
+                d["offer_anon"] = None
+            if d.get("request_anon_id"):
+                anon = db.execute(
+                    "SELECT id, suffix, price FROM anon_numbers WHERE id=?",
+                    (d["request_anon_id"],),
+                ).fetchone()
+                d["request_anon"] = _anon_item(anon) if anon else None
+            else:
+                d["request_anon"] = None
             return d
 
         incoming = [_offer_row(r) for r in db.execute(
@@ -2819,31 +2870,74 @@ def create_trade(req: TradeCreateRequest, authenticated_user: AuthenticatedUser)
     import time as _time
     if req.from_user_id == req.to_user_id:
         raise HTTPException(400, "Cannot trade with yourself")
-    if not req.offer_gift_id and req.offer_wrk <= 0 and not req.request_gift_id and req.request_wrk <= 0:
+    if req.offer_wrk < 0 or req.request_wrk < 0:
+        raise HTTPException(400, "WRK$ amounts cannot be negative")
+    if req.offer_gift_id and req.offer_anon_id:
+        raise HTTPException(400, "Choose one collectible for your offer")
+    if req.request_gift_id and req.request_anon_id:
+        raise HTTPException(400, "Choose one collectible to request")
+    if (
+        not req.offer_gift_id
+        and not req.offer_anon_id
+        and req.offer_wrk <= 0
+        and not req.request_gift_id
+        and not req.request_anon_id
+        and req.request_wrk <= 0
+    ):
         raise HTTPException(400, "Trade must have at least one item on either side")
     with db_conn() as db:
+        target = db.execute(
+            "SELECT 1 FROM economy WHERE user_id=?", (req.to_user_id,)
+        ).fetchone()
+        if not target:
+            raise HTTPException(404, "Trade recipient not found")
         if req.offer_gift_id:
-            row = db.execute("SELECT owner_id, is_admin_gift FROM gift_instances WHERE id=?", (req.offer_gift_id,)).fetchone()
+            row = db.execute(
+                "SELECT owner_id, COALESCE(is_admin_gift, 0) AS is_admin_gift "
+                "FROM gift_instances WHERE id=?",
+                (req.offer_gift_id,),
+            ).fetchone()
             if not row or row["owner_id"] != req.from_user_id:
                 raise HTTPException(400, "You don't own that gift")
             if row["is_admin_gift"]:
                 raise HTTPException(400, "Admin gifts cannot be traded")
+        if req.offer_anon_id:
+            row = db.execute(
+                "SELECT owner_id FROM anon_numbers WHERE id=?",
+                (req.offer_anon_id,),
+            ).fetchone()
+            if not row or row["owner_id"] != req.from_user_id:
+                raise HTTPException(400, "You don't own that anonymous number")
         if req.request_gift_id:
-            row = db.execute("SELECT owner_id, is_admin_gift FROM gift_instances WHERE id=?", (req.request_gift_id,)).fetchone()
+            row = db.execute(
+                "SELECT owner_id, COALESCE(is_admin_gift, 0) AS is_admin_gift "
+                "FROM gift_instances WHERE id=?",
+                (req.request_gift_id,),
+            ).fetchone()
             if not row or row["owner_id"] != req.to_user_id:
                 raise HTTPException(400, "Target doesn't own that gift")
             if row["is_admin_gift"]:
                 raise HTTPException(400, "Admin gifts cannot be traded")
+        if req.request_anon_id:
+            row = db.execute(
+                "SELECT owner_id FROM anon_numbers WHERE id=?",
+                (req.request_anon_id,),
+            ).fetchone()
+            if not row or row["owner_id"] != req.to_user_id:
+                raise HTTPException(400, "Target doesn't own that anonymous number")
         if req.offer_wrk > 0:
             bal = db.execute("SELECT balance FROM economy WHERE user_id=?", (req.from_user_id,)).fetchone()
             if not bal or bal["balance"] < req.offer_wrk:
                 raise HTTPException(400, "Insufficient balance for WRK$ offer")
         db.execute(
-            "INSERT INTO gift_offers (from_user_id, to_user_id, instance_id, wrk_offered, request_gift_id, request_wrk, status, created_at) "
-            "VALUES (?,?,?,?,?,?,?,?)",
+            "INSERT INTO gift_offers "
+            "(from_user_id, to_user_id, instance_id, wrk_offered, "
+            "request_gift_id, request_wrk, offer_anon_id, request_anon_id, status, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?)",
             (req.from_user_id, req.to_user_id,
              req.offer_gift_id, req.offer_wrk,
              req.request_gift_id, req.request_wrk,
+             req.offer_anon_id, req.request_anon_id,
              "pending", int(_time.time()))
         )
         db.commit()
@@ -2866,15 +2960,46 @@ def accept_trade(offer_id: int, req: TradeActionRequest, authenticated_user: Aut
         from_id = offer["from_user_id"]
         to_id = offer["to_user_id"]
         offered_gift = offer["instance_id"]
+        requested_gift = offer["request_gift_id"]
+        offered_anon = offer["offer_anon_id"]
+        requested_anon = offer["request_anon_id"]
 
         if offered_gift:
-            row = db.execute("SELECT owner_id FROM gift_instances WHERE id=?", (offered_gift,)).fetchone()
+            row = db.execute(
+                "SELECT owner_id, COALESCE(is_admin_gift, 0) AS is_admin_gift "
+                "FROM gift_instances WHERE id=?",
+                (offered_gift,),
+            ).fetchone()
             if not row or row["owner_id"] != from_id:
                 raise HTTPException(400, "Sender no longer owns the offered gift")
-        if offer["request_gift_id"]:
-            row = db.execute("SELECT owner_id FROM gift_instances WHERE id=?", (offer["request_gift_id"],)).fetchone()
+            if row["is_admin_gift"]:
+                raise HTTPException(400, "Admin gifts cannot be traded")
+        if requested_gift:
+            row = db.execute(
+                "SELECT owner_id, COALESCE(is_admin_gift, 0) AS is_admin_gift "
+                "FROM gift_instances WHERE id=?",
+                (requested_gift,),
+            ).fetchone()
             if not row or row["owner_id"] != to_id:
                 raise HTTPException(400, "You no longer own the requested gift")
+            if row["is_admin_gift"]:
+                raise HTTPException(400, "Admin gifts cannot be traded")
+        if offered_anon:
+            row = db.execute(
+                "SELECT owner_id FROM anon_numbers WHERE id=?", (offered_anon,)
+            ).fetchone()
+            if not row or row["owner_id"] != from_id:
+                raise HTTPException(
+                    400, "Sender no longer owns the offered anonymous number"
+                )
+        if requested_anon:
+            row = db.execute(
+                "SELECT owner_id FROM anon_numbers WHERE id=?", (requested_anon,)
+            ).fetchone()
+            if not row or row["owner_id"] != to_id:
+                raise HTTPException(
+                    400, "You no longer own the requested anonymous number"
+                )
         wrk_offered = offer["wrk_offered"]
         if wrk_offered > 0:
             bal = db.execute("SELECT balance FROM economy WHERE user_id=?", (from_id,)).fetchone()
@@ -2885,10 +3010,54 @@ def accept_trade(offer_id: int, req: TradeActionRequest, authenticated_user: Aut
             if not bal or bal["balance"] < offer["request_wrk"]:
                 raise HTTPException(400, "Insufficient balance to meet WRK$ request")
 
+        now = int(time.time())
         if offered_gift:
-            db.execute("UPDATE gift_instances SET owner_id=? WHERE id=?", (to_id, offered_gift))
-        if offer["request_gift_id"]:
-            db.execute("UPDATE gift_instances SET owner_id=? WHERE id=?", (from_id, offer["request_gift_id"]))
+            db.execute(
+                "UPDATE gift_instances SET owner_id=?, acquired_at=? WHERE id=?",
+                (to_id, now, offered_gift),
+            )
+            db.execute(
+                "UPDATE economy SET pinned_gift_id=NULL "
+                "WHERE user_id=? AND pinned_gift_id=?",
+                (from_id, offered_gift),
+            )
+        if requested_gift:
+            db.execute(
+                "UPDATE gift_instances SET owner_id=?, acquired_at=? WHERE id=?",
+                (from_id, now, requested_gift),
+            )
+            db.execute(
+                "UPDATE economy SET pinned_gift_id=NULL "
+                "WHERE user_id=? AND pinned_gift_id=?",
+                (to_id, requested_gift),
+            )
+        for gift_id in (offered_gift, requested_gift):
+            if gift_id:
+                db.execute(
+                    "UPDATE gift_market_listings SET status='cancelled' "
+                    "WHERE gift_id=? AND status='active'",
+                    (gift_id,),
+                )
+        if offered_anon:
+            db.execute(
+                "UPDATE anon_numbers SET owner_id=?, acquired_at=? WHERE id=?",
+                (to_id, now, offered_anon),
+            )
+            db.execute(
+                "UPDATE economy SET pinned_anon_id=NULL "
+                "WHERE user_id=? AND pinned_anon_id=?",
+                (from_id, offered_anon),
+            )
+        if requested_anon:
+            db.execute(
+                "UPDATE anon_numbers SET owner_id=?, acquired_at=? WHERE id=?",
+                (from_id, now, requested_anon),
+            )
+            db.execute(
+                "UPDATE economy SET pinned_anon_id=NULL "
+                "WHERE user_id=? AND pinned_anon_id=?",
+                (to_id, requested_anon),
+            )
         if wrk_offered > 0:
             db.execute("UPDATE economy SET balance=balance-? WHERE user_id=?", (wrk_offered, from_id))
             db.execute("UPDATE economy SET balance=balance+? WHERE user_id=?", (wrk_offered, to_id))
@@ -2897,12 +3066,20 @@ def accept_trade(offer_id: int, req: TradeActionRequest, authenticated_user: Aut
             db.execute("UPDATE economy SET balance=balance+? WHERE user_id=?", (offer["request_wrk"], from_id))
 
         db.execute("UPDATE gift_offers SET status='accepted' WHERE id=?", (offer_id,))
-        for gid in [offered_gift, offer["request_gift_id"]]:
+        for gid in (offered_gift, requested_gift):
             if gid:
                 db.execute(
                     "UPDATE gift_offers SET status='rejected' WHERE id!=? AND status='pending' "
                     "AND (instance_id=? OR request_gift_id=?)",
                     (offer_id, gid, gid)
+                )
+        for anon_id in (offered_anon, requested_anon):
+            if anon_id:
+                db.execute(
+                    "UPDATE gift_offers SET status='rejected' "
+                    "WHERE id!=? AND status='pending' "
+                    "AND (offer_anon_id=? OR request_anon_id=?)",
+                    (offer_id, anon_id, anon_id),
                 )
         db.commit()
         return {"ok": True}
@@ -3505,16 +3682,72 @@ async def _startup():
                 db.commit()
             except Exception:
                 pass
-        # gift_offers new columns for two-sided trades
-        for col in (
-            "request_gift_id INTEGER",
-            "request_wrk INTEGER NOT NULL DEFAULT 0",
-        ):
-            try:
-                db.execute(f"ALTER TABLE gift_offers ADD COLUMN {col}")
-                db.commit()
-            except Exception:
-                pass
+        # Older installs require an offered gift. Rebuild that table once so
+        # WRK$-only and anonymous-number trades can use NULL instance_id.
+        trade_info = db.execute("PRAGMA table_info(gift_offers)").fetchall()
+        trade_cols = {row["name"]: row for row in trade_info}
+        instance_col = trade_cols.get("instance_id")
+        if instance_col and instance_col["notnull"]:
+            db.execute("DROP TABLE IF EXISTS gift_offers_trade_migration")
+            db.execute("""CREATE TABLE gift_offers_trade_migration (
+                id              INTEGER PRIMARY KEY,
+                from_user_id    INTEGER NOT NULL,
+                to_user_id      INTEGER NOT NULL,
+                instance_id     INTEGER REFERENCES gift_instances(id),
+                wrk_offered     INTEGER NOT NULL DEFAULT 0,
+                request_gift_id INTEGER REFERENCES gift_instances(id),
+                request_wrk     INTEGER NOT NULL DEFAULT 0,
+                offer_anon_id   INTEGER REFERENCES anon_numbers(id),
+                request_anon_id INTEGER REFERENCES anon_numbers(id),
+                status          TEXT NOT NULL DEFAULT 'pending',
+                created_at      INTEGER NOT NULL
+            )""")
+            copy_expr = {
+                "id": "id",
+                "from_user_id": "from_user_id",
+                "to_user_id": "to_user_id",
+                "instance_id": "instance_id",
+                "wrk_offered": "wrk_offered",
+                "request_gift_id": (
+                    "request_gift_id"
+                    if "request_gift_id" in trade_cols else "NULL"
+                ),
+                "request_wrk": (
+                    "request_wrk" if "request_wrk" in trade_cols else "0"
+                ),
+                "offer_anon_id": (
+                    "offer_anon_id" if "offer_anon_id" in trade_cols else "NULL"
+                ),
+                "request_anon_id": (
+                    "request_anon_id"
+                    if "request_anon_id" in trade_cols else "NULL"
+                ),
+                "status": "status",
+                "created_at": "created_at",
+            }
+            names = ", ".join(copy_expr)
+            values = ", ".join(copy_expr.values())
+            db.execute(
+                f"INSERT INTO gift_offers_trade_migration ({names}) "
+                f"SELECT {values} FROM gift_offers"
+            )
+            db.execute("DROP TABLE gift_offers")
+            db.execute(
+                "ALTER TABLE gift_offers_trade_migration RENAME TO gift_offers"
+            )
+            db.commit()
+        else:
+            for col, typedef in (
+                ("request_gift_id", "INTEGER REFERENCES gift_instances(id)"),
+                ("request_wrk", "INTEGER NOT NULL DEFAULT 0"),
+                ("offer_anon_id", "INTEGER REFERENCES anon_numbers(id)"),
+                ("request_anon_id", "INTEGER REFERENCES anon_numbers(id)"),
+            ):
+                if col not in trade_cols:
+                    db.execute(
+                        f"ALTER TABLE gift_offers ADD COLUMN {col} {typedef}"
+                    )
+            db.commit()
         try:
             db.execute("ALTER TABLE economy ADD COLUMN pinned_stat TEXT NOT NULL DEFAULT 'crash_mult'")
             db.commit()

@@ -98,13 +98,17 @@ CREATE TABLE IF NOT EXISTS gift_prices (
     PRIMARY KEY (collection, background)
 );
 CREATE TABLE IF NOT EXISTS gift_offers (
-    id           INTEGER PRIMARY KEY,
-    from_user_id INTEGER NOT NULL,
-    to_user_id   INTEGER NOT NULL,
-    instance_id  INTEGER NOT NULL REFERENCES gift_instances(id),
-    wrk_offered  INTEGER NOT NULL DEFAULT 0,
-    status       TEXT NOT NULL DEFAULT 'pending',
-    created_at   INTEGER NOT NULL
+    id              INTEGER PRIMARY KEY,
+    from_user_id    INTEGER NOT NULL,
+    to_user_id      INTEGER NOT NULL,
+    instance_id     INTEGER REFERENCES gift_instances(id),
+    wrk_offered     INTEGER NOT NULL DEFAULT 0,
+    request_gift_id INTEGER REFERENCES gift_instances(id),
+    request_wrk     INTEGER NOT NULL DEFAULT 0,
+    offer_anon_id   INTEGER REFERENCES anon_numbers(id),
+    request_anon_id INTEGER REFERENCES anon_numbers(id),
+    status          TEXT NOT NULL DEFAULT 'pending',
+    created_at      INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS gift_market_listings (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -189,6 +193,64 @@ async def _migrate(db) -> None:
         if col not in gift_cols:
             await db.execute(f"ALTER TABLE gift_instances ADD COLUMN {col} {typedef}")
             await db.commit()
+
+    # Trades originally required an offered gift. Rebuild older tables so a
+    # WRK$-only or anonymous-number-only trade can be stored as well.
+    async with db.execute("PRAGMA table_info(gift_offers)") as cur:
+        trade_info = [row async for row in cur]
+    trade_cols = {row[1]: row for row in trade_info}
+    instance_col = trade_cols.get("instance_id")
+    if instance_col and instance_col[3]:
+        await db.execute("DROP TABLE IF EXISTS gift_offers_trade_migration")
+        await db.execute("""CREATE TABLE gift_offers_trade_migration (
+            id              INTEGER PRIMARY KEY,
+            from_user_id    INTEGER NOT NULL,
+            to_user_id      INTEGER NOT NULL,
+            instance_id     INTEGER REFERENCES gift_instances(id),
+            wrk_offered     INTEGER NOT NULL DEFAULT 0,
+            request_gift_id INTEGER REFERENCES gift_instances(id),
+            request_wrk     INTEGER NOT NULL DEFAULT 0,
+            offer_anon_id   INTEGER REFERENCES anon_numbers(id),
+            request_anon_id INTEGER REFERENCES anon_numbers(id),
+            status          TEXT NOT NULL DEFAULT 'pending',
+            created_at      INTEGER NOT NULL
+        )""")
+        copy_expr = {
+            "id": "id",
+            "from_user_id": "from_user_id",
+            "to_user_id": "to_user_id",
+            "instance_id": "instance_id",
+            "wrk_offered": "wrk_offered",
+            "request_gift_id": "request_gift_id" if "request_gift_id" in trade_cols else "NULL",
+            "request_wrk": "request_wrk" if "request_wrk" in trade_cols else "0",
+            "offer_anon_id": "offer_anon_id" if "offer_anon_id" in trade_cols else "NULL",
+            "request_anon_id": "request_anon_id" if "request_anon_id" in trade_cols else "NULL",
+            "status": "status",
+            "created_at": "created_at",
+        }
+        names = ", ".join(copy_expr)
+        values = ", ".join(copy_expr.values())
+        await db.execute(
+            f"INSERT INTO gift_offers_trade_migration ({names}) "
+            f"SELECT {values} FROM gift_offers"
+        )
+        await db.execute("DROP TABLE gift_offers")
+        await db.execute(
+            "ALTER TABLE gift_offers_trade_migration RENAME TO gift_offers"
+        )
+        await db.commit()
+    else:
+        for col, typedef in {
+            "request_gift_id": "INTEGER REFERENCES gift_instances(id)",
+            "request_wrk": "INTEGER NOT NULL DEFAULT 0",
+            "offer_anon_id": "INTEGER REFERENCES anon_numbers(id)",
+            "request_anon_id": "INTEGER REFERENCES anon_numbers(id)",
+        }.items():
+            if col not in trade_cols:
+                await db.execute(
+                    f"ALTER TABLE gift_offers ADD COLUMN {col} {typedef}"
+                )
+        await db.commit()
 
     # hack_sessions table (shared with mini-app)
     await db.execute("""CREATE TABLE IF NOT EXISTS hack_sessions (
@@ -1029,6 +1091,7 @@ async def get_user_gifts(db_path: str, user_id: int) -> list[dict]:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT gi.id, gi.background, gi.gift_number, gi.acquired_at,
+                      COALESCE(gi.is_admin_gift, 0) AS is_admin_gift,
                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
                       gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                FROM gift_instances gi
@@ -1045,6 +1108,7 @@ async def get_gift_instance(db_path: str, instance_id: int) -> dict | None:
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT gi.id, gi.background, gi.gift_number, gi.owner_id, gi.acquired_at,
+                      COALESCE(gi.is_admin_gift, 0) AS is_admin_gift,
                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
                       gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                FROM gift_instances gi
@@ -1071,6 +1135,7 @@ async def get_gift_instance_by_spec(
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT gi.id, gi.background, gi.gift_number, gi.owner_id, gi.acquired_at,
+                      COALESCE(gi.is_admin_gift, 0) AS is_admin_gift,
                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
                       gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                FROM gift_instances gi
@@ -1104,6 +1169,7 @@ async def get_gift_instance_by_number(db_path: str, collection: str, gift_number
         db.row_factory = aiosqlite.Row
         async with db.execute(
             """SELECT gi.id, gi.background, gi.gift_number, gi.owner_id, gi.acquired_at,
+                      COALESCE(gi.is_admin_gift, 0) AS is_admin_gift,
                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
                       gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
                FROM gift_instances gi
