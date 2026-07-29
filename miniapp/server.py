@@ -21,6 +21,13 @@ from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
+from collectibles import (
+    ANON_MAX_SUFFIX,
+    ANON_MIN_SUFFIX,
+    anon_number_price,
+    anon_number_rarity,
+    format_anon_number,
+)
 
 DB_PATH = config.DB_PATH
 STATIC_DIR = Path(__file__).parent / "static"
@@ -207,13 +214,23 @@ def leaderboard(tab: str = "balance", limit: int = 20):
                 f"""SELECT e.user_id,
                            e.username AS e_username, e.full_name AS e_full_name,
                            a.username AS a_username, a.full_name AS a_full_name,
-                           e.balance + COALESCE(SUM(gp.current_price), 0) AS value
+                           e.balance
+                           + COALESCE(gv.gift_value, 0)
+                           + COALESCE(av.anon_value, 0) AS value
                     FROM economy e
-                    LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id
-                    LEFT JOIN gift_models gm ON gm.id = gi.model_id
-                    LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+                    LEFT JOIN (
+                        SELECT gi.owner_id, SUM(gp.current_price) AS gift_value
+                        FROM gift_instances gi
+                        JOIN gift_models gm ON gm.id = gi.model_id
+                        JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+                        GROUP BY gi.owner_id
+                    ) gv ON gv.owner_id = e.user_id
+                    LEFT JOIN (
+                        SELECT owner_id, SUM(price) AS anon_value
+                        FROM anon_numbers WHERE owner_id IS NOT NULL GROUP BY owner_id
+                    ) av ON av.owner_id = e.user_id
                     {_name_subquery}
-                    GROUP BY e.user_id ORDER BY value DESC LIMIT ?""", (limit,)
+                    ORDER BY value DESC LIMIT ?""", (limit,)
             ).fetchall()
             return [{"rank": i + 1, "user_id": r["user_id"], "name": _merged_name(r),
                      "value": r["value"]} for i, r in enumerate(rows)]
@@ -264,7 +281,7 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         """SELECT e.user_id,
                   e.username  AS e_username,  e.full_name  AS e_full_name,
                   a.username  AS a_username,  a.full_name  AS a_full_name,
-                  e.balance, e.streak, e.last_daily, e.pinned_gift_id
+                  e.balance, e.streak, e.last_daily, e.pinned_gift_id, e.pinned_anon_id
            FROM economy e
            LEFT JOIN (
                SELECT user_id, username, full_name FROM user_activity
@@ -319,6 +336,17 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         ).fetchone()
         pinned_gift = dict(pg) if pg else None
 
+    pinned_anon = None
+    if row["pinned_anon_id"]:
+        pa = db.execute(
+            "SELECT id, suffix, price FROM anon_numbers WHERE id = ? AND owner_id = ?",
+            (row["pinned_anon_id"], user_id),
+        ).fetchone()
+        if pa:
+            pinned_anon = dict(pa)
+            pinned_anon["number"] = format_anon_number(pinned_anon["suffix"])
+            pinned_anon["rarity"] = anon_number_rarity(pinned_anon["suffix"])[0]
+
     gift_value = db.execute(
         """SELECT COALESCE(SUM(gp.current_price), 0)
            FROM gift_instances gi
@@ -327,15 +355,33 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
            WHERE gi.owner_id = ? AND COALESCE(gi.is_admin_gift, 0) = 0""",
         (user_id,)
     ).fetchone()[0]
-    net_worth = row["balance"] + gift_value
+    anon_value_row = db.execute(
+        "SELECT COUNT(*) AS anon_count, COALESCE(SUM(price), 0) AS anon_value "
+        "FROM anon_numbers WHERE owner_id = ?",
+        (user_id,),
+    ).fetchone()
+    anon_count = anon_value_row["anon_count"]
+    anon_value = anon_value_row["anon_value"]
+    net_worth = row["balance"] + gift_value + anon_value
     networth_rank = db.execute(
         """SELECT COUNT(*)+1 FROM (
-               SELECT e.user_id, e.balance + COALESCE(SUM(gp.current_price),0) AS nw
+               SELECT e.user_id,
+                      e.balance
+                      + COALESCE(gv.gift_value, 0)
+                      + COALESCE(av.anon_value, 0) AS nw
                FROM economy e
-               LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id AND COALESCE(gi.is_admin_gift,0)=0
-               LEFT JOIN gift_models gm ON gm.id = gi.model_id
-               LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
-               GROUP BY e.user_id
+               LEFT JOIN (
+                   SELECT gi.owner_id, SUM(gp.current_price) AS gift_value
+                   FROM gift_instances gi
+                   JOIN gift_models gm ON gm.id = gi.model_id
+                   JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+                   WHERE COALESCE(gi.is_admin_gift,0)=0
+                   GROUP BY gi.owner_id
+               ) gv ON gv.owner_id = e.user_id
+               LEFT JOIN (
+                   SELECT owner_id, SUM(price) AS anon_value
+                   FROM anon_numbers WHERE owner_id IS NOT NULL GROUP BY owner_id
+               ) av ON av.owner_id = e.user_id
            ) WHERE nw > ?""",
         (net_worth,)
     ).fetchone()[0]
@@ -345,20 +391,23 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
     # #1 Net Worth
     nw_rank = db.execute(
         """SELECT COUNT(*)+1 FROM (
-               SELECT e.user_id, e.balance + COALESCE(SUM(gp.current_price),0) AS nw
+               SELECT e.user_id,
+                      e.balance
+                      + COALESCE(gv.gift_value, 0)
+                      + COALESCE(av.anon_value, 0) AS nw
                FROM economy e
-               LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id
-               LEFT JOIN gift_models gm ON gm.id = gi.model_id
-               LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
-               GROUP BY e.user_id
-           ) WHERE nw > (
-               SELECT e2.balance + COALESCE(SUM(gp2.current_price),0)
-               FROM economy e2
-               LEFT JOIN gift_instances gi2 ON gi2.owner_id = e2.user_id
-               LEFT JOIN gift_models gm2 ON gm2.id = gi2.model_id
-               LEFT JOIN gift_prices gp2 ON gp2.collection = gm2.collection AND gp2.background = gi2.background
-               WHERE e2.user_id = ?
-           )""", (user_id,)
+               LEFT JOIN (
+                   SELECT gi.owner_id, SUM(gp.current_price) AS gift_value
+                   FROM gift_instances gi
+                   JOIN gift_models gm ON gm.id = gi.model_id
+                   JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+                   GROUP BY gi.owner_id
+               ) gv ON gv.owner_id = e.user_id
+               LEFT JOIN (
+                   SELECT owner_id, SUM(price) AS anon_value
+                   FROM anon_numbers WHERE owner_id IS NOT NULL GROUP BY owner_id
+               ) av ON av.owner_id = e.user_id
+           ) WHERE nw > ?""", (net_worth,)
     ).fetchone()[0]
     if nw_rank == 1:
         tags.append("#1 Net Worth")
@@ -442,11 +491,15 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         "gift_count": gift_count,
         "gift_rank": gift_rank,
         "gift_value": gift_value,
+        "anon_count": anon_count,
+        "anon_value": anon_value,
         "net_worth": net_worth,
         "networth_rank": networth_rank,
         "gifts": [dict(g) for g in gifts],
         "pinned_gift": pinned_gift,
         "pinned_gift_id": row["pinned_gift_id"],
+        "pinned_anon": pinned_anon,
+        "pinned_anon_id": row["pinned_anon_id"],
         "has_more": len(gifts) == gifts_limit and (gifts_offset + gifts_limit) < gift_count,
         "tags": tags[:3],
         **d,
@@ -2021,6 +2074,408 @@ def market_buy(req: MarketBuyRequest, authenticated_user: AuthenticatedUser):
     return {"gift_number": gift_number, "price": price, "new_balance": new_bal}
 
 
+# ── Shop hub: Rift buyback, MKRT listings, Fragsmint, wallet ─────────────────
+
+class RiftSellRequest(BaseModel):
+    user_id: int
+    gift_id: int
+
+
+class MkrtListRequest(BaseModel):
+    user_id: int
+    gift_id: int
+    price: int
+
+
+class ShopActorRequest(BaseModel):
+    user_id: int
+
+
+class AnonBuyRequest(BaseModel):
+    user_id: int
+    anon_id: int
+
+
+class AnonPinRequest(BaseModel):
+    user_id: int
+    anon_id: int | None = None
+
+
+def _anon_item(row) -> dict:
+    item = dict(row)
+    item["number"] = format_anon_number(item["suffix"])
+    item["rarity"] = anon_number_rarity(item["suffix"])[0]
+    return item
+
+
+@app.get("/api/wallet")
+def shop_wallet(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
+    with db_conn() as db:
+        wallet = db.execute(
+            "SELECT balance, pinned_gift_id, pinned_anon_id FROM economy WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        if not wallet:
+            raise HTTPException(404, "User not found — use the bot first")
+        gifts = db.execute(
+            """SELECT gi.id, gi.gift_number, gi.background, gi.acquired_at,
+                      COALESCE(gi.staked, 0) AS staked,
+                      gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
+                      gm.tier, gm.custom_emoji_id, COALESCE(gp.current_price, 0) AS current_price,
+                      l.id AS listing_id, l.price AS listing_price
+               FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               LEFT JOIN gift_prices gp
+                      ON gp.collection = gm.collection AND gp.background = gi.background
+               LEFT JOIN gift_market_listings l
+                      ON l.gift_id = gi.id AND l.status = 'active'
+               WHERE gi.owner_id = ?
+               ORDER BY COALESCE(gi.sort_index, 999999), gi.acquired_at DESC""",
+            (user_id,),
+        ).fetchall()
+        anons = db.execute(
+            "SELECT id, suffix, price, acquired_at FROM anon_numbers "
+            "WHERE owner_id = ? ORDER BY suffix",
+            (user_id,),
+        ).fetchall()
+
+    gift_items = []
+    for row in gifts:
+        gift = dict(row)
+        gift["buyback_price"] = int(gift["current_price"] * 0.80)
+        gift["is_pinned"] = gift["id"] == wallet["pinned_gift_id"]
+        gift_items.append(gift)
+    anon_items = [_anon_item(row) for row in anons]
+    for item in anon_items:
+        item["is_pinned"] = item["id"] == wallet["pinned_anon_id"]
+    return {
+        "balance": wallet["balance"],
+        "gifts": gift_items,
+        "anon_numbers": anon_items,
+        "pinned_anon_id": wallet["pinned_anon_id"],
+    }
+
+
+@app.post("/api/rift/sell")
+def rift_sell(req: RiftSellRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        gift = db.execute(
+            """SELECT gi.id, gi.gift_number, gi.background, COALESCE(gi.staked, 0) AS staked,
+                      gm.collection, gm.model_name,
+                      COALESCE(gp.current_price, 0) AS current_price,
+                      EXISTS(
+                          SELECT 1 FROM gift_market_listings l
+                          WHERE l.gift_id = gi.id AND l.status = 'active'
+                      ) AS is_listed
+               FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               LEFT JOIN gift_prices gp
+                      ON gp.collection = gm.collection AND gp.background = gi.background
+               WHERE gi.id = ? AND gi.owner_id = ?""",
+            (req.gift_id, req.user_id),
+        ).fetchone()
+        if not gift:
+            raise HTTPException(404, "You do not own that gift")
+        if gift["staked"]:
+            raise HTTPException(400, "Unstake this gift before selling it")
+        if gift["is_listed"]:
+            raise HTTPException(400, "Cancel the MKRT listing before selling to Rift")
+        buyback = int(gift["current_price"] * 0.80)
+        if buyback <= 0:
+            raise HTTPException(400, "This gift does not have a Rift buyback price")
+
+        db.execute(
+            "UPDATE gift_instances SET owner_id = NULL, acquired_at = NULL WHERE id = ?",
+            (req.gift_id,),
+        )
+        db.execute(
+            "UPDATE economy SET balance = balance + ?, "
+            "pinned_gift_id = CASE WHEN pinned_gift_id = ? THEN NULL ELSE pinned_gift_id END "
+            "WHERE user_id = ?",
+            (buyback, req.gift_id, req.user_id),
+        )
+        db.execute(
+            "UPDATE gift_prices SET demand_pressure = demand_pressure - 1 "
+            "WHERE collection = ? AND background = ?",
+            (gift["collection"], gift["background"]),
+        )
+        new_balance = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)
+        ).fetchone()["balance"]
+        db.commit()
+    return {
+        "gift_id": req.gift_id,
+        "gift_number": gift["gift_number"],
+        "buyback_price": buyback,
+        "new_balance": new_balance,
+    }
+
+
+@app.get("/api/mkrt")
+def mkrt_listings(limit: int = 40, offset: int = 0, search: str = ""):
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
+    where = ["l.status = 'active'", "gi.owner_id = l.seller_id"]
+    params: list = []
+    if search:
+        if search.isdigit():
+            where.append(
+                "(gm.model_name LIKE ? OR gm.collection LIKE ? OR gi.gift_number = ?)"
+            )
+            params.extend([f"%{search}%", f"%{search}%", int(search)])
+        else:
+            where.append("(gm.model_name LIKE ? OR gm.collection LIKE ?)")
+            params.extend([f"%{search}%", f"%{search}%"])
+    where_sql = " AND ".join(where)
+    with db_conn() as db:
+        rows = db.execute(
+            f"""SELECT l.id AS listing_id, l.seller_id, l.price, l.created_at,
+                       gi.id AS gift_id, gi.gift_number, gi.background,
+                       gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
+                       gm.tier, gm.custom_emoji_id,
+                       e.username AS seller_username, e.full_name AS seller_full_name
+                FROM gift_market_listings l
+                JOIN gift_instances gi ON gi.id = l.gift_id
+                JOIN gift_models gm ON gm.id = gi.model_id
+                LEFT JOIN economy e ON e.user_id = l.seller_id
+                WHERE {where_sql}
+                ORDER BY l.created_at DESC, l.id DESC LIMIT ? OFFSET ?""",
+            params + [limit, offset],
+        ).fetchall()
+        total = db.execute(
+            f"""SELECT COUNT(*) FROM gift_market_listings l
+                JOIN gift_instances gi ON gi.id = l.gift_id
+                JOIN gift_models gm ON gm.id = gi.model_id
+                WHERE {where_sql}""",
+            params,
+        ).fetchone()[0]
+
+    items = []
+    for row in rows:
+        item = dict(row)
+        item["seller_name"] = (
+            f"@{item['seller_username']}" if item["seller_username"]
+            else item["seller_full_name"] or f"User {item['seller_id']}"
+        )
+        items.append(item)
+    return {"items": items, "total": total, "offset": offset}
+
+
+@app.post("/api/mkrt/list")
+def mkrt_create_listing(req: MkrtListRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
+    if req.price < 10:
+        raise HTTPException(400, "MKRT price must be at least 10 WRK$")
+    if req.price > 1_000_000_000_000_000:
+        raise HTTPException(400, "MKRT price is too large")
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        gift = db.execute(
+            "SELECT id, COALESCE(staked, 0) AS staked FROM gift_instances "
+            "WHERE id = ? AND owner_id = ?",
+            (req.gift_id, req.user_id),
+        ).fetchone()
+        if not gift:
+            raise HTTPException(404, "You do not own that gift")
+        if gift["staked"]:
+            raise HTTPException(400, "Unstake this gift before listing it")
+        existing = db.execute(
+            "SELECT id FROM gift_market_listings WHERE gift_id = ? AND status = 'active'",
+            (req.gift_id,),
+        ).fetchone()
+        if existing:
+            raise HTTPException(400, "That gift is already listed on MKRT")
+        cur = db.execute(
+            "INSERT INTO gift_market_listings "
+            "(gift_id, seller_id, price, status, created_at) VALUES (?, ?, ?, 'active', ?)",
+            (req.gift_id, req.user_id, req.price, int(time.time())),
+        )
+        listing_id = cur.lastrowid
+        db.commit()
+    return {"listing_id": listing_id, "price": req.price}
+
+
+@app.post("/api/mkrt/{listing_id}/cancel")
+def mkrt_cancel_listing(
+    listing_id: int,
+    req: ShopActorRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    with db_conn() as db:
+        cur = db.execute(
+            "UPDATE gift_market_listings SET status = 'cancelled' "
+            "WHERE id = ? AND seller_id = ? AND status = 'active'",
+            (listing_id, req.user_id),
+        )
+        if cur.rowcount != 1:
+            raise HTTPException(404, "Active listing not found")
+        db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/mkrt/{listing_id}/buy")
+def mkrt_buy_listing(
+    listing_id: int,
+    req: ShopActorRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        listing = db.execute(
+            """SELECT l.id, l.gift_id, l.seller_id, l.price, l.status,
+                      gi.owner_id, gi.gift_number
+               FROM gift_market_listings l
+               JOIN gift_instances gi ON gi.id = l.gift_id
+               WHERE l.id = ?""",
+            (listing_id,),
+        ).fetchone()
+        if not listing or listing["status"] != "active":
+            raise HTTPException(404, "This MKRT listing is no longer active")
+        if listing["owner_id"] != listing["seller_id"]:
+            db.execute(
+                "UPDATE gift_market_listings SET status = 'cancelled' WHERE id = ?",
+                (listing_id,),
+            )
+            db.commit()
+            raise HTTPException(409, "The seller no longer owns this gift")
+        if listing["seller_id"] == req.user_id:
+            raise HTTPException(400, "You cannot buy your own listing")
+        buyer = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if not buyer:
+            raise HTTPException(404, "User not found — use the bot first")
+        if buyer["balance"] < listing["price"]:
+            raise HTTPException(400, f"Insufficient balance ({buyer['balance']:,} WRK$)")
+
+        sold_at = int(time.time())
+        db.execute(
+            "UPDATE economy SET balance = balance - ? WHERE user_id = ?",
+            (listing["price"], req.user_id),
+        )
+        db.execute(
+            "UPDATE economy SET balance = balance + ?, "
+            "pinned_gift_id = CASE WHEN pinned_gift_id = ? THEN NULL ELSE pinned_gift_id END "
+            "WHERE user_id = ?",
+            (listing["price"], listing["gift_id"], listing["seller_id"]),
+        )
+        db.execute(
+            "UPDATE gift_instances SET owner_id = ?, acquired_at = ? WHERE id = ?",
+            (req.user_id, sold_at, listing["gift_id"]),
+        )
+        db.execute(
+            "UPDATE gift_market_listings SET status = 'sold', buyer_id = ?, sold_at = ? "
+            "WHERE id = ?",
+            (req.user_id, sold_at, listing_id),
+        )
+        new_balance = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)
+        ).fetchone()["balance"]
+        db.commit()
+    return {
+        "gift_id": listing["gift_id"],
+        "gift_number": listing["gift_number"],
+        "price": listing["price"],
+        "new_balance": new_balance,
+    }
+
+
+@app.get("/api/fragsmint")
+def fragsmint_numbers(limit: int = 40, offset: int = 0, search: str = ""):
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
+    where = ["owner_id IS NULL"]
+    params: list = []
+    clean_search = search.replace("+", "").replace(" ", "")
+    if clean_search.startswith("888"):
+        clean_search = clean_search[3:]
+    if clean_search:
+        if not clean_search.isdigit() or len(clean_search) > 3:
+            return {"items": [], "total": 0, "offset": offset}
+        where.append("printf('%03d', suffix) LIKE ?")
+        params.append(f"%{clean_search}%")
+    where_sql = " AND ".join(where)
+    with db_conn() as db:
+        rows = db.execute(
+            f"SELECT id, suffix, price FROM anon_numbers WHERE {where_sql} "
+            "ORDER BY price ASC, suffix ASC LIMIT ? OFFSET ?",
+            params + [limit, offset],
+        ).fetchall()
+        total = db.execute(
+            f"SELECT COUNT(*) FROM anon_numbers WHERE {where_sql}", params
+        ).fetchone()[0]
+    return {
+        "items": [_anon_item(row) for row in rows],
+        "total": total,
+        "offset": offset,
+    }
+
+
+@app.post("/api/fragsmint/buy")
+def fragsmint_buy(req: AnonBuyRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        anon = db.execute(
+            "SELECT id, suffix, price, owner_id FROM anon_numbers WHERE id = ?",
+            (req.anon_id,),
+        ).fetchone()
+        if not anon:
+            raise HTTPException(404, "Anonymous number not found")
+        if anon["owner_id"] is not None:
+            raise HTTPException(409, "That anonymous number is already owned")
+        buyer = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if not buyer:
+            raise HTTPException(404, "User not found — use the bot first")
+        if buyer["balance"] < anon["price"]:
+            raise HTTPException(400, f"Insufficient balance ({buyer['balance']:,} WRK$)")
+        acquired_at = int(time.time())
+        db.execute(
+            "UPDATE economy SET balance = balance - ? WHERE user_id = ?",
+            (anon["price"], req.user_id),
+        )
+        db.execute(
+            "UPDATE anon_numbers SET owner_id = ?, acquired_at = ? WHERE id = ?",
+            (req.user_id, acquired_at, req.anon_id),
+        )
+        new_balance = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)
+        ).fetchone()["balance"]
+        db.commit()
+    return {
+        "anon_id": anon["id"],
+        "number": format_anon_number(anon["suffix"]),
+        "price": anon["price"],
+        "new_balance": new_balance,
+    }
+
+
+@app.post("/api/profile/pin-anon")
+def pin_anon_number(req: AnonPinRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
+    with db_conn() as db:
+        if req.anon_id is not None:
+            owned = db.execute(
+                "SELECT id FROM anon_numbers WHERE id = ? AND owner_id = ?",
+                (req.anon_id, req.user_id),
+            ).fetchone()
+            if not owned:
+                raise HTTPException(403, "You do not own that anonymous number")
+        db.execute(
+            "UPDATE economy SET pinned_anon_id = ? WHERE user_id = ?",
+            (req.anon_id, req.user_id),
+        )
+        db.commit()
+    return {"ok": True, "pinned_anon_id": req.anon_id}
+
+
 # ── Blackjack ─────────────────────────────────────────────────────────────────
 
 _bj_games: dict[int, dict] = {}
@@ -2906,7 +3361,7 @@ def game_timers():
 
 async def _startup():
     with db_conn() as db:
-        for col in ("pinned_gift_id INTEGER", "photo_url TEXT"):
+        for col in ("pinned_gift_id INTEGER", "pinned_anon_id INTEGER", "photo_url TEXT"):
             try:
                 db.execute(f"ALTER TABLE economy ADD COLUMN {col}")
                 db.commit()
@@ -3000,6 +3455,32 @@ async def _startup():
     created_at    INTEGER NOT NULL,
     UNIQUE(from_user_id, to_user_id)
 )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS gift_market_listings (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    gift_id    INTEGER NOT NULL REFERENCES gift_instances(id),
+    seller_id  INTEGER NOT NULL,
+    price      INTEGER NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'active',
+    buyer_id   INTEGER,
+    created_at INTEGER NOT NULL,
+    sold_at    INTEGER
+)""")
+        db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_gift_market_active
+    ON gift_market_listings(gift_id) WHERE status = 'active'""")
+        db.execute("""CREATE TABLE IF NOT EXISTS anon_numbers (
+    id          INTEGER PRIMARY KEY,
+    suffix      INTEGER NOT NULL UNIQUE,
+    price       INTEGER NOT NULL,
+    owner_id    INTEGER,
+    acquired_at INTEGER
+)""")
+        db.executemany(
+            "INSERT OR IGNORE INTO anon_numbers (id, suffix, price) VALUES (?, ?, ?)",
+            [
+                (suffix, suffix, anon_number_price(suffix))
+                for suffix in range(ANON_MIN_SUFFIX, ANON_MAX_SUFFIX + 1)
+            ],
+        )
         db.commit()
         for col in ("duck_won INTEGER DEFAULT 0", "duck_lost INTEGER DEFAULT 0",
                     "marbles_won INTEGER DEFAULT 0", "marbles_lost INTEGER DEFAULT 0",

@@ -579,6 +579,9 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         col = pg["collection"]
         gift_display = " ".join(w.capitalize() for w in col.split("_")) if "_" in col else col
         pinned_line = f'\n{gift_icon}{bg_emoji} {escape(gift_display)} #{pg["gift_number"]}'
+    pinned_anon = p.get("pinned_anon")
+    if pinned_anon:
+        pinned_line += f'\n🔒 <b>{escape(pinned_anon["number"])}</b> · Anonymous WRK$ Number'
 
     # job title
     work_count = p.get("work_count") or 0
@@ -600,6 +603,7 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f'💎 <b>Net Worth: {net_worth:,} {emojis.WRK}</b> — rank #{nw_rank}\n'
         f'🔥 <b>{p["streak"]} day streak</b> — rank #{p["streak_rank"]}\n'
         f'🎁 <b>{p["gift_count"]} gifts</b> — rank #{p["gift_rank"]}\n\n'
+        f'🔒 <b>{p.get("anon_count", 0)} anonymous numbers</b>\n\n'
         f'🎰 Gambling: +{p["total_won"]:,} won · -{p["total_lost"]:,} lost · net {net_str}\n'
         f'⭐ {escape(stat_label)}: {escape(str(stat_value))}'
     )

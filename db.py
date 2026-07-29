@@ -1,6 +1,13 @@
 import time
 import aiosqlite
 
+from collectibles import (
+    ANON_MAX_SUFFIX,
+    ANON_MIN_SUFFIX,
+    anon_number_price,
+    format_anon_number,
+)
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS groups (
     chat_id INTEGER PRIMARY KEY,
@@ -99,6 +106,25 @@ CREATE TABLE IF NOT EXISTS gift_offers (
     status       TEXT NOT NULL DEFAULT 'pending',
     created_at   INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS gift_market_listings (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    gift_id    INTEGER NOT NULL REFERENCES gift_instances(id),
+    seller_id  INTEGER NOT NULL,
+    price      INTEGER NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'active',
+    buyer_id   INTEGER,
+    created_at INTEGER NOT NULL,
+    sold_at    INTEGER
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_gift_market_active
+ON gift_market_listings(gift_id) WHERE status = 'active';
+CREATE TABLE IF NOT EXISTS anon_numbers (
+    id          INTEGER PRIMARY KEY,
+    suffix      INTEGER NOT NULL UNIQUE,
+    price       INTEGER NOT NULL,
+    owner_id    INTEGER,
+    acquired_at INTEGER
+);
 CREATE TABLE IF NOT EXISTS work_sessions (
     user_id         INTEGER PRIMARY KEY,
     taps            INTEGER NOT NULL DEFAULT 0,
@@ -136,6 +162,9 @@ async def _migrate(db) -> None:
         "work_reminder":       "INTEGER NOT NULL DEFAULT 0",
         "last_reminder_sent":  "INTEGER NOT NULL DEFAULT 0",
         "pinned_gift_id":      "INTEGER",
+        "pinned_anon_id":      "INTEGER",
+        "pinned_stat":         "TEXT NOT NULL DEFAULT 'crash_mult'",
+        "photo_url":           "TEXT",
     }
     for col, typedef in econ_new.items():
         if col not in econ_cols:
@@ -149,6 +178,18 @@ async def _migrate(db) -> None:
             await db.execute(f"ALTER TABLE economy ADD COLUMN {col}")
             await db.commit()
 
+    async with db.execute("PRAGMA table_info(gift_instances)") as cur:
+        gift_cols = {row[1] async for row in cur}
+    gift_new = {
+        "sort_index":    "INTEGER",
+        "staked":        "INTEGER DEFAULT 0",
+        "is_admin_gift": "INTEGER DEFAULT 0",
+    }
+    for col, typedef in gift_new.items():
+        if col not in gift_cols:
+            await db.execute(f"ALTER TABLE gift_instances ADD COLUMN {col} {typedef}")
+            await db.commit()
+
     # hack_sessions table (shared with mini-app)
     await db.execute("""CREATE TABLE IF NOT EXISTS hack_sessions (
         user_id          INTEGER PRIMARY KEY,
@@ -159,6 +200,32 @@ async def _migrate(db) -> None:
         revealed_indices TEXT    NOT NULL DEFAULT '0',
         started_at       INTEGER NOT NULL
     )""")
+    await db.execute("""CREATE TABLE IF NOT EXISTS gift_market_listings (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        gift_id    INTEGER NOT NULL REFERENCES gift_instances(id),
+        seller_id  INTEGER NOT NULL,
+        price      INTEGER NOT NULL,
+        status     TEXT NOT NULL DEFAULT 'active',
+        buyer_id   INTEGER,
+        created_at INTEGER NOT NULL,
+        sold_at    INTEGER
+    )""")
+    await db.execute("""CREATE UNIQUE INDEX IF NOT EXISTS idx_gift_market_active
+        ON gift_market_listings(gift_id) WHERE status = 'active'""")
+    await db.execute("""CREATE TABLE IF NOT EXISTS anon_numbers (
+        id          INTEGER PRIMARY KEY,
+        suffix      INTEGER NOT NULL UNIQUE,
+        price       INTEGER NOT NULL,
+        owner_id    INTEGER,
+        acquired_at INTEGER
+    )""")
+    await db.executemany(
+        "INSERT OR IGNORE INTO anon_numbers (id, suffix, price) VALUES (?, ?, ?)",
+        [
+            (suffix, suffix, anon_number_price(suffix))
+            for suffix in range(ANON_MIN_SUFFIX, ANON_MAX_SUFFIX + 1)
+        ],
+    )
     await db.commit()
 
     # groups table migrations
@@ -660,7 +727,8 @@ async def get_profile(db_path: str, user_id: int) -> dict | None:
     async with aiosqlite.connect(db_path) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            """SELECT e.user_id, e.balance, e.streak, e.work_count, e.pinned_gift_id,
+            """SELECT e.user_id, e.balance, e.streak, e.work_count,
+                      e.pinned_gift_id, e.pinned_anon_id,
                       COALESCE(e.pinned_stat, 'crash_mult') AS pinned_stat,
                       COALESCE(a.username, e.username) AS username,
                       COALESCE(a.full_name, e.full_name) AS full_name
@@ -708,6 +776,19 @@ async def get_profile(db_path: str, user_id: int) -> dict | None:
                 pinned = dict(pg) if pg else None
         d["pinned_gift"] = pinned
 
+        pinned_anon = None
+        if d.get("pinned_anon_id"):
+            async with db.execute(
+                "SELECT id, suffix, price FROM anon_numbers "
+                "WHERE id = ? AND owner_id = ?",
+                (d["pinned_anon_id"], user_id),
+            ) as cur:
+                pa = await cur.fetchone()
+                if pa:
+                    pinned_anon = dict(pa)
+                    pinned_anon["number"] = format_anon_number(pinned_anon["suffix"])
+        d["pinned_anon"] = pinned_anon
+
         gs_cols = ("slots_won","slots_lost","coinflip_won","coinflip_lost",
                    "blackjack_won","blackjack_lost","crash_won","crash_lost","crash_best_mult")
         async with db.execute(
@@ -731,16 +812,34 @@ async def get_profile(db_path: str, user_id: int) -> dict | None:
         ) as cur:
             row2 = await cur.fetchone()
             d["gift_value"] = row2[0] if row2 else 0
-        d["net_worth"] = d["balance"] + d["gift_value"]
+        async with db.execute(
+            "SELECT COUNT(*) AS anon_count, COALESCE(SUM(price), 0) AS anon_value "
+            "FROM anon_numbers WHERE owner_id = ?",
+            (user_id,),
+        ) as cur:
+            anon_row = await cur.fetchone()
+            d["anon_count"] = anon_row["anon_count"]
+            d["anon_value"] = anon_row["anon_value"]
+        d["net_worth"] = d["balance"] + d["gift_value"] + d["anon_value"]
 
         async with db.execute(
             """SELECT COUNT(*)+1 FROM (
-                   SELECT e.user_id, e.balance + COALESCE(SUM(gp.current_price),0) AS nw
+                   SELECT e.user_id,
+                          e.balance
+                          + COALESCE(gv.gift_value, 0)
+                          + COALESCE(av.anon_value, 0) AS nw
                    FROM economy e
-                   LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id
-                   LEFT JOIN gift_models gm ON gm.id = gi.model_id
-                   LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
-                   GROUP BY e.user_id
+                   LEFT JOIN (
+                       SELECT gi.owner_id, SUM(gp.current_price) AS gift_value
+                       FROM gift_instances gi
+                       JOIN gift_models gm ON gm.id = gi.model_id
+                       JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
+                       GROUP BY gi.owner_id
+                   ) gv ON gv.owner_id = e.user_id
+                   LEFT JOIN (
+                       SELECT owner_id, SUM(price) AS anon_value
+                       FROM anon_numbers WHERE owner_id IS NOT NULL GROUP BY owner_id
+                   ) av ON av.owner_id = e.user_id
                ) WHERE nw > ?""",
             (d["net_worth"],)
         ) as cur:

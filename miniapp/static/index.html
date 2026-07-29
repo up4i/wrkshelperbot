@@ -911,6 +911,440 @@
     backdrop-filter: blur(4px);
   }
 
+  /* ── Three-shop hub + wallet ── */
+  .shop-page-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .shop-wallet-button {
+    flex: none;
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 11px;
+    border: 1px solid rgba(82,174,235,.25);
+    border-radius: 12px;
+    background: rgba(82,174,235,.09);
+    color: #9bd8ff;
+    font: 750 11px system-ui;
+    cursor: pointer;
+  }
+  .shop-wallet-button span { font-size: 16px; }
+  .shop-menu {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 8px;
+  }
+  .shop-menu-card {
+    position: relative;
+    min-width: 0;
+    min-height: 104px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-end;
+    overflow: hidden;
+    padding: 11px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 17px;
+    background: #151621;
+    color: #fff;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+  }
+  .shop-menu-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 80% 8%, var(--shop-glow), transparent 54%);
+    opacity: .7;
+  }
+  .shop-menu-card:active { transform: scale(.97); }
+  .shop-menu-card.active {
+    border-color: var(--shop-accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--shop-accent) 30%, transparent), 0 9px 24px rgba(0,0,0,.2);
+  }
+  .shop-menu-card.rift { --shop-accent:#9b7bff; --shop-glow:rgba(155,123,255,.38); }
+  .shop-menu-card.mkrt { --shop-accent:#53b5f5; --shop-glow:rgba(83,181,245,.35); }
+  .shop-menu-card.fragsmint { --shop-accent:#f4bd60; --shop-glow:rgba(244,189,96,.3); }
+  .shop-menu-icon {
+    position: absolute;
+    z-index: 1;
+    top: 11px;
+    right: 10px;
+    min-width: 33px;
+    height: 33px;
+    display: grid;
+    place-items: center;
+    padding: 0 5px;
+    border: 1px solid color-mix(in srgb, var(--shop-accent) 35%, transparent);
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--shop-accent) 13%, rgba(5,7,14,.72));
+    color: color-mix(in srgb, var(--shop-accent) 82%, white);
+    font-size: 11px;
+    font-weight: 900;
+  }
+  .shop-menu-name,
+  .shop-menu-sub { position: relative; z-index: 1; min-width: 0; }
+  .shop-menu-name { font-size: 14px; font-weight: 850; letter-spacing: -.2px; }
+  .shop-menu-sub {
+    width: 100%;
+    margin-top: 2px;
+    overflow: hidden;
+    color: #77838f;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: .2px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .shop-panel { display: none; flex-direction: column; gap: 10px; }
+  .shop-panel.active { display: flex; }
+  .shop-panel-hero {
+    min-height: 116px;
+    display: grid;
+    grid-template-columns: 58px minmax(0,1fr);
+    align-items: center;
+    gap: 13px;
+    overflow: hidden;
+    padding: 16px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 21px;
+    background:
+      radial-gradient(circle at 90% 0, var(--panel-glow), transparent 42%),
+      linear-gradient(145deg, #171824, #10111a);
+  }
+  .shop-panel-hero.rift { --panel-accent:#a78bfa; --panel-glow:rgba(139,92,246,.28); }
+  .shop-panel-hero.mkrt { --panel-accent:#7dd3fc; --panel-glow:rgba(14,165,233,.25); }
+  .shop-panel-hero.fragsmint { --panel-accent:#f6cb7a; --panel-glow:rgba(245,158,11,.24); }
+  .shop-panel-mark {
+    width: 58px;
+    height: 58px;
+    display: grid;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--panel-accent) 38%, transparent);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--panel-accent) 13%, #0a0c13);
+    color: var(--panel-accent);
+    font-size: 15px;
+    font-weight: 950;
+    box-shadow: inset 0 1px rgba(255,255,255,.06);
+  }
+  .shop-panel-kicker {
+    color: var(--panel-accent, #78c8fa);
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 1.15px;
+    text-transform: uppercase;
+  }
+  .shop-panel-title {
+    margin-top: 3px;
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: -.65px;
+  }
+  .shop-panel-copy {
+    margin-top: 5px;
+    color: #8995a0;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+  .rift-buyback-link {
+    width: 100%;
+    min-height: 54px;
+    display: grid;
+    grid-template-columns: 30px minmax(0,1fr) 12px;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 12px;
+    border: 1px solid rgba(167,139,250,.17);
+    border-radius: 15px;
+    background: rgba(167,139,250,.055);
+    color: #d7ccff;
+    text-align: left;
+    cursor: pointer;
+  }
+  .rift-buyback-link > span:first-child {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 10px;
+    background: rgba(167,139,250,.13);
+    font-size: 16px;
+  }
+  .rift-buyback-link b { display: block; font-size: 11px; }
+  .rift-buyback-link small { display: block; margin-top: 2px; color: #747f8a; font-size: 9px; }
+  .rift-buyback-link > span:last-child { color: #59636d; font-size: 19px; }
+  .rift-buyback-link.mkrt-link {
+    border-color: rgba(82,174,235,.17);
+    background: rgba(82,174,235,.055);
+    color: #bce5ff;
+  }
+  .rift-buyback-link.mkrt-link > span:first-child { background: rgba(82,174,235,.13); }
+  .mkrt-card-owner {
+    position: relative;
+    z-index: 1;
+    max-width: 100%;
+    overflow: hidden;
+    color: rgba(255,255,255,.5);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mkrt-card-actions {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+    margin-top: 5px;
+  }
+  .mkrt-card-actions .market-buy-btn { width: 100%; margin: 0; }
+  .market-buy-btn.cancel { background: rgba(251,113,133,.12); border-color: rgba(251,113,133,.25); color: #fda4af; }
+  .anon-market-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 14px;
+    background: rgba(255,255,255,.025);
+  }
+  .anon-market-summary span {
+    min-width: 0;
+    padding: 10px 5px;
+    color: #77838f;
+    font-size: 8px;
+    text-align: center;
+  }
+  .anon-market-summary span + span { border-left: 1px solid rgba(255,255,255,.07); }
+  .anon-market-summary b { display: block; margin-bottom: 2px; color: #f6cb7a; font-size: 11px; }
+  .anon-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+  .anon-grid > .loading,
+  .anon-grid > .empty,
+  .anon-grid > .error-msg { grid-column: 1/-1; }
+  .anon-card {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid rgba(246,203,122,.14);
+    border-radius: 17px;
+    background: linear-gradient(160deg, #181922, #0d0e14);
+    box-shadow: 0 10px 24px rgba(0,0,0,.18);
+  }
+  .anon-card-art {
+    position: relative;
+    aspect-ratio: 1.42;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 82% 8%, var(--anon-glow, rgba(86,171,255,.27)), transparent 43%),
+      linear-gradient(145deg, #20232e, #12141b);
+  }
+  .anon-card-art::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: .1;
+    background:
+      linear-gradient(30deg, transparent 47%, white 48% 49%, transparent 50%) 0 0 / 29px 29px,
+      linear-gradient(-30deg, transparent 47%, white 48% 49%, transparent 50%) 0 0 / 29px 29px;
+  }
+  .anon-logo-box {
+    position: absolute;
+    z-index: 2;
+    top: 11px;
+    left: 11px;
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255,255,255,.2);
+    border-radius: 12px;
+    background: linear-gradient(145deg, #8b6cff, #44a7df);
+    box-shadow: 0 8px 18px rgba(0,0,0,.24);
+  }
+  .anon-logo-box img { width: 29px; height: 29px; object-fit: contain; }
+  .anon-logo-fallback { color: #fff; font-size: 8px; font-weight: 950; }
+  .anon-number {
+    position: absolute;
+    z-index: 2;
+    left: 11px;
+    right: 11px;
+    bottom: 12px;
+    color: #fff;
+    font-size: clamp(17px, 5vw, 24px);
+    font-weight: 900;
+    letter-spacing: .5px;
+    line-height: 1;
+    white-space: nowrap;
+    text-shadow: 0 3px 12px rgba(0,0,0,.38);
+  }
+  .anon-card-body { padding: 10px; }
+  .anon-card-title {
+    overflow: hidden;
+    color: #dfe7ed;
+    font-size: 9px;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .anon-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 5px;
+    margin-top: 5px;
+  }
+  .anon-rarity {
+    color: #8d99a4;
+    font-size: 8px;
+    font-weight: 800;
+    text-transform: capitalize;
+  }
+  .anon-rarity.iconic { color:#f6cb7a; }
+  .anon-rarity.elite { color:#e9a8ff; }
+  .anon-rarity.premium { color:#8ed0fa; }
+  .anon-price { color: #fff1c8; font-size: 10px; font-weight: 850; white-space: nowrap; }
+  .anon-card-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .anon-action-btn {
+    min-height: 31px;
+    border: 1px solid rgba(246,203,122,.22);
+    border-radius: 9px;
+    background: rgba(246,203,122,.1);
+    color: #ffe6a8;
+    font: 800 9px system-ui;
+    cursor: pointer;
+  }
+  .anon-action-btn.pinned { border-color:rgba(82,174,235,.3); background:rgba(82,174,235,.12); color:#a8ddff; }
+  .wallet-hero {
+    --panel-accent:#8ed0fa;
+    min-height: 88px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px;
+    border: 1px solid rgba(82,174,235,.15);
+    border-radius: 19px;
+    background: radial-gradient(circle at 100% 0, rgba(82,174,235,.16), transparent 48%), #141620;
+  }
+  .wallet-balance {
+    color: #ffe39c;
+    font-size: 15px;
+    font-weight: 900;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .wallet-section {
+    padding: 14px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 19px;
+    background: rgba(255,255,255,.022);
+  }
+  .wallet-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 11px;
+  }
+  .wallet-section-head b { display: block; font-size: 14px; }
+  .wallet-section-head div span { display: block; margin-top: 2px; color: #78848f; font-size: 9px; }
+  .wallet-section-head > span {
+    min-width: 25px;
+    height: 25px;
+    display: grid;
+    place-items: center;
+    border-radius: 9px;
+    background: rgba(255,255,255,.05);
+    color: #94a0aa;
+    font-size: 10px;
+    font-weight: 850;
+  }
+  .wallet-gift-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+  .wallet-gift-grid > .loading,
+  .wallet-gift-grid > .empty,
+  .wallet-gift-grid > .error-msg { grid-column: 1/-1; }
+  .wallet-gift-card {
+    min-width: 0;
+    overflow: hidden;
+    padding: 11px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 15px;
+    background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
+  }
+  .wallet-gift-top { display: flex; align-items: center; gap: 8px; }
+  .wallet-gift-emoji {
+    width: 39px;
+    height: 39px;
+    display: grid;
+    place-items: center;
+    flex: none;
+    border-radius: 11px;
+    background: rgba(255,255,255,.055);
+    font-size: 24px;
+  }
+  .wallet-gift-emoji img { width: 34px; height: 34px; object-fit: contain; }
+  .wallet-gift-copy { min-width: 0; }
+  .wallet-gift-name {
+    overflow: hidden;
+    font-size: 10px;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .wallet-gift-sub { margin-top: 3px; color: #7d8994; font-size: 8px; }
+  .wallet-gift-value { margin-top: 9px; color: #aeb9c2; font-size: 9px; }
+  .wallet-gift-value b { color: #f4d889; }
+  .wallet-gift-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 8px; }
+  .wallet-gift-actions button {
+    min-width: 0;
+    min-height: 31px;
+    padding: 4px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 9px;
+    background: rgba(255,255,255,.045);
+    color: #cbd4db;
+    font: 750 8px system-ui;
+    cursor: pointer;
+  }
+  .wallet-gift-actions .sell { border-color:rgba(167,139,250,.2); color:#cabaff; }
+  .wallet-gift-actions .list { border-color:rgba(82,174,235,.2); color:#9bd8ff; }
+  .wallet-gift-actions .cancel { grid-column:1/-1; border-color:rgba(251,113,133,.22); color:#fda4af; }
+  .shop-list-modal { gap: 12px; }
+  .shop-list-gift {
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid rgba(82,174,235,.13);
+    border-radius: 14px;
+    background: rgba(82,174,235,.055);
+  }
+  .shop-field-label { color:#87939e; font-size:10px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; }
+  .shop-price-input { position:relative; }
+  .shop-price-input input { width:100%; padding-right:62px; text-align:left; }
+  .shop-price-input span {
+    position:absolute;
+    top:50%;
+    right:13px;
+    color:#8ed0fa;
+    font-size:10px;
+    font-weight:850;
+    transform:translateY(-50%);
+  }
+  .shop-list-note { color:#75818c; font-size:10px; line-height:1.45; }
+
   /* ── Crash ── */
   .crash-history {
     display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; padding: 4px 0 8px;
@@ -2545,6 +2979,28 @@
     color: #b7e2fc;
   }
   .pin-badge img { width: 20px; height: 20px; }
+  .profile-anon-pin {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 27px;
+    padding: 4px 9px;
+    border: 1px solid rgba(246,203,122,.25);
+    border-radius: 20px;
+    background: rgba(246,203,122,.09);
+    color: #ffe2a0;
+    font-size: 11px;
+    font-weight: 850;
+    letter-spacing: .35px;
+  }
+  .profile-anon-pin::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    border-radius: 5px;
+    background: linear-gradient(145deg, #8b6cff, #44a7df);
+    box-shadow: inset 0 1px rgba(255,255,255,.2);
+  }
   .profile-badges-panel {
     margin: 14px 14px 0;
     padding: 12px;
@@ -3078,34 +3534,129 @@
 
     <!-- MARKET -->
     <div class="page" id="page-market">
-      <div>
-        <div class="section-title">Market</div>
-        <div class="section-sub">Buy gifts from the bank</div>
+      <div class="shop-page-heading">
+        <div>
+          <div class="section-title">Shops</div>
+          <div class="section-sub">Telegram-style collectibles, trading, and your wallet</div>
+        </div>
+        <button class="shop-wallet-button" onclick="setShopSection('wallet')">
+          <span>◫</span> My Wallet
+        </button>
       </div>
-      <!-- Tier tabs -->
-      <div class="tab-row" id="marketTabs">
-        <div class="tab-btn" onclick="setMarketTier('all',this)">All</div>
-        <div class="tab-btn active" onclick="setMarketTier('low',this)">Low</div>
-        <div class="tab-btn" onclick="setMarketTier('mid',this)">Mid</div>
-        <div class="tab-btn" onclick="setMarketTier('high',this)">High</div>
+
+      <div class="shop-menu" id="shopMenu">
+        <button class="shop-menu-card rift active" data-shop="rift" onclick="setShopSection('rift')">
+          <span class="shop-menu-icon">✦</span>
+          <span class="shop-menu-name">Rift</span>
+          <span class="shop-menu-sub">Gift vault</span>
+        </button>
+        <button class="shop-menu-card mkrt" data-shop="mkrt" onclick="setShopSection('mkrt')">
+          <span class="shop-menu-icon">M</span>
+          <span class="shop-menu-name">MKRT</span>
+          <span class="shop-menu-sub">User listings</span>
+        </button>
+        <button class="shop-menu-card fragsmint" data-shop="fragsmint" onclick="setShopSection('fragsmint')">
+          <span class="shop-menu-icon">+888</span>
+          <span class="shop-menu-name">Fragsmint</span>
+          <span class="shop-menu-sub">Anon numbers</span>
+        </button>
       </div>
-      <!-- Search -->
-      <input class="market-search" id="marketSearch" placeholder="Search by name, collection, or #number…" oninput="onMarketSearch(this.value)">
-      <!-- Collection filter -->
-      <select class="collection-select" id="marketCollection" onchange="onMarketCollection(this.value)">
-        <option value="">All collections</option>
-      </select>
-      <!-- Background pills -->
-      <div class="bg-pills" id="bgPills">
-        <div class="bg-pill active" style="background:#444" data-bg="" onclick="setMarketBg('',this)">All</div>
-        <div class="bg-pill" style="background:#161717" data-bg="black" onclick="setMarketBg('black',this)">Black</div>
-        <div class="bg-pill" style="background:#33373a" data-bg="onyx" onclick="setMarketBg('onyx',this)">Onyx</div>
-        <div class="bg-pill" style="background:#7e52a4" data-bg="grape" onclick="setMarketBg('grape',this)">Grape</div>
-        <div class="bg-pill" style="background:#4ba774" data-bg="emerald" onclick="setMarketBg('emerald',this)">Emerald</div>
-        <div class="bg-pill" style="background:#3c475f" data-bg="midnight" onclick="setMarketBg('midnight',this)">Midnight</div>
-        <div class="bg-pill" style="background:#c47b42" data-bg="orange" onclick="setMarketBg('orange',this)">Orange</div>
-      </div>
-      <div class="market-grid" id="marketGrid"><div class="loading">Loading…</div></div>
+
+      <section class="shop-panel active" id="shopPanelRift" data-shop-panel="rift">
+        <div class="shop-panel-hero rift">
+          <div class="shop-panel-mark">✦</div>
+          <div>
+            <div class="shop-panel-kicker">Official gift vault</div>
+            <div class="shop-panel-title">Rift</div>
+            <div class="shop-panel-copy">Buy bank gifts or instantly sell yours back for 80% of Rift value.</div>
+          </div>
+        </div>
+        <button class="rift-buyback-link" onclick="setShopSection('wallet')">
+          <span>↙</span>
+          <span><b>Auto Buyback</b><small>Open My Wallet to sell a gift to Rift</small></span>
+          <span>›</span>
+        </button>
+        <div class="tab-row" id="marketTabs">
+          <div class="tab-btn" onclick="setMarketTier('all',this)">All</div>
+          <div class="tab-btn active" onclick="setMarketTier('low',this)">Low</div>
+          <div class="tab-btn" onclick="setMarketTier('mid',this)">Mid</div>
+          <div class="tab-btn" onclick="setMarketTier('high',this)">High</div>
+        </div>
+        <input class="market-search" id="marketSearch" placeholder="Search gifts, collections, or #number…" oninput="onMarketSearch(this.value)">
+        <select class="collection-select" id="marketCollection" onchange="onMarketCollection(this.value)">
+          <option value="">All collections</option>
+        </select>
+        <div class="bg-pills" id="bgPills">
+          <div class="bg-pill active" style="background:#444" data-bg="" onclick="setMarketBg('',this)">All</div>
+          <div class="bg-pill" style="background:#161717" data-bg="black" onclick="setMarketBg('black',this)">Black</div>
+          <div class="bg-pill" style="background:#33373a" data-bg="onyx" onclick="setMarketBg('onyx',this)">Onyx</div>
+          <div class="bg-pill" style="background:#7e52a4" data-bg="grape" onclick="setMarketBg('grape',this)">Grape</div>
+          <div class="bg-pill" style="background:#4ba774" data-bg="emerald" onclick="setMarketBg('emerald',this)">Emerald</div>
+          <div class="bg-pill" style="background:#3c475f" data-bg="midnight" onclick="setMarketBg('midnight',this)">Midnight</div>
+          <div class="bg-pill" style="background:#c47b42" data-bg="orange" onclick="setMarketBg('orange',this)">Orange</div>
+        </div>
+        <div class="market-grid" id="marketGrid"><div class="loading">Loading…</div></div>
+      </section>
+
+      <section class="shop-panel" id="shopPanelMkrt" data-shop-panel="mkrt">
+        <div class="shop-panel-hero mkrt">
+          <div class="shop-panel-mark">M</div>
+          <div>
+            <div class="shop-panel-kicker">Peer-to-peer marketplace</div>
+            <div class="shop-panel-title">MKRT</div>
+            <div class="shop-panel-copy">Collectors set the price. Purchases transfer gifts and WRK$ instantly.</div>
+          </div>
+        </div>
+        <button class="rift-buyback-link mkrt-link" onclick="setShopSection('wallet')">
+          <span>＋</span>
+          <span><b>List a gift</b><small>Choose a collectible from My Wallet</small></span>
+          <span>›</span>
+        </button>
+        <input class="market-search" id="mkrtSearch" placeholder="Search MKRT gifts or #number…" oninput="onMkrtSearch(this.value)">
+        <div class="market-grid mkrt-grid" id="mkrtGrid"><div class="loading">Loading…</div></div>
+      </section>
+
+      <section class="shop-panel" id="shopPanelFragsmint" data-shop-panel="fragsmint">
+        <div class="shop-panel-hero fragsmint">
+          <div class="shop-panel-mark">+888</div>
+          <div>
+            <div class="shop-panel-kicker">999 numbers · fixed supply</div>
+            <div class="shop-panel-title">Fragsmint</div>
+            <div class="shop-panel-copy">Own a six-digit Anonymous WRK$ Number and pin one to your profile.</div>
+          </div>
+        </div>
+        <input class="market-search" id="anonSearch" inputmode="numeric" placeholder="Find +888 001–999…" oninput="onAnonSearch(this.value)">
+        <div class="anon-market-summary">
+          <span><b>+888</b> permanent prefix</span>
+          <span><b>999</b> total supply</span>
+          <span><b>30M</b> floor</span>
+        </div>
+        <div class="anon-grid" id="anonGrid"><div class="loading">Loading…</div></div>
+      </section>
+
+      <section class="shop-panel" id="shopPanelWallet" data-shop-panel="wallet">
+        <div class="wallet-hero">
+          <div>
+            <div class="shop-panel-kicker">Your collectibles</div>
+            <div class="shop-panel-title">My Wallet</div>
+          </div>
+          <div class="wallet-balance" id="shopWalletBalance">—</div>
+        </div>
+        <div class="wallet-section">
+          <div class="wallet-section-head">
+            <div><b>Gifts</b><span>Sell to Rift or list on MKRT</span></div>
+            <span id="walletGiftCount">0</span>
+          </div>
+          <div class="wallet-gift-grid" id="walletGiftGrid"><div class="loading">Loading…</div></div>
+        </div>
+        <div class="wallet-section">
+          <div class="wallet-section-head">
+            <div><b>Anonymous Numbers</b><span>Pin one number to your profile</span></div>
+            <span id="walletAnonCount">0</span>
+          </div>
+          <div class="anon-grid wallet-anon-grid" id="walletAnonGrid"></div>
+        </div>
+      </section>
     </div>
   </main>
 
@@ -3559,6 +4110,22 @@
   </div>
 </div>
 
+<div class="modal-bg" id="mkrtListModal" onclick="if(event.target.id==='mkrtListModal')closeMkrtListModal()">
+  <div class="modal shop-list-modal" style="position:relative">
+    <button class="modal-close" onclick="closeMkrtListModal()">✕</button>
+    <div class="modal-title">List on MKRT</div>
+    <div class="shop-list-gift" id="mkrtListGift"></div>
+    <label class="shop-field-label" for="mkrtListPrice">Your asking price</label>
+    <div class="shop-price-input">
+      <input class="input bet-input" id="mkrtListPrice" type="text" inputmode="numeric" placeholder="Custom price">
+      <span>WRK$</span>
+    </div>
+    <div class="shop-list-note">The buyer pays you the full listed amount. You can cancel before it sells.</div>
+    <button class="btn" id="mkrtListSubmit" style="width:100%" onclick="submitMkrtListing()">Publish listing</button>
+    <div class="error-msg" id="mkrtListErr"></div>
+  </div>
+</div>
+
 <script>
 const API = '';  // same origin
 
@@ -3802,7 +4369,7 @@ function showPage(id, btn) {
   haptic();
   if (id === 'lb') loadLeaderboard(state.lbTab);
   if (id === 'work') openWorkPage();
-  if (id === 'market') { loadMarketCollections(); loadMarket(true); }
+  if (id === 'market') openShopHub();
   if (id === 'profile') openProfilePage();
   if (id === 'games') _startGameTimers(); else _stopGameTimers();
   updateTelegramBackButton();
@@ -4426,6 +4993,11 @@ function _pinnedBadgeHtml(pg) {
   return `<span class="pin-badge" title="${esc(pg.model_name)} #${pg.gift_number}" style="cursor:pointer" onclick="openProfileGiftModal(${pg.id})">${imgHtml}</span>`;
 }
 
+function _pinnedAnonHtml(anon) {
+  if (!anon) return '';
+  return `<span class="profile-anon-pin" title="Anonymous WRK$ Number">${esc(anon.number)}</span>`;
+}
+
 function _buildGiftCardHtml(g, isOwn, pinnedGiftId) {
   if (!window._profileGiftContext) window._profileGiftContext = {};
   window._profileGiftContext[g.id] = { isOwn: !!isOwn, pinnedGiftId: pinnedGiftId || null };
@@ -4528,11 +5100,16 @@ function buildProfileHtml(d, isOwn) {
         <div class="profile-id">Telegram ID ${d.user_id}</div>
         ${d.pinned_gift ? `
           <div class="profile-pinned-line">
-            <span class="profile-pinned-label">Pinned</span>
+            <span class="profile-pinned-label">Gift</span>
             ${_pinnedBadgeHtml(d.pinned_gift)}
           </div>` : isOwn ? `
           <div class="profile-pinned-line">
             <span class="profile-pinned-empty">Tap a gift below to pin it to your profile</span>
+          </div>` : ''}
+        ${d.pinned_anon ? `
+          <div class="profile-pinned-line">
+            <span class="profile-pinned-label">Number</span>
+            ${_pinnedAnonHtml(d.pinned_anon)}
           </div>` : ''}
       </div>
       <div class="profile-badges-panel">
@@ -6551,6 +7128,425 @@ function handleShiftComplete(result) {
 
 // ── Market ────────────────────────────────────────────────────────────────────
 let _marketItems = [];
+let _shopSection = 'rift';
+let _mkrtItems = [];
+let _mkrtOffset = 0;
+let _mkrtTotal = 0;
+let _mkrtSearch = '';
+let _mkrtSearchTimer = null;
+let _anonItems = [];
+let _anonOffset = 0;
+let _anonTotal = 0;
+let _anonSearch = '';
+let _anonSearchTimer = null;
+let _shopWallet = null;
+let _mkrtListingGiftId = null;
+
+function openShopHub() {
+  setShopSection(_shopSection || 'rift', true);
+}
+
+function setShopSection(section, force = false) {
+  if (!['rift','mkrt','fragsmint','wallet'].includes(section)) section = 'rift';
+  _shopSection = section;
+  document.querySelectorAll('#shopMenu .shop-menu-card').forEach(card => {
+    card.classList.toggle('active', card.dataset.shop === section);
+  });
+  document.querySelectorAll('[data-shop-panel]').forEach(panel => {
+    panel.classList.toggle('active', panel.dataset.shopPanel === section);
+  });
+  if (section === 'rift') {
+    loadMarketCollections();
+    if (force || !_marketItems.length) loadMarket(true);
+  } else if (section === 'mkrt') {
+    loadMkrt(true);
+  } else if (section === 'fragsmint') {
+    loadFragsmint(true);
+  } else {
+    loadShopWallet();
+  }
+  haptic();
+}
+
+function _shopGiftEmoji(g, className = '') {
+  if (g.custom_emoji_id) {
+    return `<img class="${className}" src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<span>${esc(g.model_emoji || '🎁')}</span>'">`;
+  }
+  return `<span>${esc(g.model_emoji || '🎁')}</span>`;
+}
+
+function _shopToast(message, kind = 'success') {
+  const old = document.getElementById('shopToast');
+  if (old) old.remove();
+  const toast = document.createElement('div');
+  toast.id = 'shopToast';
+  toast.className = 'lobby-toast show';
+  toast.style.borderColor = kind === 'error' ? 'rgba(251,113,133,.35)' : 'rgba(52,211,153,.35)';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  haptic(kind === 'error' ? 'error' : 'success');
+  setTimeout(() => toast.remove(), 2600);
+}
+
+function _shopConfirm(title, detailHtml, confirmText, onConfirm, danger = false) {
+  document.getElementById('marketConfirmBar')?.remove();
+  const bar = document.createElement('div');
+  bar.id = 'marketConfirmBar';
+  bar.style.cssText = 'position:fixed;bottom:calc(var(--nav-h) + 12px);left:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;z-index:1200;display:flex;flex-direction:column;gap:10px;box-shadow:0 -4px 24px rgba(0,0,0,.5)';
+  bar.innerHTML = `
+    <div style="font-size:14px;font-weight:800">${title}</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.45">${detailHtml}</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn outline shop-confirm-cancel" style="flex:1">Cancel</button>
+      <button class="btn ${danger ? 'red-btn' : 'green-btn'} shop-confirm-ok" style="flex:1">${confirmText}</button>
+    </div>
+    <div class="error-msg shop-confirm-error"></div>`;
+  bar.querySelector('.shop-confirm-cancel').onclick = () => bar.remove();
+  bar.querySelector('.shop-confirm-ok').onclick = async event => {
+    const btn = event.currentTarget;
+    btn.disabled = true;
+    const oldText = btn.textContent;
+    btn.textContent = '…';
+    try {
+      await onConfirm();
+      bar.remove();
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = oldText;
+      bar.querySelector('.shop-confirm-error').textContent = e.message;
+      haptic('error');
+    }
+  };
+  document.body.appendChild(bar);
+}
+
+function onMkrtSearch(value) {
+  clearTimeout(_mkrtSearchTimer);
+  _mkrtSearchTimer = setTimeout(() => {
+    _mkrtSearch = value.trim();
+    loadMkrt(true);
+  }, 280);
+}
+
+async function loadMkrt(reset = false) {
+  if (reset) _mkrtOffset = 0;
+  const grid = document.getElementById('mkrtGrid');
+  if (!grid) return;
+  if (_mkrtOffset === 0) grid.innerHTML = '<div class="loading">Loading MKRT…</div>';
+  const params = new URLSearchParams({
+    limit: 40,
+    offset: _mkrtOffset,
+    ...(_mkrtSearch && { search: _mkrtSearch }),
+  });
+  try {
+    const data = await api(`/api/mkrt?${params}`);
+    _mkrtTotal = data.total;
+    if (_mkrtOffset === 0) _mkrtItems = [];
+    if (_mkrtOffset === 0 && !data.items.length) {
+      grid.innerHTML = '<div class="empty">No active MKRT listings yet</div>';
+      return;
+    }
+    _mkrtItems.push(...data.items);
+    const cards = data.items.map(g => {
+      const bg = BG_HEX[g.background] || '#161717';
+      const isOwn = state.userId && +state.userId === +g.seller_id;
+      const emoji = g.custom_emoji_id
+        ? `<img class="market-emoji-img" src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<div class=\\'market-emoji\\'>${esc(g.model_emoji || '🎁')}</div>'">`
+        : `<div class="market-emoji">${esc(g.model_emoji || '🎁')}</div>`;
+      return `
+        <article class="market-card mkrt-card" style="background:${bg}">
+          <div class="market-glow"></div>
+          <div class="market-num-badge">#${g.gift_number}</div>
+          ${emoji}
+          <div class="market-col">${esc(fmtCollection(g.collection))}</div>
+          <div class="market-name">${esc(g.model_name)}</div>
+          <div class="mkrt-card-owner">by ${esc(g.seller_name)}</div>
+          <div class="market-price">${fmtK(g.price)} ${WRK}</div>
+          <div class="mkrt-card-actions">
+            ${isOwn
+              ? `<button class="market-buy-btn cancel" onclick="cancelMkrtListing(${g.listing_id})">Cancel listing</button>`
+              : `<button class="market-buy-btn" onclick="confirmMkrtBuy(${g.listing_id})">Buy from collector</button>`}
+          </div>
+        </article>`;
+    }).join('');
+    if (_mkrtOffset === 0) grid.innerHTML = cards;
+    else {
+      document.getElementById('mkrtLoadMore')?.remove();
+      grid.insertAdjacentHTML('beforeend', cards);
+    }
+    _mkrtOffset += data.items.length;
+    if (_mkrtOffset < _mkrtTotal) {
+      grid.insertAdjacentHTML('beforeend',
+        `<button class="btn outline market-load-more" id="mkrtLoadMore" onclick="loadMkrt()">Load more (${_mkrtTotal-_mkrtOffset})</button>`);
+    }
+  } catch (e) {
+    grid.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+  }
+}
+
+function confirmMkrtBuy(listingId) {
+  if (!state.userId) return alert('Open in Telegram to buy.');
+  const item = _mkrtItems.find(g => g.listing_id === listingId);
+  if (!item) return;
+  _shopConfirm(
+    `Buy ${esc(item.model_name)} #${item.gift_number}?`,
+    `Pay <b style="color:#fff">${fmt(item.price)} ${WRK}</b> to ${esc(item.seller_name)}. The gift transfers to your wallet immediately.`,
+    'Buy',
+    async () => {
+      const data = await api(`/api/mkrt/${listingId}/buy`, {
+        method:'POST',
+        json:{ user_id:+state.userId },
+      });
+      state.balance = data.new_balance;
+      refreshHeaderBal();
+      _shopToast(`Purchased gift #${data.gift_number} from MKRT`);
+      loadMkrt(true);
+    },
+  );
+}
+
+async function cancelMkrtListing(listingId) {
+  if (!state.userId) return;
+  try {
+    await api(`/api/mkrt/${listingId}/cancel`, {
+      method:'POST',
+      json:{ user_id:+state.userId },
+    });
+    _shopToast('MKRT listing cancelled');
+    if (_shopSection === 'wallet') loadShopWallet();
+    else loadMkrt(true);
+  } catch (e) {
+    _shopToast(e.message, 'error');
+  }
+}
+
+function _anonCardHtml(item, walletMode = false) {
+  const rarity = item.rarity || 'standard';
+  const glow = {
+    iconic:'rgba(245,158,11,.38)',
+    elite:'rgba(217,70,239,.34)',
+    premium:'rgba(14,165,233,.34)',
+    select:'rgba(99,102,241,.3)',
+    standard:'rgba(82,174,235,.24)',
+  }[rarity];
+  const action = walletMode
+    ? `<button class="anon-action-btn ${item.is_pinned ? 'pinned' : ''}" onclick="pinAnonNumber(${item.is_pinned ? 'null' : item.id})">${item.is_pinned ? '📌 Pinned · tap to unpin' : '📌 Pin to profile'}</button>`
+    : `<button class="anon-action-btn" onclick="confirmAnonBuy(${item.id})">Buy number</button>`;
+  return `
+    <article class="anon-card" style="--anon-glow:${glow}">
+      <div class="anon-card-art">
+        <div class="anon-logo-box">
+          <img src="/emoji/5093898072811898950" alt="WRK$" onerror="this.outerHTML='<span class=\\'anon-logo-fallback\\'>WRK$</span>'">
+        </div>
+        <div class="anon-number">${esc(item.number)}</div>
+      </div>
+      <div class="anon-card-body">
+        <div class="anon-card-title">Anonymous WRK$ Number</div>
+        <div class="anon-card-meta">
+          <span class="anon-rarity ${rarity}">${esc(rarity)}</span>
+          <span class="anon-price">${fmtK(item.price)} ${WRK}</span>
+        </div>
+        <div class="anon-card-actions">${action}</div>
+      </div>
+    </article>`;
+}
+
+function onAnonSearch(value) {
+  clearTimeout(_anonSearchTimer);
+  _anonSearchTimer = setTimeout(() => {
+    _anonSearch = value.trim();
+    loadFragsmint(true);
+  }, 260);
+}
+
+async function loadFragsmint(reset = false) {
+  if (reset) _anonOffset = 0;
+  const grid = document.getElementById('anonGrid');
+  if (!grid) return;
+  if (_anonOffset === 0) grid.innerHTML = '<div class="loading">Opening Fragsmint…</div>';
+  const params = new URLSearchParams({
+    limit: 40,
+    offset: _anonOffset,
+    ...(_anonSearch && { search:_anonSearch }),
+  });
+  try {
+    const data = await api(`/api/fragsmint?${params}`);
+    _anonTotal = data.total;
+    if (_anonOffset === 0) _anonItems = [];
+    if (_anonOffset === 0 && !data.items.length) {
+      grid.innerHTML = '<div class="empty">No available numbers match that search</div>';
+      return;
+    }
+    _anonItems.push(...data.items);
+    const cards = data.items.map(item => _anonCardHtml(item)).join('');
+    if (_anonOffset === 0) grid.innerHTML = cards;
+    else {
+      document.getElementById('anonLoadMore')?.remove();
+      grid.insertAdjacentHTML('beforeend', cards);
+    }
+    _anonOffset += data.items.length;
+    if (_anonOffset < _anonTotal) {
+      grid.insertAdjacentHTML('beforeend',
+        `<button class="btn outline market-load-more" id="anonLoadMore" onclick="loadFragsmint()">Load more (${_anonTotal-_anonOffset})</button>`);
+    }
+  } catch (e) {
+    grid.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+  }
+}
+
+function confirmAnonBuy(anonId) {
+  if (!state.userId) return alert('Open in Telegram to buy.');
+  const item = _anonItems.find(a => a.id === anonId);
+  if (!item) return;
+  _shopConfirm(
+    `Mint ${esc(item.number)}?`,
+    `This Anonymous WRK$ Number costs <b style="color:#fff1c8">${fmt(item.price)} ${WRK}</b> and will move into My Wallet.`,
+    'Buy number',
+    async () => {
+      const data = await api('/api/fragsmint/buy', {
+        method:'POST',
+        json:{ user_id:+state.userId, anon_id:anonId },
+      });
+      state.balance = data.new_balance;
+      refreshHeaderBal();
+      _shopToast(`${data.number} added to your wallet`);
+      loadFragsmint(true);
+    },
+  );
+}
+
+async function loadShopWallet() {
+  const giftGrid = document.getElementById('walletGiftGrid');
+  const anonGrid = document.getElementById('walletAnonGrid');
+  if (!state.userId) {
+    giftGrid.innerHTML = '<div class="empty">Open the mini-app in Telegram to see your wallet.</div>';
+    anonGrid.innerHTML = '';
+    return;
+  }
+  giftGrid.innerHTML = '<div class="loading">Loading gifts…</div>';
+  anonGrid.innerHTML = '<div class="loading">Loading numbers…</div>';
+  try {
+    const data = await api(`/api/wallet?user_id=${state.userId}`);
+    _shopWallet = data;
+    state.balance = data.balance;
+    refreshHeaderBal();
+    document.getElementById('shopWalletBalance').innerHTML = `${fmtK(data.balance)} ${WRK}`;
+    document.getElementById('walletGiftCount').textContent = fmt(data.gifts.length);
+    document.getElementById('walletAnonCount').textContent = fmt(data.anon_numbers.length);
+    giftGrid.innerHTML = data.gifts.length
+      ? data.gifts.map(g => {
+          const listed = !!g.listing_id;
+          return `
+            <article class="wallet-gift-card">
+              <div class="wallet-gift-top">
+                <div class="wallet-gift-emoji">${_shopGiftEmoji(g)}</div>
+                <div class="wallet-gift-copy">
+                  <div class="wallet-gift-name">${esc(g.model_name)} #${g.gift_number}</div>
+                  <div class="wallet-gift-sub">${esc(fmtCollection(g.collection))} · ${esc(fmtBackground(g.background))}</div>
+                </div>
+              </div>
+              <div class="wallet-gift-value">${listed
+                ? `Listed for <b>${fmtK(g.listing_price)} ${WRK}</b>`
+                : `Rift buyback <b>${fmtK(g.buyback_price)} ${WRK}</b>`}</div>
+              <div class="wallet-gift-actions">
+                ${g.staked
+                  ? '<button class="cancel" disabled>Staked · unavailable</button>'
+                  : listed
+                  ? `<button class="cancel" onclick="cancelMkrtListing(${g.listing_id})">Cancel MKRT listing</button>`
+                  : `<button class="sell" onclick="confirmRiftSell(${g.id})">Sell to Rift</button>
+                     <button class="list" onclick="openMkrtListModal(${g.id})">List on MKRT</button>`}
+              </div>
+            </article>`;
+        }).join('')
+      : '<div class="empty">No gifts in your wallet yet</div>';
+    anonGrid.innerHTML = data.anon_numbers.length
+      ? data.anon_numbers.map(item => _anonCardHtml(item, true)).join('')
+      : '<div class="empty">No anonymous numbers yet — visit Fragsmint.</div>';
+  } catch (e) {
+    giftGrid.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+    anonGrid.innerHTML = '';
+  }
+}
+
+function confirmRiftSell(giftId) {
+  const gift = _shopWallet?.gifts.find(g => g.id === giftId);
+  if (!gift) return;
+  _shopConfirm(
+    `Sell ${esc(gift.model_name)} #${gift.gift_number} to Rift?`,
+    `Rift will pay <b style="color:#cabaff">${fmt(gift.buyback_price)} ${WRK}</b> (80% of current value). This moves the gift back into Rift inventory.`,
+    'Sell gift',
+    async () => {
+      const data = await api('/api/rift/sell', {
+        method:'POST',
+        json:{ user_id:+state.userId, gift_id:giftId },
+      });
+      state.balance = data.new_balance;
+      refreshHeaderBal();
+      _shopToast(`Sold gift #${data.gift_number} to Rift`);
+      loadShopWallet();
+      _marketItems = [];
+    },
+    true,
+  );
+}
+
+function openMkrtListModal(giftId) {
+  const gift = _shopWallet?.gifts.find(g => g.id === giftId);
+  if (!gift || gift.listing_id) return;
+  _mkrtListingGiftId = giftId;
+  document.getElementById('mkrtListGift').innerHTML = `
+    <div class="wallet-gift-emoji">${_shopGiftEmoji(gift)}</div>
+    <div><b>${esc(gift.model_name)} #${gift.gift_number}</b><div style="margin-top:3px;color:var(--muted);font-size:10px">Current Rift value: ${fmt(gift.current_price)} ${WRK}</div></div>`;
+  document.getElementById('mkrtListPrice').value = fmt(gift.current_price);
+  document.getElementById('mkrtListErr').textContent = '';
+  document.getElementById('mkrtListSubmit').disabled = false;
+  document.getElementById('mkrtListModal').classList.add('open');
+}
+
+function closeMkrtListModal() {
+  document.getElementById('mkrtListModal').classList.remove('open');
+  _mkrtListingGiftId = null;
+}
+
+async function submitMkrtListing() {
+  if (!_mkrtListingGiftId) return;
+  const price = Number(document.getElementById('mkrtListPrice').value.replace(/,/g,''));
+  const err = document.getElementById('mkrtListErr');
+  if (!Number.isSafeInteger(price) || price < 10) {
+    err.textContent = 'Enter a whole-number price of at least 10 WRK$.';
+    return;
+  }
+  const btn = document.getElementById('mkrtListSubmit');
+  btn.disabled = true;
+  err.textContent = '';
+  try {
+    await api('/api/mkrt/list', {
+      method:'POST',
+      json:{ user_id:+state.userId, gift_id:_mkrtListingGiftId, price },
+    });
+    closeMkrtListModal();
+    _shopToast('Gift listed on MKRT');
+    loadShopWallet();
+  } catch (e) {
+    err.textContent = e.message;
+    btn.disabled = false;
+  }
+}
+
+async function pinAnonNumber(anonId) {
+  if (!state.userId) return;
+  try {
+    await api('/api/profile/pin-anon', {
+      method:'POST',
+      json:{ user_id:+state.userId, anon_id:anonId },
+    });
+    _shopToast(anonId === null ? 'Anonymous number unpinned' : 'Anonymous number pinned');
+    loadShopWallet();
+    if (document.getElementById('page-profile').classList.contains('active')) loadOwnProfile();
+  } catch (e) {
+    _shopToast(e.message, 'error');
+  }
+}
 
 const BG_HEX = {
   black: '#161717', onyx: '#33373a', grape: '#7e52a4',
