@@ -2377,6 +2377,395 @@
   }
   .game-modal--case .case-item-emoji { font-size: 36px; }
 
+  /* ── Telegram-inspired profiles ── */
+  #page-profile { padding-bottom: calc(18px + var(--safe-bottom)); }
+  #ownProfileWrap,
+  #profileSearchWrap,
+  #profileContent { gap: 10px !important; }
+  .profile-search-launch {
+    min-height: 44px;
+    border-color: rgba(82,174,235,.28) !important;
+    border-radius: 14px !important;
+    background: rgba(82,174,235,.075) !important;
+    color: #8ed0fa !important;
+  }
+  #profileTabRow {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 4px;
+    margin: 0;
+    padding: 4px;
+    overflow: visible;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 15px;
+    background: rgba(255,255,255,.035);
+    mask-image: none;
+  }
+  #profileTabRow .tab-btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 38px;
+    padding: 8px 5px;
+    border-color: transparent;
+    border-radius: 11px;
+    background: transparent;
+    font-size: 12px;
+  }
+  #profileTabRow .tab-btn.active {
+    border-color: rgba(82,174,235,.28);
+    background: rgba(82,174,235,.16);
+    color: #9bd8ff;
+    box-shadow: 0 3px 12px rgba(0,0,0,.16);
+  }
+  .profile-search-card {
+    border-color: rgba(82,174,235,.16);
+    border-radius: 18px;
+    background: linear-gradient(145deg, rgba(82,174,235,.07), var(--card));
+  }
+  .profile-hero {
+    overflow: hidden;
+    padding: 0 0 15px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 24px;
+    background: linear-gradient(180deg, #151722, #10111a);
+    text-align: center;
+    box-shadow: 0 18px 44px rgba(0,0,0,.23);
+  }
+  .profile-cover {
+    position: relative;
+    height: 105px;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 72% 5%, rgba(255,255,255,.2), transparent 26%),
+      radial-gradient(circle at 18% 88%, rgba(126,231,255,.2), transparent 28%),
+      linear-gradient(135deg, #168acd, #277fc3 52%, #6451bb);
+  }
+  .profile-cover::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    opacity: .18;
+    background:
+      linear-gradient(30deg, transparent 46%, rgba(255,255,255,.3) 47% 49%, transparent 50%) 0 0 / 42px 42px,
+      linear-gradient(-30deg, transparent 46%, rgba(255,255,255,.18) 47% 49%, transparent 50%) 0 0 / 42px 42px;
+  }
+  .profile-cover-label {
+    position: absolute;
+    top: 14px;
+    left: 16px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: rgba(255,255,255,.78);
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 1.55px;
+    text-transform: uppercase;
+  }
+  .profile-cover-label::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border: 2px solid rgba(255,255,255,.88);
+    border-radius: 50%;
+    box-shadow: 0 0 12px rgba(255,255,255,.35);
+  }
+  .profile-avatar-shell {
+    position: relative;
+    z-index: 2;
+    width: 104px;
+    height: 104px;
+    margin: -55px auto 0;
+    padding: 4px;
+    border-radius: 50%;
+    background: #11121b;
+    box-shadow: 0 10px 24px rgba(0,0,0,.34);
+  }
+  .profile-avatar-shell .avatar {
+    width: 96px;
+    height: 96px;
+    margin: 0;
+    border: 2px solid rgba(255,255,255,.12);
+    font-size: 34px;
+  }
+  .profile-avatar-shell .profile-presence {
+    position: absolute;
+    right: 5px;
+    bottom: 8px;
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    border: 4px solid #11121b;
+    border-radius: 50%;
+    background: #34c759;
+    box-shadow: 0 0 12px rgba(52,199,89,.55);
+  }
+  .profile-identity { padding: 10px 16px 0; }
+  .profile-name-wrap { gap: 6px; }
+  .profile-name {
+    max-width: 100%;
+    margin: 0;
+    overflow: hidden;
+    font-size: 23px;
+    font-weight: 820;
+    letter-spacing: -.45px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .profile-id {
+    margin: 5px 0 0;
+    color: #82909c;
+    font-size: 11px;
+    letter-spacing: .15px;
+  }
+  .profile-pinned-line {
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-top: 8px;
+  }
+  .profile-pinned-label {
+    color: #74818e;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .profile-pinned-empty {
+    color: #6f7a85;
+    font-size: 11px;
+  }
+  .pin-badge {
+    min-height: 27px;
+    padding: 3px 9px 3px 5px;
+    border-color: rgba(82,174,235,.25);
+    background: rgba(82,174,235,.11);
+    color: #b7e2fc;
+  }
+  .pin-badge img { width: 20px; height: 20px; }
+  .profile-badges-panel {
+    margin: 14px 14px 0;
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 17px;
+    background: rgba(255,255,255,.027);
+  }
+  .profile-panel-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 9px;
+    color: #8b98a5;
+    font-size: 9px;
+    font-weight: 850;
+    letter-spacing: 1.05px;
+    text-transform: uppercase;
+  }
+  .profile-panel-title span:last-child {
+    color: #54606b;
+    font-size: 8px;
+    letter-spacing: .35px;
+  }
+  .profile-badges-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 8px;
+  }
+  .profile-badge-slot {
+    min-height: 52px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 13px;
+    background: rgba(3,7,18,.3);
+  }
+  .profile-badge-slot.filled {
+    border-color: rgba(82,174,235,.2);
+    background: radial-gradient(circle, rgba(82,174,235,.13), rgba(3,7,18,.32));
+  }
+  .profile-badge-slot.empty::before {
+    content: "+";
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    border: 1px dashed rgba(148,163,184,.24);
+    border-radius: 50%;
+    color: rgba(148,163,184,.34);
+    font-size: 17px;
+    font-weight: 400;
+  }
+  .profile-badge {
+    width: 34px;
+    height: 34px;
+  }
+  .profile-stats {
+    margin: 14px 14px 0;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 17px;
+    background: rgba(255,255,255,.027);
+  }
+  .profile-stats .pstat { padding: 13px 6px 12px; }
+  .profile-stats .pstat + .pstat { border-left: 1px solid rgba(255,255,255,.07); }
+  .profile-stats .pstat .v { font-size: 17px; font-weight: 820; }
+  .profile-stats .pstat .l {
+    margin-top: 4px;
+    color: #788592;
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: .75px;
+    text-transform: uppercase;
+  }
+  .profile-ranks {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 12px 14px 0;
+  }
+  .profile-ranks .rank-pill {
+    padding: 5px 9px;
+    border-color: rgba(255,255,255,.07);
+    background: rgba(3,7,18,.28);
+    color: #b4bec8;
+    font-size: 10px;
+  }
+  .profile-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 8px;
+    margin: 12px 14px 0;
+  }
+  .profile-feature {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 15px;
+    background: rgba(255,255,255,.027);
+    text-align: left;
+  }
+  .profile-feature-icon {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 9px;
+    border-radius: 10px;
+    background: rgba(82,174,235,.12);
+    font-size: 15px;
+  }
+  .profile-feature-label {
+    overflow: hidden;
+    color: #74818e;
+    font-size: 8px;
+    font-weight: 850;
+    letter-spacing: .75px;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .profile-feature-value {
+    margin-top: 4px;
+    overflow: hidden;
+    color: #edf5fb;
+    font-size: 15px;
+    font-weight: 800;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .profile-tags { margin: 12px 14px 0; gap: 6px; }
+  .profile-tag {
+    border: 1px solid rgba(82,174,235,.18);
+    background: rgba(82,174,235,.09);
+    color: #8ed0fa;
+    font-size: 9px;
+  }
+  .profile-stat-picker {
+    width: calc(100% - 28px);
+    margin: 10px 14px 0;
+    padding: 10px 12px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 13px;
+    outline: none;
+    background: #0c0d15;
+    color: #dbe5ec;
+    font-size: 11px;
+  }
+  .profile-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 7px;
+    margin: 13px 14px 0;
+  }
+  .profile-actions .btn {
+    min-width: 0;
+    padding: 10px 5px;
+    border-radius: 12px;
+    font-size: 10px;
+  }
+  .profile-collection {
+    padding: 15px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.018));
+    box-shadow: 0 14px 35px rgba(0,0,0,.16);
+  }
+  .profile-collection-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .profile-collection-copy { min-width: 0; }
+  .profile-collection-kicker {
+    color: #52aeeb;
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 1.25px;
+    text-transform: uppercase;
+  }
+  .profile-collection-title {
+    margin-top: 3px;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -.2px;
+  }
+  .profile-collection-sub {
+    margin-top: 3px;
+    color: #74818e;
+    font-size: 10px;
+  }
+  .profile-collection #reorderBtn {
+    flex: none;
+    padding: 7px 10px !important;
+    border-color: rgba(82,174,235,.25);
+    border-radius: 10px;
+    color: #8ed0fa;
+    font-size: 10px !important;
+  }
+  .profile-collection .gifts-grid { gap: 9px; }
+  .profile-collection .gift-card {
+    min-width: 0;
+    padding: 11px 6px;
+    overflow: hidden;
+    border-color: rgba(255,255,255,.08);
+    border-radius: 16px;
+    box-shadow: inset 0 1px rgba(255,255,255,.04);
+    transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+  }
+  .profile-collection .gift-card:active { transform: scale(.96); }
+  .profile-collection .gift-card.pinned-gift {
+    border-color: #52aeeb;
+    box-shadow: 0 0 0 1px rgba(82,174,235,.35), 0 8px 20px rgba(17,120,190,.16);
+  }
+  .profile-collection .gift-card .gname { font-size: 10px; }
+  .profile-collection .gift-card .gtier { font-size: 9px; text-transform: capitalize; }
+
   @media (min-width: 721px) {
     #app { border-inline: 1px solid var(--border); }
   }
@@ -2390,6 +2779,14 @@
     .lbj-table, .poker-table { border-width: 6px; padding-inline: 7px; }
     .lbj-card { width: 30px; height: 43px; font-size: 10px; }
     .play-card { width: 43px; height: 61px; }
+    .profile-cover { height: 92px; }
+    .profile-avatar-shell { width: 94px; height: 94px; margin-top: -49px; }
+    .profile-avatar-shell .avatar { width: 86px; height: 86px; }
+    .profile-name { font-size: 21px; }
+    .profile-feature-grid { grid-template-columns: 1fr; }
+    .profile-actions { grid-template-columns: 1fr; }
+    .profile-actions .btn { font-size: 11px; }
+    .profile-collection { padding-inline: 11px; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -2584,7 +2981,7 @@
     <div class="page" id="page-profile">
       <!-- Own profile (shown when logged in) -->
       <div id="ownProfileWrap" style="display:none;flex-direction:column;gap:12px">
-        <button class="btn outline" style="width:100%" onclick="togglePlayerSearch()">🔍 Look up a player</button>
+        <button class="btn outline profile-search-launch" style="width:100%" onclick="togglePlayerSearch()">⌕ Look up a Telegram player</button>
         <div class="tab-row" id="profileTabRow">
           <button class="tab-btn active" id="overviewTabBtn" onclick="setProfileTab('overview',this)">👤 Overview</button>
           <button class="tab-btn" id="tradesTabBtn" onclick="setProfileTab('trades',this)" style="display:none">🔄 Trades</button>
@@ -2614,11 +3011,11 @@
           </div>
           <div class="user-id-hint" style="margin-top:10px">Send <strong>/id</strong> in the bot to find it.</div>
         </div>
-        <button class="btn outline" style="width:100%" onclick="togglePlayerSearch()">🔍 Look up a player</button>
+        <button class="btn outline profile-search-launch" style="width:100%" onclick="togglePlayerSearch()">⌕ Look up a Telegram player</button>
       </div>
       <!-- Search other players (collapsible) -->
       <div id="profileSearchWrap" style="display:none;flex-direction:column;gap:12px">
-        <div class="card">
+        <div class="card profile-search-card">
           <div class="card-title">Look up a player</div>
           <div class="search-row">
             <input class="input" id="profileInput" placeholder="User ID or @username" onkeydown="if(event.key==='Enter')loadProfile()">
@@ -2909,7 +3306,7 @@
     <div style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:8px">Drag to set your win chance</div>
     <div class="slider-arrow-track"><div class="slider-arrow" id="sliderArrow">▼</div></div>
     <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
-      <button class="btn outline" style="padding:4px 12px;font-size:12px" onclick="flipSlider()">🔄 Flip</button>
+      <button class="btn outline slider-flip-btn" style="padding:4px 12px;font-size:12px" onclick="flipSlider()">🔄 Flip</button>
     </div>
     <div class="slider-bar-wrap" id="sliderBarWrap">
       <div class="slider-bar-red" id="sliderRed"></div>
@@ -3579,12 +3976,12 @@ async function loadOwnProfile() {
   try {
     const d = await api(`/api/profile/${state.userId}`);
     el.innerHTML = buildProfileHtml(d, true);
-    _loadProfileBadges(state.userId);
-    _setupGiftsObserver(el.querySelector('#giftsGrid'));
-    initAnimatedGiftsInGrid(el.querySelector('#giftsGrid'));
+    _loadProfileBadges(state.userId, el);
+    _setupGiftsObserver(el.querySelector('.gifts-grid'));
+    initAnimatedGiftsInGrid(el.querySelector('.gifts-grid'));
     const onlineData = await api('/api/presence/online').catch(()=>({online:[]}));
     const isOnline = onlineData.online.includes(+d.user_id);
-    const dot = document.getElementById('profileOnlineDot');
+    const dot = el.querySelector('[data-profile-online]');
     if (dot) dot.style.display = isOnline ? 'inline-block' : 'none';
   } catch(e) {
     el.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
@@ -3604,12 +4001,12 @@ async function loadProfile() {
     const isOwnProfile = state.userId && +state.userId === +d.user_id;
     content.innerHTML = buildProfileHtml(d, isOwnProfile);
     content.style.display = 'flex';
-    _loadProfileBadges(d.user_id);
-    _setupGiftsObserver(content.querySelector('#giftsGrid'));
-    initAnimatedGiftsInGrid(content.querySelector('#giftsGrid'));
+    _loadProfileBadges(d.user_id, content);
+    _setupGiftsObserver(content.querySelector('.gifts-grid'));
+    initAnimatedGiftsInGrid(content.querySelector('.gifts-grid'));
     const onlineData = await api('/api/presence/online').catch(()=>({online:[]}));
     const isOnline = onlineData.online.includes(+d.user_id);
-    const dot = document.getElementById('profileOnlineDot');
+    const dot = content.querySelector('[data-profile-online]');
     if (dot) dot.style.display = isOnline ? 'inline-block' : 'none';
     if (!isOwnProfile && state.userId) {
       const fs = await api(`/api/friends?user_id=${state.userId}`).catch(()=>({friends:[],outgoing:[],incoming:[]}));
@@ -4030,6 +4427,8 @@ function _pinnedBadgeHtml(pg) {
 }
 
 function _buildGiftCardHtml(g, isOwn, pinnedGiftId) {
+  if (!window._profileGiftContext) window._profileGiftContext = {};
+  window._profileGiftContext[g.id] = { isOwn: !!isOwn, pinnedGiftId: pinnedGiftId || null };
   const tierColor = { common:'', uncommon:'', rare:'rare', epic:'epic', legendary:'legendary' };
   const hasAnim = !!g.custom_emoji_id;
   const innerEmoji = g.custom_emoji_id
@@ -4058,18 +4457,27 @@ const _BADGE_EMOJI = {
   plush_pepe_1: BADGE_PLUSH1,
 };
 
-async function _loadProfileBadges(userId) {
-  const el = document.getElementById('profileBadges');
+function _profileBadgeSlotsHtml(badges = []) {
+  const known = badges.filter(b => _BADGE_EMOJI[b]);
+  const filled = known.map(b =>
+    `<span class="profile-badge-slot filled" data-badge="${esc(b)}">${_BADGE_EMOJI[b]}</span>`
+  ).join('');
+  const empty = Array.from({ length: Math.max(0, 3-known.length) }, () =>
+    '<span class="profile-badge-slot empty" title="Available badge slot" aria-label="Available badge slot"></span>'
+  ).join('');
+  return filled + empty;
+}
+
+async function _loadProfileBadges(userId, scopeEl = null) {
+  const el = scopeEl?.querySelector('[data-profile-badges]')
+    || document.querySelector('[data-profile-badges]');
   if (!el || !userId) return;
   try {
     const data = await api(`/api/user/badges/${userId}`);
-    const html = (data.badges || [])
-      .filter(b => _BADGE_EMOJI[b])
-      .map(b => _BADGE_EMOJI[b])
-      .join('');
-    el.innerHTML = html;
-    el.style.display = html ? 'flex' : 'none';
-  } catch { el.style.display = 'none'; }
+    el.innerHTML = _profileBadgeSlotsHtml(data.badges || []);
+  } catch {
+    el.innerHTML = _profileBadgeSlotsHtml([]);
+  }
 }
 
 function buildProfileHtml(d, isOwn) {
@@ -4082,7 +4490,14 @@ function buildProfileHtml(d, isOwn) {
   window._profileIsOwn = isOwn;
   window._profilePinnedId = d.pinned_gift_id || null;
   d.gifts.forEach(g => { window._profileGifts[g.id] = g; });
-  if (d.pinned_gift) window._profileGifts[d.pinned_gift.id] = d.pinned_gift;
+  if (d.pinned_gift) {
+    window._profileGifts[d.pinned_gift.id] = d.pinned_gift;
+    if (!window._profileGiftContext) window._profileGiftContext = {};
+    window._profileGiftContext[d.pinned_gift.id] = {
+      isOwn: !!isOwn,
+      pinnedGiftId: d.pinned_gift_id || null,
+    };
+  }
 
   // track scroll state
   _giftsProfileId = d.user_id;
@@ -4099,48 +4514,77 @@ function buildProfileHtml(d, isOwn) {
 
   return `
     <div class="profile-hero">
-      ${avatarHtml}
-      <div class="profile-name-wrap">
-        <span class="profile-name">${esc(d.name)}</span>
-        <span class="online-dot" id="profileOnlineDot" style="display:none"></span>
-        ${_pinnedBadgeHtml(d.pinned_gift)}
+      <div class="profile-cover">
+        <div class="profile-cover-label">Telegram profile</div>
       </div>
-      <div id="profileBadges" style="display:flex;gap:4px;justify-content:center;margin-top:4px"></div>
-      <div class="profile-id">ID: ${d.user_id}</div>
-      <div class="rank-pills">
-        <span class="rank-pill">💰 #${d.balance_rank} Balance</span>
-        <span class="rank-pill">🔥 #${d.streak_rank} Streak</span>
-        <span class="rank-pill">🎁 #${d.gift_rank} Gifts</span>
-        ${d.networth_rank !== undefined ? `<span class="rank-pill">💎 #${d.networth_rank} Net Worth</span>` : ''}
+      <div class="profile-avatar-shell">
+        ${avatarHtml}
+        <span class="profile-presence" data-profile-online style="display:none" title="Online"></span>
+      </div>
+      <div class="profile-identity">
+        <div class="profile-name-wrap">
+          <span class="profile-name">${esc(d.name)}</span>
+        </div>
+        <div class="profile-id">Telegram ID ${d.user_id}</div>
+        ${d.pinned_gift ? `
+          <div class="profile-pinned-line">
+            <span class="profile-pinned-label">Pinned</span>
+            ${_pinnedBadgeHtml(d.pinned_gift)}
+          </div>` : isOwn ? `
+          <div class="profile-pinned-line">
+            <span class="profile-pinned-empty">Tap a gift below to pin it to your profile</span>
+          </div>` : ''}
+      </div>
+      <div class="profile-badges-panel">
+        <div class="profile-panel-title"><span>Badges</span><span>3 profile slots</span></div>
+        <div class="profile-badges-strip" data-profile-badges aria-label="Profile badges">${_profileBadgeSlotsHtml([])}</div>
       </div>
       <div class="profile-stats">
-        <div class="pstat"><div class="v gold">${fmtK(d.balance)}</div><div class="l">${WRK}</div></div>
-        <div class="pstat"><div class="v green">${d.streak}</div><div class="l">day streak</div></div>
-        <div class="pstat"><div class="v purple">${d.gift_count}</div><div class="l">gifts</div></div>
+        <div class="pstat"><div class="v gold">${fmtK(d.balance)}</div><div class="l">Balance</div></div>
+        <div class="pstat"><div class="v green">${fmt(d.streak)}</div><div class="l">Day streak</div></div>
+        <div class="pstat"><div class="v purple">${fmt(d.gift_count)}</div><div class="l">Gifts</div></div>
       </div>
-      ${d.net_worth !== undefined ? `<div id="profileNetWorth" style="font-size:13px;color:var(--muted);margin-top:2px">💎 Net Worth: ${fmtK(d.net_worth)} ${WRK}</div>` : ''}
-      ${d.tags && d.tags.length > 0 ? `<div class="profile-tags">${d.tags.map(t => `<span class="profile-tag">${t}</span>`).join('')}</div>` : ''}
-      <div id="profileStatHighlight" style="margin-top:10px;text-align:center">
-        <div id="profileStatLabel" style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">${d.stat_highlight_label || ''}</div>
-        <div id="profileStatValue" style="font-size:20px;font-weight:800;margin-top:2px">${d.stat_highlight_value || '—'}</div>
+      <div class="profile-ranks">
+        <span class="rank-pill">💰 #${fmt(d.balance_rank)}</span>
+        <span class="rank-pill">🔥 #${fmt(d.streak_rank)}</span>
+        <span class="rank-pill">🎁 #${fmt(d.gift_rank)}</span>
+        ${d.networth_rank !== undefined ? `<span class="rank-pill">💎 #${fmt(d.networth_rank)}</span>` : ''}
       </div>
-      ${isOwn ? `<select id="pinnedStatPicker" style="margin-top:6px;background:var(--card);color:#fff;border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 10px;font-size:12px" onchange="setPinnedStat(this.value)">
+      <div class="profile-feature-grid">
+        ${d.net_worth !== undefined ? `
+          <div class="profile-feature">
+            <div class="profile-feature-icon">💎</div>
+            <div class="profile-feature-label">Net worth</div>
+            <div class="profile-feature-value">${fmtK(d.net_worth)} ${WRK}</div>
+          </div>` : ''}
+        <div class="profile-feature">
+          <div class="profile-feature-icon">📊</div>
+          <div class="profile-feature-label">${esc(d.stat_highlight_label || 'Profile highlight')}</div>
+          <div class="profile-feature-value">${esc(d.stat_highlight_value || '—')}</div>
+        </div>
+      </div>
+      ${d.tags && d.tags.length > 0 ? `<div class="profile-tags">${d.tags.map(t => `<span class="profile-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+      ${isOwn ? `<select id="pinnedStatPicker" class="profile-stat-picker" aria-label="Profile highlight" onchange="setPinnedStat(this.value)">
         ${[['crash_mult','Best Crash Mult'],['gamble_won','Total WRK$ Won'],['gamble_lost','Total WRK$ Lost'],['gifts_owned','Gifts Owned'],['streak','Day Streak']].map(([v,l]) => `<option value="${v}"${d.pinned_stat===v?' selected':''}>${l}</option>`).join('')}
       </select>` : ''}
       ${!isOwn && state.userId ? `
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
-        <button class="btn" style="flex:1" onclick="openSendWrk(${d.user_id}, '${esc(d.username || d.name)}')">💸 Send ${WRK}</button>
-        <button class="btn outline" style="flex:1" onclick="openTradeModal(${d.user_id})">🔄 Trade Gift</button>
-        <button class="btn outline" style="flex:1" id="addFriendBtn" onclick="sendFriendRequest(${d.user_id})">➕ Add Friend</button>
+      <div class="profile-actions">
+        <button class="btn" onclick="openSendWrk(${d.user_id}, '${esc(d.username || d.name)}')">💸 Send</button>
+        <button class="btn outline" onclick="openTradeModal(${d.user_id})">🔄 Trade</button>
+        <button class="btn outline" id="addFriendBtn" onclick="sendFriendRequest(${d.user_id})">＋ Friend</button>
       </div>` : ''}
     </div>
-    <div>
-      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-        <span>Gift Collection (${d.gift_count})${isOwn ? ' — tap to pin' : ''}</span>
+    <section class="profile-collection">
+      <div class="profile-collection-header">
+        <div class="profile-collection-copy">
+          <div class="profile-collection-kicker">Collectibles</div>
+          <div class="profile-collection-title">Gift collection · ${fmt(d.gift_count)}</div>
+          <div class="profile-collection-sub">${isOwn ? 'Tap a gift to view or pin it' : 'Tap a gift to view its details'}</div>
+        </div>
         ${isOwn ? `<button class="btn outline" id="reorderBtn" onclick="toggleReorderMode()" style="font-size:12px;padding:4px 10px">⠿ Reorder</button>` : ''}
       </div>
       <div class="gifts-grid" id="giftsGrid">${giftHtml}${sentinelHtml}</div>
-    </div>
+    </section>
   `;
 }
 
@@ -5040,11 +5484,11 @@ function flipSlider() {
 function _updateSliderUI() {
   const pct = _sliderGreenPct;
   const redPct = 100 - pct;
-  const handle = redPct;
+  const handle = _sliderFlipped ? pct : redPct;
   document.getElementById('sliderHandle').style.left = handle + '%';
   if (_sliderFlipped) {
-    document.getElementById('sliderGreen').style.cssText = 'position:absolute;top:0;left:0;right:auto;height:100%;background:#10b981;width:' + handle + '%';
-    document.getElementById('sliderRed').style.cssText = 'position:absolute;top:0;left:auto;right:0;height:100%;background:#dc2626;width:' + pct + '%';
+    document.getElementById('sliderGreen').style.cssText = 'position:absolute;top:0;left:0;right:auto;height:100%;background:#10b981;width:' + pct + '%';
+    document.getElementById('sliderRed').style.cssText = 'position:absolute;top:0;left:auto;right:0;height:100%;background:#dc2626;width:' + redPct + '%';
   } else {
     document.getElementById('sliderRed').style.cssText = 'position:absolute;top:0;left:0;right:auto;height:100%;background:#dc2626;width:' + redPct + '%';
     document.getElementById('sliderGreen').style.cssText = 'position:absolute;top:0;left:auto;right:0;height:100%;background:#10b981;width:' + pct + '%';
@@ -5095,7 +5539,7 @@ async function playSlider() {
   const errEl = document.getElementById('sliderErr');
   errEl.textContent = '';
   if (!bet || bet < 10) { errEl.innerHTML = 'Minimum bet is 10 ' + WRK; return; }
-  document.getElementById('sliderModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
+  document.getElementById('sliderModal').querySelectorAll('.slider-again-btn').forEach(b => b.remove());
   document.getElementById('sliderPlayBtn').disabled = true;
   document.getElementById('sliderBarWrap').style.pointerEvents = 'none';
   document.getElementById('sliderResult').className = 'result-box';
@@ -5114,12 +5558,12 @@ async function playSlider() {
 
     const resEl = document.getElementById('sliderResult');
     const delta = data.delta > 0 ? `+${fmt(data.delta)}` : fmt(data.delta);
-    resEl.textContent = data.won
+    resEl.innerHTML = data.won
       ? `✅ Landed green! ${delta} ${WRK} (${data.payout_mult}×)`
       : `❌ Landed red. ${delta} ${WRK}`;
     resEl.className = `result-box show ${data.won ? 'win-box' : 'lose-box'}`;
     resEl.insertAdjacentHTML('afterend',
-      `<button class="btn outline" style="width:100%;margin-top:8px" onclick="sliderPlayAgain(${bet})">⚡ Play Again</button>`);
+      `<button class="btn outline slider-again-btn" style="width:100%;margin-top:8px" onclick="sliderPlayAgain(${bet})">⚡ Play Again</button>`);
     state.balance = data.new_balance;
     document.getElementById('sliderBal').textContent = fmt(state.balance);
     refreshHeaderBal();
@@ -5134,7 +5578,7 @@ async function playSlider() {
 function sliderPlayAgain(bet) {
   document.getElementById('sliderBet').value = Number(bet).toLocaleString('en-US');
   document.getElementById('sliderResult').className = 'result-box';
-  const pa = document.getElementById('sliderModal').querySelector('.btn.outline');
+  const pa = document.getElementById('sliderModal').querySelector('.slider-again-btn');
   if (pa) pa.remove();
   playSlider();
 }
@@ -6382,9 +6826,12 @@ function openProfileGiftModal(giftId) {
   `;
 
   const buyBtn = document.getElementById('giftDetailBuyBtn');
-  const isOwn = window._profileIsOwn;
+  const giftContext = (window._profileGiftContext || {})[g.id];
+  const isOwn = giftContext ? giftContext.isOwn : window._profileIsOwn;
   if (isOwn) {
-    const isPinned = g.id === window._profilePinnedId;
+    const isPinned = giftContext
+      ? g.id === giftContext.pinnedGiftId
+      : g.id === window._profilePinnedId;
     buyBtn.style.display = '';
     buyBtn.className = 'btn outline';
     buyBtn.style.cssText = 'width:100%;padding:14px;font-size:16px;font-weight:800';
