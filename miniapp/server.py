@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import gzip
 import hashlib
 import hmac
@@ -9,11 +10,11 @@ import sys
 import time
 import urllib.parse
 import urllib.request
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -24,8 +25,103 @@ import config
 DB_PATH = config.DB_PATH
 STATIC_DIR = Path(__file__).parent / "static"
 
-app = FastAPI(title="wrk.money mini-app")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    background_tasks = await _startup()
+    try:
+        yield
+    finally:
+        for task in background_tasks:
+            task.cancel()
+        await asyncio.gather(*background_tasks, return_exceptions=True)
+
+
+app = FastAPI(title="wrk.money mini-app", lifespan=_lifespan)
+
+_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
+_SESSION_KEY = hmac.new(
+    config.BOT_TOKEN.encode(),
+    b"wrk.money mini-app session v1",
+    hashlib.sha256,
+).digest()
+
+
+def _b64url_encode(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).rstrip(b"=").decode()
+
+
+def _b64url_decode(value: str) -> bytes:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+
+
+def _issue_session_token(user_id: int, *, now: int | None = None) -> str:
+    issued_at = int(time.time()) if now is None else now
+    payload = _b64url_encode(json.dumps(
+        {"user_id": int(user_id), "iat": issued_at, "exp": issued_at + _SESSION_TTL_SECONDS},
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode())
+    signature = hmac.new(_SESSION_KEY, payload.encode(), hashlib.sha256).hexdigest()
+    return f"{payload}.{signature}"
+
+
+def _verify_session_token(token: str, *, now: int | None = None) -> int:
+    try:
+        payload, signature = token.split(".", 1)
+        expected = hmac.new(_SESSION_KEY, payload.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            raise ValueError("invalid signature")
+        data = json.loads(_b64url_decode(payload))
+        current_time = int(time.time()) if now is None else now
+        if int(data["exp"]) < current_time:
+            raise ValueError("expired")
+        return int(data["user_id"])
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise HTTPException(401, "Telegram session is invalid or expired") from exc
+
+
+def _authenticated_user(request: Request) -> int:
+    scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(401, "Open this mini-app from Telegram to sign in")
+    return _verify_session_token(token)
+
+
+AuthenticatedUser = Annotated[int, Depends(_authenticated_user)]
+
+
+def _require_actor(authenticated_user: int, claimed_user: int) -> None:
+    if authenticated_user != int(claimed_user):
+        raise HTTPException(403, "You cannot act as another Telegram user")
+
+
+def _require_owner(authenticated_user: int) -> None:
+    if authenticated_user != config.OWNER_ID:
+        raise HTTPException(403, "Owner access required")
+
+
+def _websocket_protocol(websocket: WebSocket) -> tuple[str, str] | None:
+    for protocol in websocket.headers.get("sec-websocket-protocol", "").split(","):
+        protocol = protocol.strip()
+        if protocol.startswith("wrk-auth."):
+            return protocol, protocol.removeprefix("wrk-auth.")
+    return None
+
+
+async def _accept_authenticated_websocket(websocket: WebSocket) -> int | None:
+    protocol_and_token = _websocket_protocol(websocket)
+    if not protocol_and_token:
+        await websocket.close(code=1008, reason="Telegram session required")
+        return None
+    protocol, token = protocol_and_token
+    try:
+        user_id = _verify_session_token(token)
+    except HTTPException:
+        await websocket.close(code=1008, reason="Telegram session expired")
+        return None
+    await websocket.accept(subprotocol=protocol)
+    return user_id
 
 
 @contextmanager
@@ -185,7 +281,7 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
     display   = f"@{username}" if username else (full_name or f"User {user_id}")
 
     gifts = db.execute(
-        "SELECT gi.id, gi.gift_number, gi.background, gi.acquired_at, "
+        "SELECT gi.id, gi.gift_number, gi.background, gi.acquired_at, gi.is_admin_gift, "
         "gm.model_name, gm.model_emoji, gm.tier, gm.collection, gm.custom_emoji_id, "
         "COALESCE(gp.current_price, 0) AS current_price "
         "FROM gift_instances gi JOIN gift_models gm ON gm.id = gi.model_id "
@@ -213,7 +309,7 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
     pinned_gift = None
     if row["pinned_gift_id"]:
         pg = db.execute(
-            "SELECT gi.id, gi.gift_number, gi.background, "
+            "SELECT gi.id, gi.gift_number, gi.background, gi.is_admin_gift, "
             "gm.model_name, gm.model_emoji, gm.custom_emoji_id, "
             "COALESCE(gp.current_price, 0) AS current_price "
             "FROM gift_instances gi JOIN gift_models gm ON gm.id = gi.model_id "
@@ -228,7 +324,7 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
            FROM gift_instances gi
            JOIN gift_models gm ON gm.id = gi.model_id
            JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
-           WHERE gi.owner_id = ?""",
+           WHERE gi.owner_id = ? AND COALESCE(gi.is_admin_gift, 0) = 0""",
         (user_id,)
     ).fetchone()[0]
     net_worth = row["balance"] + gift_value
@@ -236,7 +332,7 @@ def _load_profile(db, user_id: int, gifts_offset: int = 0, gifts_limit: int = 20
         """SELECT COUNT(*)+1 FROM (
                SELECT e.user_id, e.balance + COALESCE(SUM(gp.current_price),0) AS nw
                FROM economy e
-               LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id
+               LEFT JOIN gift_instances gi ON gi.owner_id = e.user_id AND COALESCE(gi.is_admin_gift,0)=0
                LEFT JOIN gift_models gm ON gm.id = gi.model_id
                LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background
                GROUP BY e.user_id
@@ -393,7 +489,8 @@ class ReorderRequest(BaseModel):
 
 
 @app.post("/api/profile/pin")
-def pin_gift(req: PinGiftRequest):
+def pin_gift(req: PinGiftRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         if req.gift_id is not None:
             row = db.execute(
@@ -419,7 +516,8 @@ class PinnedStatRequest(BaseModel):
 
 
 @app.patch("/api/profile/stat")
-def update_pinned_stat(req: PinnedStatRequest):
+def update_pinned_stat(req: PinnedStatRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     if req.pinned_stat not in _VALID_PINNED_STATS:
         raise HTTPException(400, f"pinned_stat must be one of: {', '.join(_VALID_PINNED_STATS)}")
     with db_conn() as db:
@@ -429,7 +527,8 @@ def update_pinned_stat(req: PinnedStatRequest):
 
 
 @app.post("/api/profile/reorder")
-def profile_reorder(req: ReorderRequest):
+def profile_reorder(req: ReorderRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         # Verify all gift_ids belong to this user
         placeholders = ",".join("?" * len(req.gift_ids))
@@ -640,7 +739,8 @@ def get_avatar(user_id: int):
 # ── Avatar debug ─────────────────────────────────────────────────────────────
 
 @app.get("/api/avatar-debug/{user_id}")
-def avatar_debug(user_id: int):
+def avatar_debug(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_owner(authenticated_user)
     token = config.BOT_TOKEN
     req = urllib.request.Request(
         f"https://api.telegram.org/bot{token}/getUserProfilePhotos",
@@ -671,11 +771,17 @@ def auth_telegram(req: TelegramAuthRequest):
     if not hmac.compare_digest(computed, received_hash):
         raise HTTPException(403, "Invalid signature")
 
-    auth_date = int(parsed.get("auth_date", 0))
-    if time.time() - auth_date > 86400:
+    try:
+        auth_date = int(parsed.get("auth_date", 0))
+    except ValueError as exc:
+        raise HTTPException(400, "Invalid auth_date") from exc
+    if auth_date <= 0 or abs(time.time() - auth_date) > 86400:
         raise HTTPException(403, "initData expired")
 
-    user = json.loads(parsed.get("user", "{}"))
+    try:
+        user = json.loads(parsed.get("user", "{}"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(400, "Invalid Telegram user data") from exc
     user_id = user.get("id")
     if not user_id:
         raise HTTPException(400, "No user in initData")
@@ -689,8 +795,18 @@ def auth_telegram(req: TelegramAuthRequest):
             )
             db.commit()
 
-    return {"user_id": user_id, "first_name": user.get("first_name", ""),
-            "username": user.get("username", ""), "photo_url": photo_url}
+    return {
+        "user_id": user_id,
+        "first_name": user.get("first_name", ""),
+        "username": user.get("username", ""),
+        "photo_url": photo_url,
+        "session_token": _issue_session_token(user_id),
+    }
+
+
+@app.get("/api/auth/session")
+def auth_session(authenticated_user: AuthenticatedUser):
+    return {"user_id": authenticated_user}
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
@@ -904,7 +1020,8 @@ def _deduct_and_check(db, user_id: int, bet: int) -> int:
 
 
 @app.post("/api/play/slots")
-def play_slots(req: BetRequest):
+def play_slots(req: BetRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         bal = _deduct_and_check(db, req.user_id, req.bet)
         reels = [random.choice(_SLOT_SYMBOLS) for _ in range(3)]
@@ -921,7 +1038,8 @@ def play_slots(req: BetRequest):
 
 
 @app.post("/api/play/coinflip")
-def play_coinflip(req: CoinflipRequest):
+def play_coinflip(req: CoinflipRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     if req.choice not in ("heads", "tails"):
         raise HTTPException(400, "choice must be heads or tails")
     with db_conn() as db:
@@ -956,7 +1074,8 @@ class RouletteRequest(BaseModel):
 
 
 @app.post("/api/play/roulette")
-def play_roulette(req: RouletteRequest):
+def play_roulette(req: RouletteRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     valid = {"red","black","green","odd","even","dozen1","dozen2","dozen3","col1","col2","col3"}
     if req.bet_type not in valid:
         raise HTTPException(400, f"bet_type must be one of: {', '.join(sorted(valid))}")
@@ -1017,7 +1136,8 @@ class SliderRequest(BaseModel):
 
 
 @app.post("/api/play/slider")
-def play_slider(req: SliderRequest):
+def play_slider(req: SliderRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     if not (5 <= req.green_pct <= 95):
         raise HTTPException(400, "green_pct must be between 5 and 95")
     with db_conn() as db:
@@ -1063,7 +1183,8 @@ class PlinkoRequest(BaseModel):
 
 
 @app.post("/api/play/plinko")
-def play_plinko(req: PlinkoRequest):
+def play_plinko(req: PlinkoRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     if req.risk not in _PLINKO_MULTS:
         raise HTTPException(400, "risk must be low, medium, or high")
     with db_conn() as db:
@@ -1100,7 +1221,8 @@ class WheelRequest(BaseModel):
 
 
 @app.post("/api/play/wheel")
-def play_wheel(req: WheelRequest):
+def play_wheel(req: WheelRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         bal = _deduct_and_check(db, req.user_id, req.bet)
         segment = random.randint(0, 11)
@@ -1140,7 +1262,8 @@ class CaseRequest(BaseModel):
 
 
 @app.post("/api/play/case")
-def play_case(req: CaseRequest):
+def play_case(req: CaseRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     import time as _time
     with db_conn() as db:
         row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
@@ -1225,7 +1348,8 @@ class CrapsRollRequest(BaseModel):
 
 
 @app.post("/api/play/craps/start")
-def craps_start(req: CrapsStartRequest):
+def craps_start(req: CrapsStartRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         existing = db.execute(
             "SELECT user_id FROM craps_sessions WHERE user_id = ?", (req.user_id,)
@@ -1245,7 +1369,8 @@ def craps_start(req: CrapsStartRequest):
 
 
 @app.post("/api/play/craps/roll")
-def craps_roll(req: CrapsRollRequest):
+def craps_roll(req: CrapsRollRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         sess = db.execute(
             "SELECT * FROM craps_sessions WHERE user_id = ?", (req.user_id,)
@@ -1310,7 +1435,8 @@ def craps_roll(req: CrapsRollRequest):
 
 
 @app.get("/api/play/craps/status/{user_id}")
-def craps_status(user_id: int):
+def craps_status(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
     with db_conn() as db:
         sess = db.execute("SELECT * FROM craps_sessions WHERE user_id = ?", (user_id,)).fetchone()
         if not sess:
@@ -1371,7 +1497,8 @@ _HACK_COOLDOWN = 3600
 
 
 @app.get("/api/hack/status/{user_id}")
-def hack_status(user_id: int):
+def hack_status(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
     with db_conn() as db:
         row = db.execute("SELECT last_hack FROM economy WHERE user_id = ?", (user_id,)).fetchone()
         if not row:
@@ -1396,7 +1523,8 @@ def hack_status(user_id: int):
 
 
 @app.post("/api/hack/start")
-def hack_start(req: HackStartRequest):
+def hack_start(req: HackStartRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         row = db.execute("SELECT last_hack, balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
         if not row:
@@ -1425,7 +1553,8 @@ def hack_start(req: HackStartRequest):
 
 
 @app.post("/api/hack/guess")
-def hack_guess(req: HackGuessRequest):
+def hack_guess(req: HackGuessRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     guess = req.word.lower().strip()
     with db_conn() as db:
         sess = db.execute("SELECT * FROM hack_sessions WHERE user_id = ?", (req.user_id,)).fetchone()
@@ -1545,7 +1674,8 @@ def _send_telegram_dm(user_id: int, text: str) -> None:
 
 
 @app.get("/api/rob/targets")
-def rob_targets(user_id: int, limit: int = 30):
+def rob_targets(user_id: int, authenticated_user: AuthenticatedUser, limit: int = 30):
+    _require_actor(authenticated_user, user_id)
     with db_conn() as db:
         rows = db.execute(
             """SELECT e.user_id,
@@ -1566,7 +1696,8 @@ def rob_targets(user_id: int, limit: int = 30):
 
 
 @app.post("/api/rob/attempt")
-def rob_attempt(req: RobAttemptRequest):
+def rob_attempt(req: RobAttemptRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     if req.user_id == req.target_id:
         raise HTTPException(400, "You can't rob yourself")
     with db_conn() as db:
@@ -1645,7 +1776,8 @@ def rob_attempt(req: RobAttemptRequest):
 
 
 @app.get("/api/rob/cooldown/{user_id}")
-def rob_cooldown_status(user_id: int):
+def rob_cooldown_status(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
     with db_conn() as db:
         row = db.execute("SELECT last_rob FROM economy WHERE user_id = ?", (user_id,)).fetchone()
         if not row:
@@ -1658,7 +1790,8 @@ def rob_cooldown_status(user_id: int):
 # ── Work / Jobs endpoints ─────────────────────────────────────────────────────
 
 @app.get("/api/work/status/{user_id}")
-def work_status(user_id: int):
+def work_status(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
     with db_conn() as db:
         row = db.execute(
             "SELECT work_count, last_work FROM economy WHERE user_id = ?", (user_id,)
@@ -1682,7 +1815,8 @@ def work_status(user_id: int):
 
 
 @app.post("/api/work/start")
-def work_start(req: WorkStartRequest):
+def work_start(req: WorkStartRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         row = db.execute(
             "SELECT work_count, last_work FROM economy WHERE user_id = ?", (req.user_id,)
@@ -1718,7 +1852,8 @@ def work_start(req: WorkStartRequest):
 
 
 @app.post("/api/work/sync")
-def work_sync(req: WorkSyncRequest):
+def work_sync(req: WorkSyncRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     if req.taps_delta < 1 or req.taps_delta > _SHIFT_MAX_TAPS:
         raise HTTPException(400, "taps_delta out of range")
     with db_conn() as db:
@@ -1753,7 +1888,8 @@ def work_sync(req: WorkSyncRequest):
 
 
 @app.post("/api/work/end")
-def work_end(req: WorkEndRequest):
+def work_end(req: WorkEndRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         session_row = db.execute(
             "SELECT * FROM work_sessions WHERE user_id = ?", (req.user_id,)
@@ -1845,7 +1981,8 @@ class MarketBuyRequest(BaseModel):
 
 
 @app.post("/api/market/buy")
-def market_buy(req: MarketBuyRequest):
+def market_buy(req: MarketBuyRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         row = db.execute(
             """SELECT gi.id, gi.gift_number FROM gift_instances gi
@@ -2025,7 +2162,8 @@ class TradeActionRequest(BaseModel):
 
 
 @app.get("/api/blackjack/status/{user_id}")
-def blackjack_status(user_id: int):
+def blackjack_status(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
     game = _bj_games.get(user_id)
     if not game:
         return {"active": False}
@@ -2036,7 +2174,8 @@ def blackjack_status(user_id: int):
 
 
 @app.post("/api/blackjack/start")
-def blackjack_start(req: BlackjackStartRequest):
+def blackjack_start(req: BlackjackStartRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     if req.user_id in _bj_games:
         raise HTTPException(400, "Game already in progress — finish it first")
     with db_conn() as db:
@@ -2112,7 +2251,8 @@ def blackjack_start(req: BlackjackStartRequest):
 
 
 @app.post("/api/blackjack/action")
-def blackjack_action(req: BlackjackActionRequest):
+def blackjack_action(req: BlackjackActionRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     game = _bj_games.get(req.user_id)
     if not game:
         raise HTTPException(404, "No active game")
@@ -2174,7 +2314,8 @@ def blackjack_action(req: BlackjackActionRequest):
 # ── Trades ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/trades")
-def get_trades(user_id: int):
+def get_trades(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
     with db_conn() as db:
         def _offer_row(row) -> dict:
             d = dict(row)
@@ -2218,7 +2359,8 @@ def get_trades(user_id: int):
 
 
 @app.post("/api/trades")
-def create_trade(req: TradeCreateRequest):
+def create_trade(req: TradeCreateRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.from_user_id)
     import time as _time
     if req.from_user_id == req.to_user_id:
         raise HTTPException(400, "Cannot trade with yourself")
@@ -2254,7 +2396,8 @@ def create_trade(req: TradeCreateRequest):
 
 
 @app.post("/api/trades/{offer_id}/accept")
-def accept_trade(offer_id: int, req: TradeActionRequest):
+def accept_trade(offer_id: int, req: TradeActionRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         db.execute("BEGIN IMMEDIATE")
         offer = db.execute("SELECT * FROM gift_offers WHERE id=?", (offer_id,)).fetchone()
@@ -2311,7 +2454,8 @@ def accept_trade(offer_id: int, req: TradeActionRequest):
 
 
 @app.post("/api/trades/{offer_id}/reject")
-def reject_trade(offer_id: int, req: TradeActionRequest):
+def reject_trade(offer_id: int, req: TradeActionRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         offer = db.execute("SELECT * FROM gift_offers WHERE id=?", (offer_id,)).fetchone()
         if not offer or offer["to_user_id"] != req.user_id:
@@ -2324,7 +2468,8 @@ def reject_trade(offer_id: int, req: TradeActionRequest):
 
 
 @app.post("/api/trades/{offer_id}/cancel")
-def cancel_trade(offer_id: int, req: TradeActionRequest):
+def cancel_trade(offer_id: int, req: TradeActionRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         offer = db.execute("SELECT * FROM gift_offers WHERE id=?", (offer_id,)).fetchone()
         if not offer or offer["from_user_id"] != req.user_id:
@@ -2462,7 +2607,8 @@ class PresencePingRequest(BaseModel):
     user_id: int
 
 @app.post("/api/presence/ping")
-def presence_ping(req: PresencePingRequest):
+def presence_ping(req: PresencePingRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         db.execute(
             "INSERT INTO online_sessions (user_id, last_ping) VALUES (?,?) "
@@ -2492,7 +2638,8 @@ class FriendActionRequest(BaseModel):
     user_id: int
 
 @app.get("/api/friends")
-def get_friends(user_id: int):
+def get_friends(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
     with db_conn() as db:
         def _enrich(row):
             d = dict(row)
@@ -2521,7 +2668,8 @@ class DailyClaimRequest(BaseModel):
     user_id: int
 
 @app.post("/api/daily")
-def claim_daily(req: DailyClaimRequest):
+def claim_daily(req: DailyClaimRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     now = int(time.time())
     COOLDOWN = 86400
     with db_conn() as db:
@@ -2556,7 +2704,8 @@ def claim_daily(req: DailyClaimRequest):
     }
 
 @app.get("/api/daily/status")
-def daily_status(user_id: int):
+def daily_status(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
     now = int(time.time())
     COOLDOWN = 86400
     with db_conn() as db:
@@ -2584,7 +2733,8 @@ class SendWrkRequest(BaseModel):
     to_display: str = ""
 
 @app.post("/api/send-wrk")
-def send_wrk(req: SendWrkRequest):
+def send_wrk(req: SendWrkRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.from_user_id)
     if req.from_user_id == req.to_user_id:
         raise HTTPException(400, "Cannot send to yourself")
     if req.amount <= 0:
@@ -2602,8 +2752,8 @@ def send_wrk(req: SendWrkRequest):
         db.commit()
 
     # Send DM confirmations
-    from_name = req.from_display or sender.get("username") or sender.get("full_name") or f"User {req.from_user_id}"
-    to_name = req.to_display or target.get("username") or target.get("full_name") or f"User {req.to_user_id}"
+    from_name = req.from_display or sender["username"] or sender["full_name"] or f"User {req.from_user_id}"
+    to_name = req.to_display or target["username"] or target["full_name"] or f"User {req.to_user_id}"
     amt_fmt = f"{req.amount:,}"
     _send_telegram_dm(
         req.from_user_id,
@@ -2618,7 +2768,8 @@ def send_wrk(req: SendWrkRequest):
 
 
 @app.post("/api/admin/poker-reset")
-def admin_poker_reset():
+def admin_poker_reset(authenticated_user: AuthenticatedUser):
+    _require_owner(authenticated_user)
     with db_conn() as db:
         for seat in _poker.seats:
             db.execute(
@@ -2639,7 +2790,8 @@ class AdminGiftGrantRequest(BaseModel):
     collection: str = "Admin's Plush Pepe"
 
 @app.post("/api/admin/grant-admin-gift")
-def grant_admin_gift(req: AdminGiftGrantRequest):
+def grant_admin_gift(req: AdminGiftGrantRequest, authenticated_user: AuthenticatedUser):
+    _require_owner(authenticated_user)
     with db_conn() as db:
         model = db.execute(
             "SELECT id FROM gift_models WHERE collection = ? LIMIT 1",
@@ -2663,7 +2815,8 @@ def grant_admin_gift(req: AdminGiftGrantRequest):
 
 
 @app.post("/api/friends/request")
-def send_friend_request(req: FriendRequestCreate):
+def send_friend_request(req: FriendRequestCreate, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.from_user_id)
     import time as _time
     if req.from_user_id == req.to_user_id:
         raise HTTPException(400, "Cannot add yourself")
@@ -2686,7 +2839,8 @@ def send_friend_request(req: FriendRequestCreate):
     return {"ok": True}
 
 @app.post("/api/friends/{friendship_id}/accept")
-def accept_friend(friendship_id: int, req: FriendActionRequest):
+def accept_friend(friendship_id: int, req: FriendActionRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         row = db.execute("SELECT * FROM friendships WHERE id=?", (friendship_id,)).fetchone()
         if not row or row["to_user_id"] != req.user_id:
@@ -2698,7 +2852,8 @@ def accept_friend(friendship_id: int, req: FriendActionRequest):
     return {"ok": True}
 
 @app.post("/api/friends/{friendship_id}/decline")
-def decline_friend(friendship_id: int, req: FriendActionRequest):
+def decline_friend(friendship_id: int, req: FriendActionRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
     with db_conn() as db:
         row = db.execute("SELECT * FROM friendships WHERE id=?", (friendship_id,)).fetchone()
         if not row or row["to_user_id"] != req.user_id:
@@ -2708,7 +2863,8 @@ def decline_friend(friendship_id: int, req: FriendActionRequest):
     return {"ok": True}
 
 @app.delete("/api/friends/{friendship_id}")
-def remove_friend(friendship_id: int, user_id: int):
+def remove_friend(friendship_id: int, user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
     with db_conn() as db:
         row = db.execute("SELECT * FROM friendships WHERE id=?", (friendship_id,)).fetchone()
         if not row or (row["from_user_id"] != user_id and row["to_user_id"] != user_id):
@@ -2748,13 +2904,7 @@ def game_timers():
     }
 
 
-@app.on_event("startup")
 async def _startup():
-    asyncio.create_task(_crash_loop())
-    asyncio.create_task(_duck_loop())
-    asyncio.create_task(_marble_loop())
-    asyncio.create_task(_livebj_loop())
-    asyncio.create_task(_poker_loop())
     with db_conn() as db:
         for col in ("pinned_gift_id INTEGER", "photo_url TEXT"):
             try:
@@ -2890,19 +3040,29 @@ async def _startup():
         except Exception:
             pass
 
+    return [
+        asyncio.create_task(_crash_loop()),
+        asyncio.create_task(_duck_loop()),
+        asyncio.create_task(_marble_loop()),
+        asyncio.create_task(_livebj_loop()),
+        asyncio.create_task(_poker_loop()),
+    ]
+
 
 @app.websocket("/ws/crash")
 async def crash_ws(ws: WebSocket):
-    await ws.accept()
+    authenticated_user = await _accept_authenticated_websocket(ws)
+    if authenticated_user is None:
+        return
     _crash.connections.add(ws)
     await ws.send_json({"type": "state", **_crash_snapshot()})
     try:
         while True:
             data = await ws.receive_json()
-            uid = data.get("user_id")
-            if not uid:
+            uid = authenticated_user
+            if data.get("user_id") is not None and int(data["user_id"]) != uid:
+                await ws.send_json({"type": "error", "message": "User identity mismatch"})
                 continue
-            uid = int(uid)
 
             if data.get("type") == "bet":
                 amount = int(data.get("amount", 0))
@@ -3076,16 +3236,18 @@ async def _duck_loop():
 
 @app.websocket("/ws/duck")
 async def duck_ws(ws: WebSocket):
-    await ws.accept()
+    authenticated_user = await _accept_authenticated_websocket(ws)
+    if authenticated_user is None:
+        return
     _duck.connections.add(ws)
     await ws.send_json({"type": "state", **_duck_snapshot()})
     try:
         while True:
             data = await ws.receive_json()
-            uid = data.get("user_id")
-            if not uid:
+            uid = authenticated_user
+            if data.get("user_id") is not None and int(data["user_id"]) != uid:
+                await ws.send_json({"type": "error", "message": "User identity mismatch"})
                 continue
-            uid = int(uid)
 
             if data.get("type") == "bet":
                 duck_idx = int(data.get("duck_idx", 0))
@@ -3268,16 +3430,18 @@ async def _marble_loop():
 
 @app.websocket("/ws/marbles")
 async def marbles_ws(ws: WebSocket):
-    await ws.accept()
+    authenticated_user = await _accept_authenticated_websocket(ws)
+    if authenticated_user is None:
+        return
     _marble.connections.add(ws)
     await ws.send_json({"type": "state", **_marble_snapshot()})
     try:
         while True:
             data = await ws.receive_json()
-            uid = data.get("user_id")
-            if not uid:
+            uid = authenticated_user
+            if data.get("user_id") is not None and int(data["user_id"]) != uid:
+                await ws.send_json({"type": "error", "message": "User identity mismatch"})
                 continue
-            uid = int(uid)
 
             if data.get("type") == "bet":
                 if _marble.phase != "open":
@@ -3552,17 +3716,19 @@ async def _livebj_loop():
 
 @app.websocket("/ws/livebj")
 async def livebj_ws(ws: WebSocket):
-    await ws.accept()
+    authenticated_user = await _accept_authenticated_websocket(ws)
+    if authenticated_user is None:
+        return
     _livebj.connections[ws] = None
     uid_ref = [None]
     await ws.send_json({"type": "state", **_livebj_snapshot()})
     try:
         while True:
             data = await ws.receive_json()
-            uid = data.get("user_id")
-            if not uid:
+            uid = authenticated_user
+            if data.get("user_id") is not None and int(data["user_id"]) != uid:
+                await ws.send_json({"type": "error", "message": "User identity mismatch"})
                 continue
-            uid = int(uid)
             uid_ref[0] = uid
             _livebj.connections[ws] = uid
 
@@ -3902,16 +4068,18 @@ async def _poker_loop():
 
 @app.websocket("/ws/poker")
 async def poker_ws(ws: WebSocket):
-    await ws.accept()
+    authenticated_user = await _accept_authenticated_websocket(ws)
+    if authenticated_user is None:
+        return
     uid_ref = [None]
     await ws.send_json({"type": "state", **_poker_snapshot()})
     try:
         while True:
             data = await ws.receive_json()
-            uid = data.get("user_id")
-            if not uid:
+            uid = authenticated_user
+            if data.get("user_id") is not None and int(data["user_id"]) != uid:
+                await ws.send_json({"type": "error", "message": "User identity mismatch"})
                 continue
-            uid = int(uid)
             uid_ref[0] = uid
 
             if data.get("type") == "join":
@@ -4037,7 +4205,9 @@ async def poker_ws(ws: WebSocket):
 
 @app.websocket("/ws/lobby")
 async def lobby_ws(ws: WebSocket):
-    await ws.accept()
+    authenticated_user = await _accept_authenticated_websocket(ws)
+    if authenticated_user is None:
+        return
     _lobby_connections.add(ws)
     try:
         while True:

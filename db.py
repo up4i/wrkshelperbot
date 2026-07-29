@@ -957,6 +957,32 @@ async def get_gift_instance(db_path: str, instance_id: int) -> dict | None:
             return dict(row) if row else None
 
 
+async def get_gift_instance_by_spec(
+    db_path: str,
+    collection: str,
+    model_number: int,
+    background: str,
+) -> dict | None:
+    """Look up a gift by its catalog attributes.
+
+    Commands now identify gifts by their collection-wide gift number, but this
+    compatibility lookup remains useful for catalog tooling and older callers.
+    """
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            """SELECT gi.id, gi.background, gi.gift_number, gi.owner_id, gi.acquired_at,
+                      gm.collection, gm.model_number, gm.model_name, gm.model_emoji,
+                      gm.model_rarity_pct, gm.tier, gm.custom_emoji_id
+               FROM gift_instances gi
+               JOIN gift_models gm ON gm.id = gi.model_id
+               WHERE gm.collection = ? AND gm.model_number = ? AND gi.background = ?""",
+            (collection, model_number, background),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row) if row else None
+
+
 async def set_pinned_gift(db_path: str, user_id: int, gift_id: int | None) -> None:
     async with aiosqlite.connect(db_path) as db:
         await db.execute(

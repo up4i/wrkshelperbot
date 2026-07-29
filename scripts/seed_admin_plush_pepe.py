@@ -49,6 +49,7 @@ def main():
     print("Done. Now call POST /api/admin/grant-admin-gift with the target user_id.")
     print(f'  curl -X POST http://localhost:8420/api/admin/grant-admin-gift \\')
     print(f'    -H "Content-Type: application/json" \\')
+    print(f'    -H "Authorization: Bearer <OWNER_SESSION_TOKEN>" \\')
     print(f"    -d '{{\"user_id\": <TELEGRAM_USER_ID>, \"collection\": \"{COLLECTION}\"}}'")
 
 if __name__ == "__main__":

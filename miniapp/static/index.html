@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#08080f">
+<meta name="color-scheme" content="dark">
 <title>wrk.money</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
@@ -26,16 +28,28 @@
     --nav-h: 68px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    height: 100%;
+    overflow: hidden;
+  }
   body {
     background: var(--bg);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    min-height: 100dvh;
-    overflow-x: hidden;
+    height: 100%;
+    overflow: hidden;
   }
 
   /* ── Layout ── */
-  #app { display: flex; flex-direction: column; min-height: 100dvh; }
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    height: var(--tg-viewport-stable-height, 100dvh);
+    min-height: 0;
+    overflow: hidden;
+  }
   .header {
     padding: 16px 20px 12px;
     background: var(--surface);
@@ -63,14 +77,20 @@
   .balance-pill.visible { display: block; }
 
   main {
-    flex: 1;
+    position: relative;
+    flex: 1 1 0;
+    height: 0;
+    min-height: 0;
     padding: 16px 16px calc(var(--nav-h) + 16px);
-    overflow-y: auto;
+    overflow-x: hidden;
+    overflow-y: scroll;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     overscroll-behavior: contain;
   }
 
   .page { display: none; flex-direction: column; gap: 16px; }
-  .page.active { display: flex; }
+  .page.active { display: flex; touch-action: pan-y; }
 
   /* ── Nav ── */
   nav {
@@ -1226,13 +1246,368 @@
   .lobby-toast-icon { font-size: 22px; flex-shrink: 0; }
   .lobby-toast-text { flex: 1; font-size: 13px; }
   .lobby-toast-text strong { display: block; margin-bottom: 2px; }
+
+  /* ── 2026 Telegram mini-app shell ── */
+  :root {
+    --bg: #08080f;
+    --surface: rgba(15, 15, 27, .94);
+    --card: #141420;
+    --card2: #1b1b2a;
+    --border: rgba(255, 255, 255, .08);
+    --border-strong: rgba(255, 255, 255, .14);
+    --primary: #9b7bff;
+    --primary-dim: #7c5ce7;
+    --primary-glow: rgba(155, 123, 255, .2);
+    --green: #4ade80;
+    --red: #fb7185;
+    --gold: #fbbf24;
+    --cyan: #67e8f9;
+    --text: #f7f7fb;
+    --muted: #9292a6;
+    --nav-h: 76px;
+    --safe-top: max(env(safe-area-inset-top, 0px), var(--tg-safe-area-inset-top, 0px));
+    --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--tg-safe-area-inset-bottom, 0px));
+  }
+  html {
+    background: var(--bg);
+    color-scheme: dark;
+  }
+  body {
+    background:
+      radial-gradient(circle at 15% -10%, rgba(124, 92, 231, .18), transparent 34rem),
+      radial-gradient(circle at 105% 20%, rgba(14, 165, 233, .1), transparent 28rem),
+      var(--bg);
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, select { font: inherit; }
+  button { touch-action: manipulation; }
+  #app {
+    width: min(100%, 720px);
+    margin: 0 auto;
+    background: linear-gradient(180deg, rgba(8, 8, 15, .22), rgba(8, 8, 15, .86));
+  }
+  .header {
+    min-height: calc(66px + var(--safe-top));
+    padding: calc(10px + var(--safe-top)) 16px 10px;
+    background: rgba(8, 8, 15, .78);
+    border-color: var(--border);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    z-index: 40;
+  }
+  .brand-lockup { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand-mark {
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 12px;
+    background: linear-gradient(145deg, #a78bfa, #6d46d9);
+    box-shadow: 0 8px 24px rgba(109,70,217,.28), inset 0 1px rgba(255,255,255,.2);
+    color: white;
+    font-size: 17px;
+    font-weight: 900;
+    letter-spacing: -.8px;
+  }
+  .logo { font-size: 17px; font-weight: 820; letter-spacing: -.55px; line-height: 1.05; }
+  .logo span { color: var(--primary); }
+  .brand-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 9px;
+    font-weight: 750;
+    letter-spacing: 1.1px;
+    text-transform: uppercase;
+  }
+  .brand-status {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(74,222,128,.7);
+  }
+  .header-actions { display: flex; align-items: center; gap: 8px; }
+  .header-action {
+    width: 36px;
+    height: 36px;
+    display: none;
+    place-items: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-size: 17px;
+    cursor: pointer;
+  }
+  .header-action.visible { display: grid; }
+  .balance-pill {
+    min-height: 36px;
+    display: none;
+    align-items: center;
+    border-color: rgba(251,191,36,.14);
+    border-radius: 12px;
+    padding: 0 10px;
+    background: rgba(251,191,36,.07);
+    color: #fde68a;
+    font-size: 12px;
+  }
+  .balance-pill.visible { display: flex; }
+  .header-avatar {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border-strong);
+    box-shadow: 0 5px 18px rgba(0,0,0,.24);
+  }
+  main {
+    padding: 14px 14px calc(var(--nav-h) + var(--safe-bottom) + 22px);
+  }
+  .page { gap: 14px; animation: page-in .2s ease-out; }
+  @keyframes page-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .card, .stat-card, .game-card, .profile-hero, .lb-row {
+    border-color: var(--border);
+    box-shadow: 0 10px 28px rgba(0,0,0,.12);
+  }
+  .card { border-radius: 18px; }
+  .btn {
+    min-height: 42px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #9b7bff, #7654dd);
+    box-shadow: 0 7px 18px rgba(118,84,221,.18);
+  }
+  .btn:hover { background: linear-gradient(135deg, #aa8fff, #8060e8); }
+  .btn.outline {
+    background: rgba(155,123,255,.07);
+    border-color: rgba(155,123,255,.35);
+    color: #b8a4ff;
+    box-shadow: none;
+  }
+  .input, .market-search, .collection-select {
+    min-height: 44px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.045);
+    border-color: var(--border);
+  }
+  .section-title { font-size: 23px; font-weight: 820; letter-spacing: -.6px; }
+  .section-sub { margin-top: 4px; margin-bottom: 4px; color: var(--muted); }
+  .eyebrow, .home-section-label {
+    color: #b9a8ff;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1.35px;
+    text-transform: uppercase;
+  }
+  .welcome-card {
+    position: relative;
+    overflow: hidden;
+    min-height: 170px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 22px;
+    border-radius: 22px;
+    background:
+      radial-gradient(circle at 88% 12%, rgba(103,232,249,.17), transparent 30%),
+      linear-gradient(140deg, rgba(155,123,255,.25), rgba(24,24,38,.92) 60%);
+    border-color: rgba(155,123,255,.26);
+    box-shadow: 0 18px 40px rgba(0,0,0,.2);
+  }
+  .welcome-card::after {
+    content: "W";
+    position: absolute;
+    top: -36px;
+    right: -6px;
+    color: rgba(255,255,255,.035);
+    font-size: 170px;
+    font-weight: 950;
+    line-height: 1;
+    transform: rotate(7deg);
+    pointer-events: none;
+  }
+  .welcome-card h2 {
+    position: relative;
+    z-index: 1;
+    margin: 8px 0 6px;
+    font-size: clamp(25px, 7vw, 34px);
+    font-weight: 850;
+    letter-spacing: -1.1px;
+    line-height: 1.05;
+  }
+  .welcome-card p { position: relative; z-index: 1; max-width: 400px; color: #b7b7c8; }
+  .home-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .quick-action {
+    min-width: 0;
+    min-height: 70px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: rgba(20,20,32,.9);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    color: var(--text);
+    font-size: 10px;
+    font-weight: 720;
+    cursor: pointer;
+  }
+  .quick-action .quick-icon { font-size: 21px; line-height: 1; }
+  .quick-action:active { transform: scale(.97); background: var(--card2); }
+  .home-section-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .home-section-head span:last-child { color: var(--muted); font-size: 11px; }
+  .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat-card { min-width: 0; border-radius: 16px; padding: 13px 11px; background: rgba(20,20,32,.86); }
+  .stat-card .label {
+    min-height: 25px;
+    font-size: 9px;
+    line-height: 1.25;
+    text-transform: uppercase;
+    letter-spacing: .45px;
+  }
+  .stat-card .value { overflow: hidden; font-size: 17px; letter-spacing: -.45px; text-overflow: ellipsis; }
+  .account-card {
+    overflow: hidden;
+    padding: 0;
+    background: linear-gradient(145deg, rgba(20,20,32,.96), rgba(27,27,42,.92));
+  }
+  .account-top { display: flex; align-items: center; gap: 12px; padding: 16px; }
+  .account-avatar {
+    width: 46px;
+    height: 46px;
+    flex: 0 0 auto;
+    border-radius: 15px;
+    object-fit: cover;
+    background: var(--card2);
+    border: 1px solid var(--border-strong);
+  }
+  .account-copy { flex: 1; min-width: 0; }
+  .account-name { overflow: hidden; font-size: 15px; font-weight: 760; text-overflow: ellipsis; white-space: nowrap; }
+  .account-meta { margin-top: 3px; color: var(--muted); font-size: 11px; }
+  .account-balance { color: #fde68a; font-size: 16px; font-weight: 820; white-space: nowrap; }
+  .account-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-top: 1px solid var(--border);
+  }
+  .account-stat { padding: 12px 8px; text-align: center; }
+  .account-stat + .account-stat { border-left: 1px solid var(--border); }
+  .account-stat strong { display: block; font-size: 13px; }
+  .account-stat span { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; text-transform: uppercase; }
+  .game-card { border-radius: 18px; background: linear-gradient(145deg, var(--card), rgba(20,20,32,.76)); }
+  .game-card .gicon {
+    width: 52px;
+    height: 52px;
+    display: grid;
+    place-items: center;
+    margin: 0 auto 10px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.045);
+    font-size: 30px;
+  }
+  .tab-row {
+    scrollbar-width: none;
+    mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 8px), transparent);
+  }
+  .tab-row::-webkit-scrollbar { display: none; }
+  .tab-btn, .game-tab-btn { min-height: 38px; border-radius: 11px; }
+  .loading::before {
+    content: "";
+    width: 14px;
+    height: 14px;
+    display: inline-block;
+    margin-right: 8px;
+    vertical-align: -2px;
+    border: 2px solid rgba(255,255,255,.13);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: loading-spin .7s linear infinite;
+  }
+  @keyframes loading-spin { to { transform: rotate(360deg); } }
+  nav {
+    left: 50%;
+    right: auto;
+    bottom: 0;
+    width: min(100%, 720px);
+    height: calc(var(--nav-h) + var(--safe-bottom));
+    padding: 6px 8px calc(6px + var(--safe-bottom));
+    transform: translateX(-50%);
+    background: rgba(11,11,19,.88);
+    border-color: var(--border);
+    backdrop-filter: blur(22px) saturate(150%);
+    -webkit-backdrop-filter: blur(22px) saturate(150%);
+    z-index: 50;
+  }
+  .nav-btn {
+    height: 60px;
+    gap: 4px;
+    padding: 5px 2px;
+    border-radius: 14px;
+    font-size: 9px;
+    font-weight: 680;
+  }
+  .nav-btn .icon {
+    width: 32px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 11px;
+    font-size: 18px;
+    transition: background .15s, transform .15s;
+  }
+  .nav-btn.active { color: #c9bbff; }
+  .nav-btn.active .icon { background: rgba(155,123,255,.15); transform: translateY(-1px); }
+  .modal { padding-bottom: calc(26px + var(--safe-bottom)); border-color: var(--border-strong); }
+  .modal-bg { padding-top: var(--safe-top); }
+  .lobby-toast { top: calc(10px + var(--safe-top)); border-color: var(--border-strong); }
+
+  @media (min-width: 721px) {
+    #app { border-inline: 1px solid var(--border); }
+  }
+  @media (max-width: 380px) {
+    .header { padding-inline: 12px; }
+    .balance-pill { display: none !important; }
+    .home-quick-grid { grid-template-columns: repeat(4, minmax(58px, 1fr)); gap: 6px; }
+    .quick-action { padding-inline: 3px; font-size: 9px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      scroll-behavior: auto !important;
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+    }
+  }
 </style>
 </head>
 <body>
 <div id="app">
   <header class="header">
-    <div class="logo">wrk<span>.</span>money</div>
-    <div style="display:flex;align-items:center;gap:8px">
+    <div class="brand-lockup">
+      <div class="brand-mark">W</div>
+      <div>
+        <div class="logo">wrk<span>.</span>money</div>
+        <div class="brand-subtitle"><span class="brand-status"></span>Telegram mini app</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="header-action" id="headerSendBtn" type="button" aria-label="Send WRK" onclick="openSendWrkWithPicker()">↗</button>
       <div class="balance-pill" id="headerBal" onclick="goProfile()"></div>
       <img class="header-avatar" id="headerAvatar" src="" alt="" onclick="goProfile()" onerror="this.style.display='none'">
     </div>
@@ -1242,8 +1617,19 @@
     <!-- HOME -->
     <div class="page active" id="page-home">
       <div class="welcome-card">
-        <h2>Welcome back 👋</h2>
-        <p>Play games, collect gifts, and climb the leaderboard — all in one place.</p>
+        <div class="eyebrow">Your WRK hub</div>
+        <h2 id="homeGreeting">Make your next move.</h2>
+        <p id="homeGreetingSub">Earn, play, collect, and climb — without leaving Telegram.</p>
+      </div>
+      <div class="home-quick-grid" aria-label="Quick actions">
+        <button class="quick-action" type="button" onclick="showPage('games',document.querySelector('[data-page=games]'))"><span class="quick-icon">🎮</span>Play</button>
+        <button class="quick-action" type="button" onclick="showPage('work',document.querySelector('[data-page=work]'))"><span class="quick-icon">⚡</span>Earn</button>
+        <button class="quick-action" type="button" onclick="openSendWrkWithPicker()"><span class="quick-icon">↗️</span>Send</button>
+        <button class="quick-action" type="button" onclick="showPage('lb',null)"><span class="quick-icon">🏆</span>Ranks</button>
+      </div>
+      <div class="home-section-head">
+        <div class="home-section-label">Community pulse</div>
+        <span>Live economy</span>
       </div>
       <div class="stats-grid" id="homeStats">
         <div class="stat-card"><div class="label">Total Users</div><div class="value purple" id="statUsers">—</div></div>
@@ -1255,12 +1641,11 @@
       </div>
       <div class="card" id="homeAccountCard">
         <div class="card-title">Your account</div>
-        <div class="search-row">
-          <input class="input" id="homeUserId" placeholder="Enter your Telegram user ID" type="number">
-          <button class="btn" onclick="loginFromHome()">Go</button>
-        </div>
-        <div class="user-id-hint" style="margin-top:10px">
-          Your Telegram user ID — send <strong>/id</strong> in the bot to find it.
+        <div style="text-align:center;padding:10px 4px">
+          <div style="font-size:28px;margin-bottom:8px">✈️</div>
+          <div style="font-size:13px;color:var(--muted)">
+            Your verified Telegram account will appear here.
+          </div>
         </div>
       </div>
     </div>
@@ -1527,19 +1912,13 @@
       <span class="icon">🎮</span>Games
     </button>
     <button class="nav-btn" onclick="showPage('work',this)" data-page="work">
-      <span class="icon">💼</span>Work
+      <span class="icon">⚡</span>Earn
     </button>
     <button class="nav-btn" onclick="showPage('market',this)" data-page="market">
       <span class="icon">🏪</span>Market
     </button>
-    <button class="nav-btn" onclick="showPage('lb',this)" data-page="lb">
-      <span class="icon">🏆</span>Leaderboard
-    </button>
     <button class="nav-btn" onclick="showPage('profile',this)" data-page="profile">
       <span class="icon">👤</span>Profile
-    </button>
-    <button class="nav-btn" onclick="openSendWrkWithPicker()">
-      <span class="icon">💸</span>Send
     </button>
   </nav>
 </div>
@@ -1984,7 +2363,8 @@ const BADGE_ECOADMIN = '<img src="/badges/ecoadmin.png"  class="profile-badge" t
 const BADGE_ADMIN    = '<img src="/badges/admin.png"     class="profile-badge" title="Admin"      onerror="this.outerHTML=\'⚔️\'">';
 const BADGE_PLUSH1   = '<img src="/badges/plush_pepe_1.png" class="profile-badge" title="Plush Pepe Holder" onerror="this.outerHTML=\'🐸\'">';
 let state = {
-  userId: localStorage.getItem('wrkUserId') || null,
+  userId: null,
+  sessionToken: localStorage.getItem('wrkSessionToken') || null,
   photoUrl: localStorage.getItem('wrkPhotoUrl') || null,
   inTelegram: false,
   balance: null,
@@ -1994,10 +2374,11 @@ let state = {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 const _TG_WALL_HTML = `
-  <div style="text-align:center;padding:12px 0">
-    <div style="font-size:36px;margin-bottom:8px">✈️</div>
-    <div style="font-weight:600;margin-bottom:4px">Open in Telegram</div>
-    <div style="color:var(--muted);font-size:13px">Sign-in requires the Telegram app.</div>
+  <div style="text-align:center;padding:4px 0">
+    <div style="font-size:30px;margin-bottom:5px">✈️</div>
+    <div style="font-weight:700;margin-bottom:5px">Continue in Telegram</div>
+    <div style="color:var(--muted);font-size:13px;line-height:1.45;margin-bottom:9px">Your Telegram identity keeps your WRK and gifts secure.</div>
+    <a class="btn" href="https://t.me/wrkshelperbot/app" style="display:inline-flex;align-items:center;color:#fff!important;text-decoration:none">Open mini app</a>
   </div>`;
 
 function _applyTgWalls() {
@@ -2005,7 +2386,86 @@ function _applyTgWalls() {
   document.getElementById('gamesLoginWall').innerHTML = `<div class="card-title">Sign in first</div>${_TG_WALL_HTML}`;
   document.getElementById('workLoginWall').innerHTML = `<div class="card-title">Sign in first</div>${_TG_WALL_HTML}`;
   const profileCard = document.querySelector('#profileLoginPrompt .card');
-  if (profileCard) profileCard.innerHTML = `<div class="card-title">Enter your Telegram ID</div>${_TG_WALL_HTML}`;
+  if (profileCard) profileCard.innerHTML = `<div class="card-title">Your profile</div>${_TG_WALL_HTML}`;
+}
+
+function clearSession() {
+  state.userId = null;
+  state.sessionToken = null;
+  state.balance = null;
+  if (_presenceInterval) {
+    clearInterval(_presenceInterval);
+    _presenceInterval = null;
+  }
+  localStorage.removeItem('wrkUserId');
+  localStorage.removeItem('wrkSessionToken');
+  document.getElementById('headerBal')?.classList.remove('visible');
+  document.getElementById('headerAvatar')?.classList.remove('visible');
+  document.getElementById('headerSendBtn')?.classList.remove('visible');
+}
+
+let _telegramBackHandlerReady = false;
+
+function setupTelegramBridge(tg) {
+  if (!tg) return;
+  tg.ready?.();
+  tg.expand?.();
+  tg.disableVerticalSwipes?.();
+  try {
+    tg.setHeaderColor?.('#08080f');
+    tg.setBackgroundColor?.('#08080f');
+    tg.setBottomBarColor?.('#0b0b13');
+  } catch {}
+
+  if (!_telegramBackHandlerReady && tg.BackButton) {
+    tg.BackButton.onClick(closeTopLayer);
+    _telegramBackHandlerReady = true;
+  }
+
+  const observer = new MutationObserver(updateTelegramBackButton);
+  document.querySelectorAll('.modal-bg').forEach(el => {
+    observer.observe(el, { attributes: true, attributeFilter: ['class', 'style'] });
+  });
+  updateTelegramBackButton();
+}
+
+function haptic(kind = 'selection') {
+  const feedback = window.Telegram?.WebApp?.HapticFeedback;
+  if (!feedback) return;
+  if (kind === 'success' || kind === 'error' || kind === 'warning') {
+    feedback.notificationOccurred?.(kind);
+  } else {
+    feedback.selectionChanged?.();
+  }
+}
+
+function _visibleModal() {
+  return [...document.querySelectorAll('.modal-bg')].reverse().find(el => {
+    return el.classList.contains('open') || getComputedStyle(el).display !== 'none';
+  });
+}
+
+function closeTopLayer() {
+  const modal = _visibleModal();
+  if (modal) {
+    const closeButton = modal.querySelector('.modal-close');
+    if (closeButton) closeButton.click();
+    else {
+      modal.classList.remove('open');
+      modal.style.display = 'none';
+    }
+    updateTelegramBackButton();
+    return;
+  }
+  showPage('home', document.querySelector('[data-page="home"]'));
+}
+
+function updateTelegramBackButton() {
+  const backButton = window.Telegram?.WebApp?.BackButton;
+  if (!backButton) return;
+  const activePage = document.querySelector('.page.active')?.id;
+  if (_visibleModal() || (activePage && activePage !== 'page-home')) backButton.show();
+  else backButton.hide();
 }
 
 async function boot() {
@@ -2013,30 +2473,36 @@ async function boot() {
   loadLeaderboard('balance');
 
   const tg = window.Telegram?.WebApp;
+  setupTelegramBridge(tg);
   state.inTelegram = !!(tg?.initData);
+  let authenticated = false;
 
   if (state.inTelegram) {
-    tg.expand();
-    tg.disableVerticalSwipes?.();
     try {
       const auth = await api('/api/auth/telegram', { method: 'POST', json: { init_data: tg.initData } });
+      state.sessionToken = auth.session_token;
+      localStorage.setItem('wrkSessionToken', auth.session_token);
       if (auth.photo_url) {
         state.photoUrl = auth.photo_url;
         localStorage.setItem('wrkPhotoUrl', auth.photo_url);
       }
       setUser(String(auth.user_id));
-    } catch {
-      // initData validation failed
+      authenticated = true;
+    } catch (error) {
+      clearSession();
+      console.error('Telegram authentication failed', error);
     }
-  } else if (state.userId) {
-    // Returning user with a cached Telegram session
-    refreshBalance();
-    document.getElementById('gamesLoginWall').style.display = 'none';
-    prefillUserInputs();
-    startPresencePing();
-    connectLobbyWs();
-  } else {
-    // Browser with no session — replace all login forms with "open in Telegram"
+  } else if (state.sessionToken) {
+    try {
+      const session = await api('/api/auth/session');
+      setUser(String(session.user_id));
+      authenticated = true;
+    } catch {
+      clearSession();
+    }
+  }
+
+  if (!authenticated) {
     _applyTgWalls();
   }
 
@@ -2066,8 +2532,10 @@ async function boot() {
 function prefillUserInputs() {
   const id = state.userId;
   if (!id) return;
-  document.getElementById('homeUserId').value = id;
-  document.getElementById('gamesUserId').value = id;
+  const homeInput = document.getElementById('homeUserId');
+  const gamesInput = document.getElementById('gamesUserId');
+  if (homeInput) homeInput.value = id;
+  if (gamesInput) gamesInput.value = id;
 }
 
 async function refreshBalance() {
@@ -2076,14 +2544,40 @@ async function refreshBalance() {
     const data = await api(`/api/profile/${state.userId}`);
     state.balance = data.balance;
     state.username = data.username || '';
-    state.full_name = data.full_name || '';
+    state.full_name = data.name || '';
     const pill = document.getElementById('headerBal');
     pill.innerHTML = `${fmt(data.balance)} ${WRK}`;
     pill.classList.add('visible');
+    document.getElementById('headerSendBtn').classList.add('visible');
     const av = document.getElementById('headerAvatar');
     av.src = state.photoUrl || `/api/avatar/${state.userId}`;
     av.classList.add('visible');
+    renderHomeAccount(data);
   } catch {}
+}
+
+function renderHomeAccount(data) {
+  const displayName = data.name || `User ${data.user_id}`;
+  const shortName = displayName.replace(/^@/, '').split(/\s+/)[0] || 'there';
+  document.getElementById('homeGreeting').textContent = `Ready, ${shortName}?`;
+  document.getElementById('homeGreetingSub').textContent = 'Your wallet, games, work, and collectibles are synced with Telegram.';
+
+  const card = document.getElementById('homeAccountCard');
+  card.className = 'card account-card';
+  card.innerHTML = `
+    <div class="account-top" onclick="goProfile()" style="cursor:pointer">
+      <img class="account-avatar" src="${esc(state.photoUrl || `/api/avatar/${data.user_id}`)}" alt="" onerror="this.style.visibility='hidden'">
+      <div class="account-copy">
+        <div class="account-name">${esc(displayName)}</div>
+        <div class="account-meta">Telegram verified · ${fmt(data.gift_count)} gifts</div>
+      </div>
+      <div class="account-balance">${fmtK(data.balance)} ${WRK}</div>
+    </div>
+    <div class="account-stats">
+      <div class="account-stat"><strong>#${fmt(data.balance_rank)}</strong><span>Balance</span></div>
+      <div class="account-stat"><strong>#${fmt(data.networth_rank)}</strong><span>Net worth</span></div>
+      <div class="account-stat"><strong>${fmt(data.streak)}d</strong><span>Streak</span></div>
+    </div>`;
 }
 
 function goProfile() {
@@ -2095,13 +2589,18 @@ function showPage(id, btn) {
   if (id !== 'profile' && _giftsObserver) { _giftsObserver.disconnect(); _giftsObserver = null; }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('page-' + id).classList.add('active');
-  btn.classList.add('active');
+  const page = document.getElementById('page-' + id);
+  if (!page) return;
+  page.classList.add('active');
+  if (btn) btn.classList.add('active');
+  document.querySelector('main').scrollTo({ top: 0, behavior: 'auto' });
+  haptic();
   if (id === 'lb') loadLeaderboard(state.lbTab);
   if (id === 'work') openWorkPage();
   if (id === 'market') { loadMarketCollections(); loadMarket(true); }
   if (id === 'profile') openProfilePage();
   if (id === 'games') _startGameTimers(); else _stopGameTimers();
+  updateTelegramBackButton();
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -2119,28 +2618,24 @@ async function loadStats() {
 
 // ── Login ─────────────────────────────────────────────────────────────────────
 function loginFromHome() {
-  if (!state.inTelegram && !state.userId) return;
-  const v = document.getElementById('homeUserId').value.trim();
-  if (!v) return;
-  setUser(v);
-  showPage('games', document.querySelector('[data-page="games"]'));
+  if (state.userId) showPage('games', document.querySelector('[data-page="games"]'));
 }
 
 function loginFromGames() {
-  if (!state.inTelegram && !state.userId) return;
-  const v = document.getElementById('gamesUserId').value.trim();
-  if (!v) return;
-  setUser(v);
+  if (!state.userId) _applyTgWalls();
 }
 
+let _presenceInterval = null;
+
 function startPresencePing() {
-  if (!state.userId) return;
+  if (!state.userId || _presenceInterval) return;
   const doPing = () => api('/api/presence/ping', { method: 'POST', json: { user_id: +state.userId } }).catch(()=>{});
   doPing();
-  setInterval(doPing, 30_000);
+  _presenceInterval = setInterval(doPing, 30_000);
 }
 
 function setUser(id) {
+  if (!state.sessionToken) return;
   state.userId = id;
   localStorage.setItem('wrkUserId', id);
   document.getElementById('gamesLoginWall').style.display = 'none';
@@ -2250,11 +2745,8 @@ function openProfilePage() {
 }
 
 function loginFromProfile() {
-  if (!state.inTelegram && !state.userId) return;
-  const v = document.getElementById('profileLoginId').value.trim();
-  if (!v) return;
-  setUser(v);
-  openProfilePage();
+  if (state.userId) openProfilePage();
+  else _applyTgWalls();
 }
 
 function togglePlayerSearch() {
@@ -2464,7 +2956,7 @@ async function declineFriend(id) {
   loadSocial();
 }
 async function cancelFriendRequest(id) {
-  await api(`/api/friends/${id}`, { method: 'DELETE' });
+  await api(`/api/friends/${id}?user_id=${state.userId}`, { method: 'DELETE' });
   loadSocial();
 }
 async function removeFriend(id) {
@@ -4242,6 +4734,9 @@ function refreshHeaderBal() {
 
 async function api(url, opts = {}) {
   const fetchOpts = { method: opts.method || 'GET', headers: {} };
+  if (state.sessionToken) {
+    fetchOpts.headers.Authorization = `Bearer ${state.sessionToken}`;
+  }
   if (opts.json) {
     fetchOpts.body = JSON.stringify(opts.json);
     fetchOpts.headers['Content-Type'] = 'application/json';
@@ -4252,9 +4747,26 @@ async function api(url, opts = {}) {
     const detail = Array.isArray(err.detail)
       ? (err.detail[0]?.msg || err.detail[0]?.message || 'Validation error')
       : (err.detail || `HTTP ${res.status}`);
+    if (res.status === 401 && url !== '/api/auth/telegram') {
+      clearSession();
+      _applyTgWalls();
+    }
     throw new Error(detail);
   }
   return res.json();
+}
+
+function authenticatedSocket(path) {
+  if (!state.sessionToken) throw new Error('Telegram session required');
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return new WebSocket(`${protocol}//${location.host}${path}`, [`wrk-auth.${state.sessionToken}`]);
+}
+
+function websocketCanReconnect(event) {
+  if (event.code !== 1008) return true;
+  clearSession();
+  _applyTgWalls();
+  return false;
 }
 
 function fmt(n) { return Number(n).toLocaleString('en-US'); }
@@ -4265,7 +4777,14 @@ function fmtK(n) {
   return fmt(n);
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
 
 // ── Daily Reward ──────────────────────────────────────────────────────────────
 async function loadDailyStatus() {
@@ -4335,11 +4854,8 @@ async function openWorkPage() {
 }
 
 function loginFromWork() {
-  if (!state.inTelegram && !state.userId) return;
-  const v = document.getElementById('workUserId').value.trim();
-  if (!v) return;
-  setUser(v);
-  openWorkPage();
+  if (state.userId) openWorkPage();
+  else _applyTgWalls();
 }
 
 async function refreshWorkStatus() {
@@ -4570,6 +5086,11 @@ const BG_LABEL = {
   emerald: 'Emerald', midnight: 'Midnight', orange: 'Orange',
 };
 
+function fmtBackground(bg) {
+  if (!bg) return '—';
+  return BG_LABEL[bg] || BG_LABEL[bg.replace(/_\d+$/, '')] || bg;
+}
+
 let marketTier = 'low';
 let marketOffset = 0;
 let marketTotal = 0;
@@ -4579,7 +5100,7 @@ let marketCollection = '';
 let marketSearchTimer = null;
 
 function fmtCollection(s) {
-  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return s.replace(/_/g, ' ').replace(/(^|\s)\w/g, c => c.toUpperCase());
 }
 
 function setMarketTier(tier, btn) {
@@ -4652,7 +5173,7 @@ async function loadMarket(reset = false) {
           ${emojiHtml}
           <div class="market-col">${esc(fmtCollection(g.collection))}</div>
           <div class="market-name">${esc(g.model_name)}</div>
-          <div class="market-bg">${BG_LABEL[g.background] || g.background}</div>
+          <div class="market-bg">${fmtBackground(g.background)}</div>
           <div class="market-price">${fmtK(g.current_price)} ${WRK}</div>
           <div class="market-stock">${g.stock} in stock</div>
           <button class="market-buy-btn">Buy</button>
@@ -4685,7 +5206,7 @@ function confirmBuy(collection, modelNumber, background, name, price, stock) {
   bar.id = 'marketConfirmBar';
   bar.style.cssText = 'position:fixed;bottom:calc(var(--nav-h) + 12px);left:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;z-index:200;display:flex;flex-direction:column;gap:10px;box-shadow:0 -4px 24px rgba(0,0,0,.5)';
   bar.innerHTML = `
-    <div style="font-size:14px;font-weight:700">Buy <span style="color:var(--gold)">${esc(fmtCollection(collection))} — ${esc(name)}</span> (${BG_LABEL[background]})?</div>
+    <div style="font-size:14px;font-weight:700">Buy <span style="color:var(--gold)">${esc(fmtCollection(collection))} — ${esc(name)}</span> (${fmtBackground(background)})?</div>
     <div style="font-size:13px;color:var(--muted)">Cost: <b style="color:#fff">${fmt(price)} ${WRK}</b> · Your balance: <b style="color:var(--gold)">${fmt(state.balance)} ${WRK}</b></div>
     <div style="display:flex;gap:8px">
       <button class="btn outline" style="flex:1" onclick="document.getElementById('marketConfirmBar').remove()">Cancel</button>
@@ -4765,7 +5286,7 @@ function openGiftCard(idx) {
 
   document.getElementById('giftDetailRows').innerHTML = `
     <div class="gift-detail-row"><span class="lbl">Model</span><span class="val">${esc(fmtCollection(g.collection))}</span></div>
-    <div class="gift-detail-row"><span class="lbl">Background</span><span class="val">${esc(BG_LABEL[g.background] || g.background)}</span></div>
+    <div class="gift-detail-row"><span class="lbl">Background</span><span class="val">${esc(fmtBackground(g.background))}</span></div>
     <div class="gift-detail-row"><span class="lbl">In Stock</span><span class="val">${g.stock}</span></div>
     <div class="gift-detail-row"><span class="lbl">Owner</span><span class="val">Bank</span></div>
     <div class="gift-detail-row"><span class="lbl">Market Floor Price</span><span class="val gold">${fmt(g.current_price)} ${WRK}</span></div>
@@ -4823,7 +5344,7 @@ function openProfileGiftModal(giftId) {
     : '';
   document.getElementById('giftDetailRows').innerHTML = `
     <div class="gift-detail-row"><span class="lbl">Collection</span><span class="val">${esc(fmtCollection(g.collection || g.model_name))}</span></div>
-    <div class="gift-detail-row"><span class="lbl">Background</span><span class="val">${esc(BG_LABEL[g.background] || g.background || '—')}</span></div>
+    <div class="gift-detail-row"><span class="lbl">Background</span><span class="val">${esc(fmtBackground(g.background))}</span></div>
     <div class="gift-detail-row"><span class="lbl">Tier</span><span class="val">${esc(g.tier || '—')}</span></div>
     <div class="gift-detail-row"><span class="lbl">Gift #</span><span class="val">#${g.gift_number || g.id}</span></div>
     ${priceRow}
@@ -4893,10 +5414,10 @@ function openCrash() {
 
 function connectCrashWs() {
   if (crashWs && crashWs.readyState <= 1) return; // CONNECTING or OPEN
-  const _wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  crashWs = new WebSocket(`${_wsProto}//${location.host}/ws/crash`);
+  crashWs = authenticatedSocket('/ws/crash');
   crashWs.onmessage = e => handleCrashMsg(JSON.parse(e.data));
-  crashWs.onclose = () => {
+  crashWs.onclose = (event) => {
+    if (!websocketCanReconnect(event)) return;
     setTimeout(() => {
       if (document.getElementById('crashModal').classList.contains('open')) connectCrashWs();
     }, 2000);
@@ -5099,10 +5620,10 @@ function openDuck() {
 
 function _connectDuckWs() {
   if (duckWs && duckWs.readyState <= 1) return;
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  duckWs = new WebSocket(`${proto}//${location.host}/ws/duck`);
+  duckWs = authenticatedSocket('/ws/duck');
   duckWs.onmessage = e => _handleDuckMsg(JSON.parse(e.data));
-  duckWs.onclose = () => {
+  duckWs.onclose = (event) => {
+    if (!websocketCanReconnect(event)) return;
     setTimeout(() => {
       if (document.getElementById('duckModal').classList.contains('open')) _connectDuckWs();
     }, 2000);
@@ -5250,10 +5771,10 @@ function openMarbles() {
 
 function _connectMarblesWs() {
   if (marblesWs && marblesWs.readyState <= 1) return;
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  marblesWs = new WebSocket(`${proto}//${location.host}/ws/marbles`);
+  marblesWs = authenticatedSocket('/ws/marbles');
   marblesWs.onmessage = e => _handleMarbleMsg(JSON.parse(e.data));
-  marblesWs.onclose = () => {
+  marblesWs.onclose = (event) => {
+    if (!websocketCanReconnect(event)) return;
     setTimeout(() => {
       if (document.getElementById('marblesModal').classList.contains('open')) _connectMarblesWs();
     }, 2000);
@@ -5629,10 +6150,10 @@ function toggleLbjLegend() {
 
 function _connectLiveBjWs() {
   if (liveBjWs && liveBjWs.readyState <= 1) return;
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  liveBjWs = new WebSocket(`${proto}//${location.host}/ws/livebj`);
+  liveBjWs = authenticatedSocket('/ws/livebj');
   liveBjWs.onmessage = e => _handleLbjMsg(JSON.parse(e.data));
-  liveBjWs.onclose = () => {
+  liveBjWs.onclose = (event) => {
+    if (!websocketCanReconnect(event)) return;
     setTimeout(() => {
       if (document.getElementById('liveBjModal').classList.contains('open')) _connectLiveBjWs();
     }, 2000);
@@ -5774,10 +6295,10 @@ function togglePokerLegend() {
 
 function _connectPokerWs() {
   if (pokerWs && pokerWs.readyState <= 1) return;
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  pokerWs = new WebSocket(`${proto}//${location.host}/ws/poker`);
+  pokerWs = authenticatedSocket('/ws/poker');
   pokerWs.onmessage = e => _handlePokerMsg(JSON.parse(e.data));
-  pokerWs.onclose = () => {
+  pokerWs.onclose = (event) => {
+    if (!websocketCanReconnect(event)) return;
     setTimeout(() => {
       if (document.getElementById('pokerModal').classList.contains('open')) _connectPokerWs();
     }, 2000);
@@ -5924,15 +6445,18 @@ let _lobbyToastTimer = null;
 
 function connectLobbyWs() {
   if (!state.userId) return;
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  _lobbyWs = new WebSocket(`${proto}://${location.host}/ws/lobby`);
+  if (_lobbyWs && _lobbyWs.readyState <= 1) return;
+  _lobbyWs = authenticatedSocket('/ws/lobby');
   _lobbyWs.onmessage = (e) => {
     try {
       const data = JSON.parse(e.data);
       if (data.type === 'player_joined') showLobbyToast(data);
     } catch {}
   };
-  _lobbyWs.onclose = () => setTimeout(connectLobbyWs, 5000);
+  _lobbyWs.onclose = (event) => {
+    if (!websocketCanReconnect(event)) return;
+    setTimeout(connectLobbyWs, 5000);
+  };
 }
 
 function showLobbyToast(data) {
