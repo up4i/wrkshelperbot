@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#08080f">
 <meta name="color-scheme" content="dark">
+<link rel="icon" type="image/webp" href="/emoji/5093898072811898950">
 <title>wrk.money</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
@@ -1298,19 +1299,27 @@
   }
   .brand-lockup { display: flex; align-items: center; gap: 10px; min-width: 0; }
   .brand-mark {
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
     display: grid;
     place-items: center;
-    border: 1px solid rgba(255,255,255,.14);
-    border-radius: 12px;
-    background: linear-gradient(145deg, #a78bfa, #6d46d9);
-    box-shadow: 0 8px 24px rgba(109,70,217,.28), inset 0 1px rgba(255,255,255,.2);
+    overflow: hidden;
+    border: 1px solid rgba(251,191,36,.32);
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 25%, #34301c, #080808 68%);
+    box-shadow: 0 7px 22px rgba(245,158,11,.18), inset 0 1px rgba(255,255,255,.16);
     color: white;
     font-size: 17px;
     font-weight: 900;
     letter-spacing: -.8px;
   }
+  .brand-mark-image {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+  }
+  .brand-mark-fallback { color: #fde68a; }
   .logo { font-size: 17px; font-weight: 820; letter-spacing: -.55px; line-height: 1.05; }
   .logo span { color: var(--primary); }
   .brand-subtitle {
@@ -1577,6 +1586,766 @@
   .modal-bg { padding-top: var(--safe-top); }
   .lobby-toast { top: calc(10px + var(--safe-top)); border-color: var(--border-strong); }
 
+  /* ── Premium game room ── */
+  .game-modal {
+    --game-accent: #9b7bff;
+    --game-accent-2: #67e8f9;
+    position: relative;
+    isolation: isolate;
+    width: min(100%, 560px);
+    max-height: min(92dvh, calc(var(--tg-viewport-stable-height, 100dvh) - var(--safe-top)));
+    overflow-x: hidden;
+    overflow-y: auto;
+    gap: 13px;
+    padding: 18px 16px calc(22px + var(--safe-bottom));
+    border: 1px solid color-mix(in srgb, var(--game-accent) 34%, rgba(255,255,255,.12));
+    background:
+      radial-gradient(circle at 50% -14%, color-mix(in srgb, var(--game-accent) 24%, transparent), transparent 44%),
+      linear-gradient(180deg, #161622 0%, #0b0b13 58%, #08080f 100%);
+    box-shadow:
+      0 -24px 80px rgba(0,0,0,.48),
+      inset 0 1px rgba(255,255,255,.08);
+    scrollbar-width: none;
+  }
+  .game-modal::-webkit-scrollbar { display: none; }
+  .game-modal::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0 0 auto;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--game-accent), var(--game-accent-2), transparent);
+    box-shadow: 0 0 28px color-mix(in srgb, var(--game-accent) 45%, transparent);
+  }
+  .game-modal::after {
+    content: "";
+    position: absolute;
+    z-index: -2;
+    top: -90px;
+    left: 50%;
+    width: 260px;
+    height: 180px;
+    border-radius: 50%;
+    background: var(--game-accent);
+    opacity: .09;
+    filter: blur(55px);
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+  .game-modal > * { position: relative; z-index: 1; }
+  .game-modal .modal-title {
+    min-height: 42px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0 44px 0 2px;
+    text-align: left;
+    font-size: 21px;
+    font-weight: 860;
+    letter-spacing: -.55px;
+    line-height: 1.05;
+  }
+  .game-modal .modal-title::after {
+    content: attr(data-subtitle);
+    margin-top: 6px;
+    color: color-mix(in srgb, var(--game-accent-2) 76%, white);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.35px;
+    text-transform: uppercase;
+  }
+  .game-modal .modal-close {
+    position: absolute;
+    top: 17px;
+    right: 16px;
+    z-index: 20;
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(255,255,255,.09);
+    background: rgba(255,255,255,.055);
+    color: rgba(255,255,255,.72);
+    backdrop-filter: blur(12px);
+  }
+  .game-modal .slots-help-btn,
+  .game-modal .slots-fast-btn { position: absolute; }
+  .game-help-btn {
+    position: absolute;
+    z-index: 20;
+    top: 22px;
+    right: 58px;
+    width: 31px;
+    height: 31px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px;
+    background: rgba(255,255,255,.05);
+    color: rgba(255,255,255,.62);
+    font-size: 12px;
+    font-weight: 850;
+    cursor: pointer;
+  }
+  .game-modal .card-title {
+    margin: 2px 0 7px;
+    color: rgba(255,255,255,.48);
+    font-size: 9px;
+    letter-spacing: 1.2px;
+  }
+  .game-modal .balance-display {
+    padding: 8px 10px;
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 11px;
+    background: rgba(255,255,255,.035);
+  }
+  .game-modal .bet-row {
+    padding: 5px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 15px;
+    background: rgba(0,0,0,.22);
+  }
+  .game-modal .bet-row .input {
+    min-width: 0;
+    border: 0;
+    background: transparent;
+  }
+  .game-modal .bet-row .btn { min-width: 104px; }
+  .game-modal .preset-btn {
+    min-height: 32px;
+    border-color: rgba(255,255,255,.08);
+    background: rgba(255,255,255,.045);
+  }
+  .game-modal .preset-btn:active {
+    border-color: var(--game-accent);
+    color: white;
+    background: color-mix(in srgb, var(--game-accent) 20%, transparent);
+  }
+  .game-modal .result-box {
+    border-radius: 14px;
+    backdrop-filter: blur(12px);
+  }
+  .game-modal--crash   { --game-accent: #34d399; --game-accent-2: #67e8f9; }
+  .game-modal--duck    { --game-accent: #38bdf8; --game-accent-2: #facc15; }
+  .game-modal--marbles { --game-accent: #a78bfa; --game-accent-2: #f0abfc; }
+  .game-modal--cards   { --game-accent: #22c55e; --game-accent-2: #fbbf24; }
+  .game-modal--slots   { --game-accent: #f59e0b; --game-accent-2: #fb7185; }
+  .game-modal--coin    { --game-accent: #fbbf24; --game-accent-2: #fde68a; }
+  .game-modal--roulette{ --game-accent: #ef4444; --game-accent-2: #fbbf24; }
+  .game-modal--craps   { --game-accent: #fb7185; --game-accent-2: #fbbf24; }
+  .game-modal--slider  { --game-accent: #60a5fa; --game-accent-2: #4ade80; }
+  .game-modal--plinko  { --game-accent: #67e8f9; --game-accent-2: #a78bfa; }
+  .game-modal--wheel   { --game-accent: #a78bfa; --game-accent-2: #fbbf24; }
+  .game-modal--case    { --game-accent: #ec4899; --game-accent-2: #a78bfa; }
+
+  /* Game lobby cards */
+  #gamesGrid .game-card {
+    --game-card-accent: #9b7bff;
+    position: relative;
+    isolation: isolate;
+    min-height: 164px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+    padding: 18px 14px 16px;
+    text-align: left;
+    background:
+      radial-gradient(circle at 72% 15%, color-mix(in srgb, var(--game-card-accent) 23%, transparent), transparent 46%),
+      linear-gradient(145deg, rgba(29,29,45,.98), rgba(13,13,22,.96));
+  }
+  #gamesGrid .game-card::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    border: 1px solid color-mix(in srgb, var(--game-card-accent) 18%, transparent);
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  #gamesGrid .game-card::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    right: -25px;
+    top: -25px;
+    width: 100px;
+    height: 100px;
+    border: 20px solid color-mix(in srgb, var(--game-card-accent) 8%, transparent);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+  #gamesGrid .game-card .gicon {
+    width: 58px;
+    height: 58px;
+    margin: 0 0 auto;
+    border: 1px solid color-mix(in srgb, var(--game-card-accent) 36%, transparent);
+    background: color-mix(in srgb, var(--game-card-accent) 14%, rgba(255,255,255,.03));
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--game-card-accent) 15%, transparent);
+    font-size: 31px;
+  }
+  #gamesGrid .game-card .gname { font-size: 16px; letter-spacing: -.3px; }
+  #gamesGrid .game-card .gdesc { min-height: 28px; margin-top: 4px; line-height: 1.35; }
+  #gamesGrid .game-card:active {
+    border-color: color-mix(in srgb, var(--game-card-accent) 68%, white);
+    transform: scale(.975);
+  }
+  #gcatLive .game-card:nth-child(1) { --game-card-accent: #34d399; }
+  #gcatLive .game-card:nth-child(2) { --game-card-accent: #38bdf8; }
+  #gcatLive .game-card:nth-child(3) { --game-card-accent: #a78bfa; }
+  #gcatLive .game-card:nth-child(4) { --game-card-accent: #22c55e; }
+  #gcatLive .game-card:nth-child(5) { --game-card-accent: #fbbf24; }
+  #gcatSolo .game-card:nth-child(1) { --game-card-accent: #f59e0b; }
+  #gcatSolo .game-card:nth-child(2) { --game-card-accent: #fbbf24; }
+  #gcatSolo .game-card:nth-child(3) { --game-card-accent: #22c55e; }
+  #gcatSolo .game-card:nth-child(4) { --game-card-accent: #ef4444; }
+  #gcatSolo .game-card:nth-child(5) { --game-card-accent: #fb7185; }
+  #gcatSolo .game-card:nth-child(6) { --game-card-accent: #60a5fa; }
+  #gcatSolo .game-card:nth-child(7) { --game-card-accent: #67e8f9; }
+  #gcatSolo .game-card:nth-child(8) { --game-card-accent: #a78bfa; }
+  #gcatSolo .game-card:nth-child(9) { --game-card-accent: #ec4899; }
+
+  /* Crash flight deck */
+  .crash-history {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 1px 0 4px;
+    scrollbar-width: none;
+  }
+  .crash-history::-webkit-scrollbar { display: none; }
+  .crash-chip {
+    flex: 0 0 auto;
+    padding: 5px 9px;
+    border: 1px solid currentColor;
+    border-radius: 8px;
+    background: rgba(0,0,0,.22) !important;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+  .crash-stage {
+    position: relative;
+    min-height: 236px;
+    overflow: hidden;
+    border: 1px solid rgba(52,211,153,.18);
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at 82% 18%, rgba(103,232,249,.12), transparent 25%),
+      linear-gradient(180deg, rgba(10,28,37,.94), rgba(4,12,21,.98));
+    box-shadow: inset 0 0 55px rgba(0,0,0,.36), 0 14px 30px rgba(0,0,0,.22);
+  }
+  .crash-stage::after {
+    content: "LIVE FLIGHT";
+    position: absolute;
+    top: 12px;
+    left: 13px;
+    color: rgba(255,255,255,.35);
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 1.35px;
+  }
+  .crash-chart-wrap {
+    position: absolute;
+    inset: 0;
+    height: 100%;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background:
+      linear-gradient(rgba(103,232,249,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(103,232,249,.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .crash-chart-wrap::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: 40%;
+    background: linear-gradient(transparent, rgba(52,211,153,.06));
+    pointer-events: none;
+  }
+  .crash-mult {
+    position: absolute;
+    z-index: 4;
+    inset: 76px 0 auto;
+    min-height: auto;
+    justify-content: center;
+    color: #ecfdf5;
+    font-size: clamp(52px, 16vw, 76px);
+    text-shadow: 0 0 30px rgba(52,211,153,.36), 0 6px 22px rgba(0,0,0,.65);
+  }
+  .crash-mult.red { color: #fecdd3; text-shadow: 0 0 30px rgba(251,113,133,.4); }
+  .crash-phase-txt {
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 10px;
+    background: rgba(255,255,255,.035);
+    color: rgba(255,255,255,.64);
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: .3px;
+  }
+  .crash-stage .crash-phase-txt {
+    position: absolute;
+    z-index: 5;
+    right: 12px;
+    bottom: 11px;
+    min-height: 25px;
+    padding: 0 9px;
+    background: rgba(4,12,21,.72);
+    backdrop-filter: blur(8px);
+  }
+  .crash-chart-rocket { z-index: 3; font-size: 27px; filter: drop-shadow(0 0 8px rgba(103,232,249,.55)); }
+  .crash-players { max-height: 150px; padding: 5px; border-radius: 14px; background: rgba(255,255,255,.025); }
+  .crash-player-row { min-height: 31px; border: 1px solid rgba(255,255,255,.045); background: rgba(255,255,255,.025); }
+
+  /* Duck race stadium */
+  .duck-track {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 7px;
+    border: 1px solid rgba(56,189,248,.22);
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at 50% -20%, rgba(250,204,21,.17), transparent 38%),
+      linear-gradient(180deg, #153b5b, #0c263d);
+    box-shadow: inset 0 0 50px rgba(0,0,0,.22);
+  }
+  .duck-track::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(120deg, rgba(255,255,255,.06), transparent 32%);
+    pointer-events: none;
+  }
+  .duck-lane {
+    position: relative;
+    min-height: 66px;
+    display: grid;
+    grid-template-columns: 24px minmax(0,1fr) 62px;
+    align-items: center;
+    gap: 7px;
+    overflow: hidden;
+    padding: 7px 8px;
+    border: 1px solid rgba(255,255,255,.08) !important;
+    border-radius: 13px;
+    background:
+      linear-gradient(90deg, rgba(255,255,255,.035), transparent),
+      repeating-linear-gradient(0deg, rgba(255,255,255,.025) 0 1px, transparent 1px 7px);
+  }
+  .duck-lane.selected {
+    border-color: rgba(250,204,21,.55) !important;
+    background: linear-gradient(90deg, rgba(250,204,21,.14), rgba(56,189,248,.05));
+    box-shadow: inset 3px 0 #facc15;
+  }
+  .duck-lane.winner {
+    border-color: #facc15 !important;
+    background: linear-gradient(90deg, rgba(250,204,21,.2), rgba(56,189,248,.08));
+    box-shadow: 0 0 20px rgba(250,204,21,.16), inset 3px 0 #facc15;
+  }
+  .duck-lane-no { color: rgba(255,255,255,.34); font-size: 10px; font-weight: 900; letter-spacing: .5px; }
+  .duck-raceway {
+    position: relative;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    border-radius: 10px;
+    background:
+      linear-gradient(90deg, transparent 92%, rgba(255,255,255,.2) 92% 94%, transparent 94%),
+      linear-gradient(180deg, rgba(56,189,248,.08), rgba(255,255,255,.02));
+  }
+  .duck-raceway::after {
+    content: "🏁";
+    position: absolute;
+    right: 3px;
+    top: 50%;
+    font-size: 14px;
+    opacity: .72;
+    transform: translateY(-50%);
+  }
+  .duck-runner {
+    position: relative;
+    z-index: 2;
+    margin-left: 3%;
+    font-size: 28px;
+    line-height: 1;
+    filter: drop-shadow(0 5px 4px rgba(0,0,0,.35));
+    animation: duck-bob .55s ease-in-out infinite alternate;
+  }
+  .duck-runner::after {
+    content: "≋";
+    position: absolute;
+    right: 17px;
+    bottom: -7px;
+    color: rgba(125,211,252,.45);
+    font-size: 20px;
+  }
+  @keyframes duck-bob { to { transform: translateY(-3px) rotate(-3deg); } }
+  .duck-lane-meta { min-width: 0; text-align: right; }
+  .duck-name { display: block; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+  .duck-mult { display: block; margin-top: 3px; font-size: 12px; }
+
+  /* Marble arena */
+  .marble-board-wrap {
+    min-height: 220px;
+    margin: 2px 0 7px;
+    border: 1px solid rgba(167,139,250,.3);
+    border-radius: 21px;
+    background:
+      radial-gradient(circle at 50% 30%, rgba(240,171,252,.13), transparent 32%),
+      linear-gradient(155deg, #19132c, #090812 75%);
+    box-shadow: inset 0 0 45px rgba(0,0,0,.4), 0 14px 34px rgba(0,0,0,.22);
+  }
+  .marble-board-wrap::before {
+    content: "PRIZE CHAMBER";
+    position: absolute;
+    z-index: 2;
+    top: 12px;
+    left: 14px;
+    color: rgba(255,255,255,.28);
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 1.4px;
+  }
+  .marble-board-wrap svg { min-height: 220px; }
+  .marble-players {
+    max-height: 132px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .marble-player-row {
+    min-width: 0;
+    padding: 7px 8px;
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 10px;
+    background: rgba(255,255,255,.035);
+  }
+  .marble-swatch { box-shadow: 0 0 8px currentColor; }
+
+  /* Live casino tables */
+  .lbj-table,
+  .poker-table,
+  .bj-table {
+    position: relative;
+    overflow: hidden;
+    border: 8px solid #3b2618;
+    background:
+      radial-gradient(ellipse at 50% 36%, rgba(34,197,94,.24), transparent 55%),
+      radial-gradient(ellipse at center, #10613d, #073c29 76%);
+    box-shadow:
+      inset 0 0 0 2px rgba(251,191,36,.24),
+      inset 0 0 60px rgba(0,0,0,.32),
+      0 16px 32px rgba(0,0,0,.35);
+  }
+  .lbj-table::before,
+  .poker-table::before,
+  .bj-table::before {
+    position: absolute;
+    left: 50%;
+    color: rgba(255,255,255,.085);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1.8px;
+    white-space: nowrap;
+    transform: translateX(-50%);
+    pointer-events: none;
+  }
+  .lbj-table {
+    min-height: 382px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 34px 12px 16px;
+    border-radius: 48% 48% 24px 24px / 32% 32% 18px 18px;
+  }
+  .lbj-table::before { content: "BLACKJACK PAYS 3 TO 2"; top: 145px; }
+  .lbj-dealer {
+    width: min(72%, 250px);
+    min-height: 96px;
+    margin: 0 auto 46px;
+    padding: 8px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 50%;
+    background: rgba(0,0,0,.1);
+  }
+  .lbj-dealer-label { color: rgba(255,255,255,.48); font-size: 9px; font-weight: 900; letter-spacing: 1.3px; }
+  .lbj-seats { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 7px; }
+  .lbj-seat {
+    min-width: 0;
+    min-height: 95px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 7px 4px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 42% 42% 14px 14px;
+    background: rgba(0,0,0,.2);
+    box-shadow: inset 0 1px rgba(255,255,255,.05);
+  }
+  .lbj-seat.active-turn { border-color: #fbbf24; box-shadow: 0 0 18px rgba(251,191,36,.22); }
+  .lbj-seat.mine { border-color: #86efac; background: rgba(34,197,94,.12); }
+  .lbj-card {
+    position: relative;
+    width: 35px;
+    height: 49px;
+    display: block;
+    border: 1px solid rgba(0,0,0,.13);
+    border-radius: 6px;
+    background: linear-gradient(145deg, #fff, #e9eef5);
+    box-shadow: 0 4px 8px rgba(0,0,0,.32);
+    font-family: Georgia, serif;
+    font-size: 12px;
+  }
+  .lbj-card .card-rank {
+    position: absolute;
+    top: 3px;
+    left: 4px;
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+  }
+  .lbj-card .card-suit {
+    position: absolute;
+    right: 4px;
+    bottom: 3px;
+    font-size: 16px;
+    line-height: 1;
+  }
+  .lbj-card.poker-card { width: 31px; height: 44px; }
+  .lbj-card.poker-card .card-rank { font-size: 9px; }
+  .lbj-card.poker-card .card-suit { font-size: 13px; }
+  .lbj-card.back {
+    color: transparent;
+    border: 2px solid #dbeafe;
+    background:
+      linear-gradient(45deg, transparent 42%, rgba(255,255,255,.18) 42% 58%, transparent 58%),
+      linear-gradient(135deg, #312e81, #2563eb);
+    background-size: 8px 8px, auto;
+  }
+  .poker-table {
+    min-height: 390px;
+    padding: 26px 12px 16px;
+    border-radius: 48%;
+  }
+  .poker-table::before { content: "WRK • HOLD'EM"; top: 88px; }
+  .poker-pot {
+    width: max-content;
+    max-width: 92%;
+    margin: 0 auto 8px;
+    padding: 7px 11px;
+    border: 1px solid rgba(251,191,36,.24);
+    border-radius: 999px;
+    background: rgba(0,0,0,.25);
+    color: #fde68a;
+    font-weight: 750;
+  }
+  .poker-community { min-height: 62px; margin: 7px 0 38px; }
+  .poker-seats { grid-template-columns: repeat(3, minmax(0,1fr)); gap: 7px; }
+  .poker-seat {
+    min-width: 0;
+    min-height: 98px;
+    border-radius: 38% 38% 13px 13px;
+    background: rgba(0,0,0,.23);
+  }
+  .poker-seat.active-turn { border-color: #fbbf24; box-shadow: 0 0 18px rgba(251,191,36,.2); }
+  .poker-seat.mine { border-color: #86efac; background: rgba(34,197,94,.12); }
+  .poker-legend {
+    border: 1px solid rgba(255,255,255,.07);
+    background: rgba(0,0,0,.26);
+    line-height: 1.72;
+  }
+  .bj-table {
+    min-height: 340px;
+    justify-content: space-between;
+    padding: 30px 18px 22px;
+    border-radius: 46% 46% 22px 22px / 25% 25% 16px 16px;
+  }
+  .bj-table::before { content: "DEALER STANDS ON 17"; top: 50%; }
+  .bj-table .divider { background: rgba(255,255,255,.1); }
+  .bj-section-label { color: rgba(255,255,255,.55); font-size: 9px; font-weight: 850; letter-spacing: 1.1px; }
+  .bj-hand-wrap.bj-active {
+    border-color: rgba(134,239,172,.35);
+    background: rgba(34,197,94,.13);
+  }
+  .play-card {
+    width: 48px;
+    height: 68px;
+    border: 1px solid rgba(0,0,0,.14);
+    border-radius: 8px;
+    background: linear-gradient(145deg, #fff, #edf2f7);
+    font-family: Georgia, serif;
+    box-shadow: 0 5px 12px rgba(0,0,0,.38);
+  }
+  .play-card.facedown {
+    border: 3px solid #dbeafe;
+    background:
+      linear-gradient(45deg, transparent 42%, rgba(255,255,255,.17) 42% 58%, transparent 58%),
+      linear-gradient(135deg, #312e81, #2563eb);
+    background-size: 10px 10px, auto;
+  }
+  .bj-bet-section {
+    padding: 20px 14px;
+    border: 8px solid #3b2618;
+    border-radius: 44% 44% 18px 18px / 20% 20% 12px 12px;
+    background: radial-gradient(ellipse at center, #10613d, #073c29);
+    box-shadow: inset 0 0 0 2px rgba(251,191,36,.2), inset 0 0 45px rgba(0,0,0,.25);
+  }
+  .bj-chip {
+    border: 4px dashed rgba(255,255,255,.44);
+    box-shadow: inset 0 0 0 3px rgba(0,0,0,.15), 0 5px 10px rgba(0,0,0,.3);
+  }
+
+  /* Solo game stages */
+  .game-modal--slots .reels {
+    gap: 7px;
+    margin: 3px 0;
+    padding: 22px 13px;
+    border: 1px solid rgba(251,191,36,.3);
+    border-radius: 22px;
+    background:
+      radial-gradient(circle at 50% 0, rgba(251,191,36,.18), transparent 38%),
+      linear-gradient(180deg, #3b1723, #160c16);
+    box-shadow: inset 0 0 0 5px rgba(0,0,0,.18), 0 14px 30px rgba(0,0,0,.25);
+  }
+  .game-modal--slots .reels::before {
+    content: "LUCKY WRK";
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    color: #fde68a;
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    transform: translateX(-50%);
+  }
+  .game-modal--slots .reel {
+    width: clamp(72px, 23vw, 96px);
+    height: 96px;
+    border: 2px solid rgba(251,191,36,.36);
+    background: linear-gradient(180deg, #fff, #e8e5df 50%, #fff);
+    color: #111;
+    box-shadow: inset 0 10px 20px rgba(0,0,0,.08), 0 5px 12px rgba(0,0,0,.34);
+    font-size: 42px;
+  }
+  .game-modal--slots .slots-help-btn,
+  .game-modal--slots .slots-fast-btn {
+    z-index: 20;
+    top: 22px;
+    left: auto;
+  }
+  .game-modal--slots .slots-help-btn { right: 98px; }
+  .game-modal--slots .slots-fast-btn { right: 58px; }
+  .game-modal--coin .coin-wrap {
+    height: 166px;
+    margin: 0;
+    border: 1px solid rgba(251,191,36,.18);
+    border-radius: 22px;
+    background:
+      radial-gradient(circle, rgba(251,191,36,.16), transparent 48%),
+      linear-gradient(145deg, rgba(255,255,255,.035), rgba(0,0,0,.12));
+  }
+  .game-modal--coin .coin {
+    width: 116px;
+    height: 116px;
+    border: 5px double #fde68a;
+    background: radial-gradient(circle at 35% 28%, #fff3b0, #f59e0b 54%, #92400e);
+    box-shadow: 0 12px 30px rgba(245,158,11,.3), inset 0 0 0 5px rgba(120,53,15,.18);
+  }
+  .game-modal--coin .coin-face { font-size: 62px; }
+  .game-modal--roulette .rl-wrap {
+    width: 250px;
+    height: 250px;
+    margin: 0 auto 3px;
+    padding: 9px;
+    border: 2px solid rgba(251,191,36,.42);
+    border-radius: 50%;
+    background: radial-gradient(circle, #3f2a19, #160f0b);
+    box-shadow: 0 15px 35px rgba(0,0,0,.36), inset 0 0 0 5px rgba(0,0,0,.26);
+  }
+  .game-modal--roulette .rl-wheel { width: 100%; height: 100%; }
+  .game-modal--roulette .rl-pointer { top: -5px; border-top-color: #fde68a; }
+  .game-modal--roulette #rouletteColors { grid-template-columns: repeat(3, 1fr); }
+  .game-modal--roulette #rouletteColors .cf-btn { min-width: 0; padding: 12px 4px; font-size: 12px; }
+  .craps-stage {
+    min-height: 190px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 20px;
+    border: 1px solid rgba(251,113,133,.2);
+    border-radius: 22px;
+    background:
+      linear-gradient(45deg, rgba(255,255,255,.02) 25%, transparent 25% 75%, rgba(255,255,255,.02) 75%),
+      radial-gradient(ellipse at center, #611c35, #260d1c);
+    background-size: 24px 24px, auto;
+    box-shadow: inset 0 0 40px rgba(0,0,0,.35);
+  }
+  .craps-dice { display: flex; gap: 24px; font-size: 68px; filter: drop-shadow(0 10px 10px rgba(0,0,0,.4)); }
+  .craps-die.rolling { animation: dice-tumble .18s linear infinite; }
+  @keyframes dice-tumble { 50% { transform: translateY(-8px) rotate(14deg); } }
+  .game-modal--slider .slider-bar-wrap {
+    height: 64px;
+    margin: 6px 0;
+    border: 5px solid rgba(255,255,255,.06);
+    border-radius: 18px;
+    background: #090b10;
+    box-shadow: inset 0 0 22px rgba(0,0,0,.38), 0 8px 20px rgba(0,0,0,.22);
+  }
+  .game-modal--slider .slider-bar-red { background: linear-gradient(90deg, #7f1d1d, #fb7185); }
+  .game-modal--slider .slider-bar-green { background: linear-gradient(90deg, #4ade80, #166534); }
+  .game-modal--slider .slider-handle { width: 8px; box-shadow: 0 0 18px white; }
+  .game-modal--slider .slider-arrow { font-size: 22px; color: #fff; filter: drop-shadow(0 0 8px rgba(255,255,255,.5)); }
+  .game-modal--plinko .plinko-board-wrap {
+    padding: 9px;
+    border: 1px solid rgba(103,232,249,.22);
+    border-radius: 21px;
+    background:
+      radial-gradient(circle at 50% 0, rgba(103,232,249,.12), transparent 40%),
+      linear-gradient(180deg, #11182c, #090b15);
+    box-shadow: inset 0 0 40px rgba(0,0,0,.34);
+  }
+  .game-modal--plinko .plinko-board-wrap canvas { max-height: 300px; image-rendering: auto; }
+  .game-modal--plinko .plinko-risk-btn { min-height: 40px; display: grid; place-items: center; }
+  .game-modal--wheel .wheel-wrap {
+    width: min(270px, 78vw);
+    height: min(270px, 78vw);
+    padding: 10px;
+    border: 2px solid rgba(251,191,36,.35);
+    border-radius: 50%;
+    background: radial-gradient(circle, #21152e, #0e0a14);
+    box-shadow: 0 15px 35px rgba(0,0,0,.36), inset 0 0 0 5px rgba(0,0,0,.26);
+  }
+  .game-modal--wheel .wheel-pointer { top: -9px; color: #fde68a; font-size: 27px; }
+  .game-modal--case .case-reel-wrap {
+    height: 148px;
+    margin: 3px 0;
+    border: 1px solid rgba(236,72,153,.25);
+    border-radius: 18px;
+    background:
+      linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+      #0d0b17;
+    background-size: 100% 28px;
+    box-shadow: inset 0 0 35px rgba(0,0,0,.5);
+  }
+  .game-modal--case .case-reel-center {
+    width: 3px;
+    background: #f9a8d4;
+    box-shadow: 0 0 15px rgba(236,72,153,.8);
+  }
+  .game-modal--case .case-item {
+    min-width: 104px;
+    height: 134px;
+    border-radius: 13px;
+    background: radial-gradient(circle at 50% 25%, rgba(255,255,255,.08), rgba(0,0,0,.28));
+  }
+  .game-modal--case .case-item-emoji { font-size: 36px; }
+
   @media (min-width: 721px) {
     #app { border-inline: 1px solid var(--border); }
   }
@@ -1585,6 +2354,11 @@
     .balance-pill { display: none !important; }
     .home-quick-grid { grid-template-columns: repeat(4, minmax(58px, 1fr)); gap: 6px; }
     .quick-action { padding-inline: 3px; font-size: 9px; }
+    .game-modal { padding-inline: 12px; }
+    .duck-lane { grid-template-columns: 20px minmax(0,1fr) 52px; }
+    .lbj-table, .poker-table { border-width: 6px; padding-inline: 7px; }
+    .lbj-card { width: 30px; height: 43px; font-size: 10px; }
+    .play-card { width: 43px; height: 61px; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -1600,7 +2374,10 @@
 <div id="app">
   <header class="header">
     <div class="brand-lockup">
-      <div class="brand-mark">W</div>
+      <div class="brand-mark">
+        <img class="brand-mark-image" src="/emoji/5093898072811898950" alt="WRK$" onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+        <span class="brand-mark-fallback" hidden>W</span>
+      </div>
       <div>
         <div class="logo">wrk<span>.</span>money</div>
         <div class="brand-subtitle"><span class="brand-status"></span>Telegram mini app</div>
@@ -1695,7 +2472,7 @@
           </div>
           <div class="game-card" onclick="openPoker()">
             <div class="gicon">♠️</div>
-            <div class="gname">Hold'Em</div>
+            <div class="gname">Texas Hold'Em</div>
             <div class="gdesc">10,000 <img src="/emoji/5093898072811898950" style="width:18px;height:18px;vertical-align:middle;margin-left:2px" onerror="this.outerHTML='WRK$'"> buy-in poker</div>
           </div>
         </div>
@@ -1925,9 +2702,9 @@
 
 <!-- ROULETTE MODAL -->
 <div class="modal-bg" id="rouletteModal" onclick="closeModal('rouletteModal',event)">
-  <div class="modal" style="position:relative">
+  <div class="modal game-modal game-modal--roulette" style="position:relative">
     <button class="modal-close" onclick="closeModal('rouletteModal')">✕</button>
-    <div class="modal-title">🎡 Roulette</div>
+    <div class="modal-title" data-subtitle="American wheel · up to 14×">🎡 Roulette</div>
     <div class="rl-wrap">
       <div class="rl-pointer"></div>
       <div id="rouletteWheelSvg" class="rl-wheel"></div>
@@ -1951,10 +2728,16 @@
 
 <!-- CRAPS MODAL -->
 <div class="modal-bg" id="crapsModal" onclick="closeModal('crapsModal',event)">
-  <div class="modal" style="position:relative">
+  <div class="modal game-modal game-modal--craps" style="position:relative">
     <button class="modal-close" onclick="closeModal('crapsModal')">✕</button>
-    <div class="modal-title">🎲 Street Craps</div>
-    <div id="crapsStatus" style="text-align:center;font-size:15px;font-weight:600;margin-bottom:4px"></div>
+    <div class="modal-title" data-subtitle="Roll the point · dodge the seven">🎲 Street Craps</div>
+    <div class="craps-stage">
+      <div id="crapsStatus" style="text-align:center;font-size:15px;font-weight:600;margin-bottom:4px"></div>
+      <div class="craps-dice">
+        <span class="craps-die" id="crapsDie1">⚀</span><span class="craps-die" id="crapsDie2">⚅</span>
+      </div>
+      <div style="font-size:16px;font-weight:700;min-height:20px" id="crapsTotal"></div>
+    </div>
     <div id="crapsBetWrap">
       <div class="card-title">Bet amount</div>
       <div class="bet-presets" id="crapsPresets"></div>
@@ -1964,10 +2747,6 @@
       </div>
     </div>
     <div id="crapsGameWrap" style="display:none;flex-direction:column;gap:16px;align-items:center">
-      <div style="display:flex;gap:24px;font-size:52px">
-        <span id="crapsDie1">⬜</span><span id="crapsDie2">⬜</span>
-      </div>
-      <div style="font-size:16px;font-weight:600" id="crapsTotal"></div>
       <button class="btn" id="crapsRollBtn" onclick="rollCraps()" style="width:100%">🎲 Roll</button>
     </div>
     <div class="result-box" id="crapsResult"></div>
@@ -2025,11 +2804,11 @@
 
 <!-- SLOTS MODAL -->
 <div class="modal-bg" id="slotsModal" onclick="closeModal('slotsModal',event)">
-  <div class="modal" style="position:relative">
+  <div class="modal game-modal game-modal--slots" style="position:relative">
     <button class="modal-close" onclick="closeModal('slotsModal')">✕</button>
     <button class="slots-help-btn" onclick="toggleSlotsLegend()">?</button>
     <button class="slots-fast-btn" id="fastBtn" onclick="toggleFastMode()" title="Fast mode">⚡</button>
-    <div class="modal-title">🎰 Slots</div>
+    <div class="modal-title" data-subtitle="Lucky WRK · jackpot pays 50×">🎰 Slots</div>
     <div class="slots-legend" id="slotsLegend">
       <div class="legend-row">
         <span class="legend-combo">7️⃣7️⃣7️⃣</span>
@@ -2071,9 +2850,9 @@
 
 <!-- COINFLIP MODAL -->
 <div class="modal-bg" id="cfModal" onclick="closeModal('cfModal',event)">
-  <div class="modal" style="position:relative">
+  <div class="modal game-modal game-modal--coin" style="position:relative">
     <button class="modal-close" onclick="closeModal('cfModal')">✕</button>
-    <div class="modal-title">🪙 Coinflip</div>
+    <div class="modal-title" data-subtitle="Call it · double or nothing">🪙 Coinflip</div>
     <div class="coin-wrap"><div class="coin" id="cfCoin"><div class="coin-face coin-front" id="cfFront">🌝</div><div class="coin-face coin-back" id="cfBack">🌚</div></div></div>
     <div class="result-box" id="cfResult"></div>
     <div class="cf-choice">
@@ -2093,9 +2872,9 @@
 
 <!-- SLIDER MODAL -->
 <div class="modal-bg" id="sliderModal" onclick="closeModal('sliderModal',event)">
-  <div class="modal" style="position:relative">
+  <div class="modal game-modal game-modal--slider" style="position:relative">
     <button class="modal-close" onclick="closeModal('sliderModal')">✕</button>
-    <div class="modal-title">🎚️ Slider</div>
+    <div class="modal-title" data-subtitle="Risk lab · set your own odds">🎚️ Slider</div>
     <div style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:8px">Drag to set your win chance</div>
     <div class="slider-arrow-track"><div class="slider-arrow" id="sliderArrow">▼</div></div>
     <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
@@ -2128,9 +2907,9 @@
 
 <!-- PLINKO MODAL -->
 <div class="modal-bg" id="plinkoModal" onclick="closeModal('plinkoModal',event)">
-  <div class="modal" style="position:relative">
+  <div class="modal game-modal game-modal--plinko" style="position:relative">
     <button class="modal-close" onclick="closeModal('plinkoModal')">✕</button>
-    <div class="modal-title">🎯 Plinko</div>
+    <div class="modal-title" data-subtitle="Neon drop · choose your risk">🎯 Plinko</div>
     <div class="plinko-risk-row">
       <div class="plinko-risk-btn" id="plinkoLow"    onclick="setPlinkoRisk('low')">Low</div>
       <div class="plinko-risk-btn" id="plinkoMedium" onclick="setPlinkoRisk('medium')">Medium</div>
@@ -2153,9 +2932,9 @@
 
 <!-- WHEEL MODAL -->
 <div class="modal-bg" id="wheelModal" onclick="closeModal('wheelModal',event)">
-  <div class="modal" style="position:relative">
+  <div class="modal game-modal game-modal--wheel" style="position:relative">
     <button class="modal-close" onclick="closeModal('wheelModal')">✕</button>
-    <div class="modal-title">🎡 Wheel of Fortune</div>
+    <div class="modal-title" data-subtitle="One spin · prizes up to 5×">🎡 Wheel of Fortune</div>
     <div class="wheel-wrap">
       <div class="wheel-pointer">▼</div>
       <div id="wheelSvgWrap"></div>
@@ -2174,9 +2953,9 @@
 
 <!-- CASE MODAL -->
 <div class="modal-bg" id="caseModal" onclick="closeModal('caseModal',event)">
-  <div class="modal" style="position:relative">
+  <div class="modal game-modal game-modal--case" style="position:relative">
     <button class="modal-close" onclick="closeModal('caseModal')">✕</button>
-    <div class="modal-title">📦 Case Opening</div>
+    <div class="modal-title" data-subtitle="Mystery drop · gifts and WRK inside">📦 Case Opening</div>
     <div style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:4px">75,000 <img src="/emoji/5093898072811898950" style="width:18px;height:18px;vertical-align:middle;margin-left:2px" onerror="this.outerHTML='WRK$'"> per open</div>
     <div class="case-reel-wrap">
       <div class="case-reel-center"></div>
@@ -2193,18 +2972,18 @@
 
 <!-- CRASH MODAL -->
 <div class="modal-bg" id="crashModal" onclick="if(event.target.id==='crashModal')document.getElementById('crashModal').classList.remove('open')">
-  <div class="modal" style="position:relative;max-height:90vh;overflow-y:auto">
+  <div class="modal game-modal game-modal--crash" style="position:relative;max-height:90vh;overflow-y:auto">
     <button class="modal-close" onclick="document.getElementById('crashModal').classList.remove('open')">✕</button>
-    <div class="modal-title">🚀 Crash</div>
+    <div class="modal-title" data-subtitle="Live flight · cash out before impact">🚀 Crash</div>
     <div id="crashContent"><div class="loading">Connecting…</div></div>
   </div>
 </div>
 
 <!-- DUCK RACING MODAL -->
 <div class="modal-bg" id="duckModal" onclick="closeModal('duckModal',event)">
-  <div class="modal" style="position:relative">
+  <div class="modal game-modal game-modal--duck" style="position:relative">
     <button class="modal-close" onclick="closeModal('duckModal')">✕</button>
-    <div class="modal-title">🦆 Duck Race</div>
+    <div class="modal-title" data-subtitle="Live aquadrome · pick your racer">🦆 Duck Race</div>
     <div class="crash-history" id="duckHistory"></div>
     <div class="duck-track" id="duckTrack"></div>
     <div class="crash-phase-txt" id="duckPhase">Connecting…</div>
@@ -2216,11 +2995,11 @@
 
 <!-- MARBLES MODAL -->
 <div class="modal-bg" id="marblesModal" onclick="closeModal('marblesModal',event)">
-  <div class="modal" style="position:relative">
+  <div class="modal game-modal game-modal--marbles" style="position:relative">
     <button class="modal-close" onclick="closeModal('marblesModal')">✕</button>
-    <div class="modal-title">🔮 Marbles</div>
+    <div class="modal-title" data-subtitle="Live prize chamber · weighted odds">🔮 Marbles</div>
     <div class="marble-board-wrap">
-      <svg id="marbleBoardSvg" viewBox="0 0 280 80" xmlns="http://www.w3.org/2000/svg"></svg>
+      <svg id="marbleBoardSvg" viewBox="0 0 320 190" xmlns="http://www.w3.org/2000/svg"></svg>
     </div>
     <div class="marble-players" id="marblePlayers"></div>
     <div class="crash-phase-txt" id="marblePhase">Connecting…</div>
@@ -2232,11 +3011,10 @@
 
 <!-- LIVE BLACKJACK MODAL -->
 <div class="modal-bg" id="liveBjModal" onclick="closeModal('liveBjModal',event)">
-  <div class="modal" style="position:relative">
+  <div class="modal game-modal game-modal--cards" style="position:relative">
     <button class="modal-close" onclick="closeModal('liveBjModal')">✕</button>
-    <div class="modal-title">🃏 Live Blackjack
-      <button onclick="toggleLbjLegend()" style="float:right;background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px;color:var(--muted);cursor:pointer">?</button>
-    </div>
+    <button class="game-help-btn" onclick="toggleLbjLegend()" aria-label="Blackjack rules">?</button>
+    <div class="modal-title" data-subtitle="Six-seat table · dealer stands on 17">🃏 Live Blackjack</div>
     <div id="lbjLegend" style="display:none;background:rgba(0,0,0,.2);border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px;line-height:1.8">
       <b>Card Values</b><br>
       A = 1 or 11 &nbsp;·&nbsp; 2–10 = face value &nbsp;·&nbsp; J/Q/K = 10<br>
@@ -2261,11 +3039,10 @@
 
 <!-- POKER MODAL -->
 <div class="modal-bg" id="pokerModal" onclick="closeModal('pokerModal',event)">
-  <div class="modal" style="position:relative">
+  <div class="modal game-modal game-modal--cards" style="position:relative">
     <button class="modal-close" onclick="closeModal('pokerModal')">✕</button>
-    <div class="modal-title">♠️ Texas Hold'Em
-      <button onclick="togglePokerLegend()" style="float:right;background:none;border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:12px;color:var(--muted);cursor:pointer">?</button>
-    </div>
+    <button class="game-help-btn" onclick="togglePokerLegend()" aria-label="Poker hand rankings">?</button>
+    <div class="modal-title" data-subtitle="No-limit table · 10K buy-in">♠️ Texas Hold'Em</div>
     <div id="pokerLegend" style="display:none" class="poker-legend">
       👑 Royal Flush — A K Q J 10 same suit<br>
       🌊 Straight Flush — 5 in sequence, same suit<br>
@@ -2292,9 +3069,9 @@
 
 <!-- BLACKJACK MODAL -->
 <div class="modal-bg" id="bjModal" onclick="closeBjModal(event)">
-  <div class="modal" style="position:relative;max-height:88vh;overflow-y:auto">
+  <div class="modal game-modal game-modal--cards" style="position:relative;max-height:88vh;overflow-y:auto">
     <button class="modal-close" onclick="document.getElementById('bjModal').classList.remove('open')">✕</button>
-    <div class="modal-title">🃏 Blackjack</div>
+    <div class="modal-title" data-subtitle="Private table · blackjack pays 3 to 2">🃏 Blackjack</div>
     <div id="bjContent"><div class="loading">Loading…</div></div>
   </div>
 </div>
@@ -3717,6 +4494,8 @@ const _DICE_EMOJI = ['','⚀','⚁','⚂','⚃','⚄','⚅'];
 async function _animateDice(d1, d2) {
   const el1 = document.getElementById('crapsDie1');
   const el2 = document.getElementById('crapsDie2');
+  el1.classList.add('rolling');
+  el2.classList.add('rolling');
   for (let i = 0; i < 14; i++) {
     el1.textContent = _DICE_EMOJI[Math.ceil(Math.random() * 6)];
     el2.textContent = _DICE_EMOJI[Math.ceil(Math.random() * 6)];
@@ -3724,6 +4503,8 @@ async function _animateDice(d1, d2) {
   }
   el1.textContent = _DICE_EMOJI[d1];
   el2.textContent = _DICE_EMOJI[d2];
+  el1.classList.remove('rolling');
+  el2.classList.remove('rolling');
 }
 
 async function openCraps() {
@@ -4599,7 +5380,7 @@ const _CASE_TIER_COLORS = {
 };
 const _CASE_FILLER = ['common','common','common','common','uncommon','uncommon','rare'];
 const _CASE_REVEAL_IDX = 24;
-const _CASE_ITEM_W = 90; // 84px + 6px gap
+const _CASE_ITEM_W = 110; // 104px + 6px gap
 
 function openCase() {
   if (!state.userId) return alert('Open in Telegram to play.');
@@ -5451,14 +6232,27 @@ function handleCrashMsg(msg) {
 function initCrashUI() {
   document.getElementById('crashContent').innerHTML = `
     <div class="crash-history" id="crashHistory"></div>
-    <div class="crash-chart-wrap" id="crashChartWrap">
-      <svg id="crashChartSvg" viewBox="0 0 300 110" preserveAspectRatio="none">
-        <polyline id="crashChartLine" points="0,110" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-      </svg>
-      <div class="crash-chart-rocket" id="crashChartRocket" style="left:0%;top:100%">🚀</div>
+    <div class="crash-stage">
+      <div class="crash-chart-wrap" id="crashChartWrap">
+        <svg id="crashChartSvg" viewBox="0 0 300 180" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="crashAreaGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#34d399" stop-opacity=".32"/>
+              <stop offset="100%" stop-color="#34d399" stop-opacity="0"/>
+            </linearGradient>
+            <filter id="crashLineGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2.5" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <polygon id="crashChartFill" points="0,180 300,180" fill="url(#crashAreaGradient)"/>
+          <polyline id="crashChartLine" points="0,180" fill="none" stroke="#34d399" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" filter="url(#crashLineGlow)"/>
+        </svg>
+        <div class="crash-chart-rocket" id="crashChartRocket" style="left:0%;top:100%">🚀</div>
+      </div>
+      <div class="crash-mult" id="crashMult"></div>
+      <div class="crash-phase-txt" id="crashPhase">Connecting…</div>
     </div>
-    <div class="crash-mult" id="crashMult"></div>
-    <div class="crash-phase-txt" id="crashPhase">Connecting…</div>
     <div class="crash-bet-info" id="crashBetInfo"></div>
     <div id="crashActionsArea"></div>
     <div class="error-msg" id="crashErr"></div>
@@ -5513,7 +6307,9 @@ function updateCrashDisplay(msg) {
       _crashPts = [[0, 1.0]];
       _crashMaxMult = 2;
       const line = document.getElementById('crashChartLine');
-      if (line) { line.setAttribute('points', '0,110'); line.setAttribute('stroke', '#10b981'); }
+      const fill = document.getElementById('crashChartFill');
+      if (line) { line.setAttribute('points', '0,180'); line.setAttribute('stroke', '#34d399'); }
+      if (fill) fill.setAttribute('points', '0,180 300,180');
       const r = document.getElementById('crashChartRocket');
       if (r) r.textContent = '🚀';
     }
@@ -5583,9 +6379,10 @@ function crashCashout() {
 
 function _drawCrashChart() {
   const line = document.getElementById('crashChartLine');
+  const fill = document.getElementById('crashChartFill');
   const rocket = document.getElementById('crashChartRocket');
   if (!line || !_crashPts.length) return;
-  const W = 300, H = 110, PAD = 10;
+  const W = 300, H = 180, PAD = 12;
   const maxT = Math.max(8, (_crashPts[_crashPts.length-1][0] || 1) * 1.15);
   const maxM = _crashMaxMult;
   function toX(t) { return PAD + (t / maxT) * (W - PAD * 2); }
@@ -5596,6 +6393,7 @@ function _drawCrashChart() {
   }
   const pts = _crashPts.map(([t,m]) => `${toX(t).toFixed(1)},${toY(m).toFixed(1)}`).join(' ');
   line.setAttribute('points', `0,${H} ` + pts);
+  if (fill) fill.setAttribute('points', `0,${H} ${pts} ${W},${H}`);
   if (rocket) {
     const [lt, lm] = _crashPts[_crashPts.length-1];
     rocket.style.left = (toX(lt) / W * 100).toFixed(1) + '%';
@@ -5661,8 +6459,14 @@ function _updateDuckDisplay(msg) {
         track.innerHTML = msg.ducks.map((d, i) => {
           const isSelected = _duckSelected === i || _duckMyDuck === i;
           return `<div class="duck-lane${isSelected ? ' selected' : ''}" id="duck-lane-${i}">
-            <span class="duck-runner" id="duck-runner-${i}" style="margin-left:5%;transition:margin-left 0.35s ease">${esc(d.emoji)}</span>
-            <span class="duck-mult ${_multClass(d.mult)}">${d.mult}×</span>
+            <span class="duck-lane-no">0${i + 1}</span>
+            <div class="duck-raceway">
+              <span class="duck-runner" id="duck-runner-${i}" style="margin-left:5%;transition:margin-left 0.35s ease">${esc(d.emoji)}</span>
+            </div>
+            <div class="duck-lane-meta">
+              <span class="duck-name">${esc(d.name)}</span>
+              <span class="duck-mult ${_multClass(d.mult)}">${d.mult}×</span>
+            </div>
           </div>`;
         }).join('');
         if (_duckRaceInterval) clearInterval(_duckRaceInterval);
@@ -5685,9 +6489,14 @@ function _updateDuckDisplay(msg) {
         const isSelected = _duckSelected === i || _duckMyDuck === i;
         const pos = msg.phase === 'finished' ? (isWinner ? 85 : Math.min(_duckPositions[i], 62)) : 5;
         return `<div class="duck-lane${isSelected ? ' selected' : ''}${isWinner ? ' winner' : ''}" id="duck-lane-${i}" onclick="_selectDuck(${i})">
-          <span class="duck-runner" id="duck-runner-${i}" style="margin-left:${pos}%;transition:margin-left 0.5s ease">${esc(d.emoji)}</span>
-          <span class="duck-name">${esc(d.name)}</span>
-          <span class="duck-mult ${_multClass(d.mult)}">${d.mult}×</span>
+          <span class="duck-lane-no">0${i + 1}</span>
+          <div class="duck-raceway">
+            <span class="duck-runner" id="duck-runner-${i}" style="margin-left:${pos}%;transition:margin-left 0.5s ease">${esc(d.emoji)}</span>
+          </div>
+          <div class="duck-lane-meta">
+            <span class="duck-name">${esc(d.name)}</span>
+            <span class="duck-mult ${_multClass(d.mult)}">${d.mult}×</span>
+          </div>
         </div>`;
       }).join('');
     }
@@ -5847,25 +6656,63 @@ function _updateMarblesDisplay(msg) {
 function _buildMarbleBoard(players, animate) {
   const svg = document.getElementById('marbleBoardSvg');
   if (!svg) return;
-  const W = 280, H = 80;
-  let html = '';
+  const W = 320, H = 190;
+  let html = `
+    <defs>
+      <radialGradient id="marbleBallGlow" cx="35%" cy="28%">
+        <stop offset="0%" stop-color="#ffffff"/>
+        <stop offset="32%" stop-color="#f5d0fe"/>
+        <stop offset="100%" stop-color="#8b5cf6"/>
+      </radialGradient>
+      <filter id="marbleGlow" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <linearGradient id="marbleShade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#ffffff" stop-opacity=".16"/>
+        <stop offset="55%" stop-color="#ffffff" stop-opacity="0"/>
+        <stop offset="100%" stop-color="#000000" stop-opacity=".25"/>
+      </linearGradient>
+    </defs>
+    <rect width="${W}" height="${H}" rx="18" fill="rgba(4,3,12,.65)"/>
+  `;
   // Zones
   const total = (players || []).reduce((s, p) => s + p.total_value, 0) || 1;
   let x = 0;
-  (players || []).forEach(p => {
-    const w = Math.round(p.total_value / total * W);
-    html += `<rect x="${x}" y="0" width="${w}" height="${H}" fill="${p.color}" opacity="0.7"/>`;
-    if (w > 30) html += `<text x="${x + w/2}" y="50" text-anchor="middle" font-size="9" fill="white" font-weight="700">${esc(p.name)}</text>`;
+  (players || []).forEach((p, index, all) => {
+    const w = index === all.length - 1 ? W - x : Math.round(p.total_value / total * W);
+    html += `
+      <rect x="${x}" y="0" width="${w}" height="${H}" fill="${p.color}" opacity=".58"/>
+      <rect x="${x}" y="0" width="${w}" height="${H}" fill="url(#marbleShade)"/>
+      <line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="rgba(255,255,255,.28)" stroke-width="1"/>
+    `;
+    if (w > 34) {
+      html += `
+        <text x="${x + w/2}" y="${H - 28}" text-anchor="middle" font-size="10" fill="white" font-weight="800">${esc(p.name)}</text>
+        <text x="${x + w/2}" y="${H - 14}" text-anchor="middle" font-size="8" fill="rgba(255,255,255,.65)">${p.pct}%</text>
+      `;
+    }
     x += w;
   });
+  if (!(players || []).length) {
+    html += `
+      <circle cx="${W/2}" cy="${H/2}" r="48" fill="none" stroke="rgba(167,139,250,.18)" stroke-width="1"/>
+      <circle cx="${W/2}" cy="${H/2}" r="72" fill="none" stroke="rgba(167,139,250,.1)" stroke-width="1"/>
+      <text x="${W/2}" y="${H - 18}" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.34)" font-weight="800">WAITING FOR PLAYERS</text>
+    `;
+  }
   // Ball
   if (animate) {
     _marbleBallX += _marbleBallDx;
     _marbleBallY += _marbleBallDy;
-    if (_marbleBallX < 8 || _marbleBallX > W - 8) _marbleBallDx *= -1;
-    if (_marbleBallY < 8 || _marbleBallY > H - 8) _marbleBallDy *= -1;
+    if (_marbleBallX < 12 || _marbleBallX > W - 12) _marbleBallDx *= -1;
+    if (_marbleBallY < 12 || _marbleBallY > H - 12) _marbleBallDy *= -1;
   }
-  html += `<circle cx="${_marbleBallX}" cy="${_marbleBallY}" r="8" fill="white" stroke="#111" stroke-width="1.5" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))"/>`;
+  html += `
+    <circle cx="${_marbleBallX}" cy="${_marbleBallY}" r="15" fill="rgba(167,139,250,.18)" filter="url(#marbleGlow)"/>
+    <circle cx="${_marbleBallX}" cy="${_marbleBallY}" r="10" fill="url(#marbleBallGlow)" stroke="rgba(255,255,255,.82)" stroke-width="1.5"/>
+    <circle cx="${_marbleBallX - 3}" cy="${_marbleBallY - 3}" r="2.2" fill="white" opacity=".9"/>
+  `;
   svg.innerHTML = html;
   if (animate && _marbleLastPhase === 'launching') {
     if (_marbleAnimId) cancelAnimationFrame(_marbleAnimId);
@@ -6161,10 +7008,13 @@ function _connectLiveBjWs() {
 }
 
 function _lbjCardHtml(card) {
-  if (card === '🂠') return `<div class="lbj-card back">🂠</div>`;
+  if (card === '🂠') return `<div class="lbj-card back" aria-label="Face-down card"></div>`;
   const suit = card.slice(-1);
+  const rank = card.slice(0, -1);
   const red = suit === '♥' || suit === '♦';
-  return `<div class="lbj-card${red?' red':''}">${esc(card)}</div>`;
+  return `<div class="lbj-card${red?' red':''}" aria-label="${esc(card)}">
+    <span class="card-rank">${esc(rank)}</span><span class="card-suit">${esc(suit)}</span>
+  </div>`;
 }
 
 function _handleLbjMsg(msg) {
@@ -6306,10 +7156,13 @@ function _connectPokerWs() {
 }
 
 function _pokerCardHtml(card) {
-  if (card === '🂠') return `<div class="lbj-card back" style="width:28px;height:40px;font-size:11px">🂠</div>`;
+  if (card === '🂠') return `<div class="lbj-card poker-card back" aria-label="Face-down card"></div>`;
   const suit = card.slice(-1);
+  const rank = card.slice(0, -1);
   const red = suit === '♥' || suit === '♦';
-  return `<div class="lbj-card${red?' red':''}" style="width:28px;height:40px;font-size:11px">${esc(card)}</div>`;
+  return `<div class="lbj-card poker-card${red?' red':''}" aria-label="${esc(card)}">
+    <span class="card-rank">${esc(rank)}</span><span class="card-suit">${esc(suit)}</span>
+  </div>`;
 }
 
 function _handlePokerMsg(msg) {

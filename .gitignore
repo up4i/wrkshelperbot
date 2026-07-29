@@ -3,5 +3,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.log
+*.db
+miniapp/static/emoji_cache/
 .venv/
 venv/
