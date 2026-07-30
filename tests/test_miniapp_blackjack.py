@@ -53,6 +53,40 @@ def test_perfect_pair_uses_tuple_cards_and_credits_full_payout(
     assert result["balance"] == 11_400
 
 
+def test_war_side_game_compares_first_cards_and_updates_bankroll(
+    tmp_path,
+    monkeypatch,
+):
+    path = tmp_path / "blackjack-war.db"
+    _seed_wallet(path)
+    monkeypatch.setattr(server, "DB_PATH", str(path))
+    server._bj_games.clear()
+    monkeypatch.setattr(
+        server,
+        "_bj_new_deck",
+        lambda: _rigged_deck(
+            ("K", "♠"),
+            ("6", "♦"),
+            ("Q", "♥"),
+            ("7", "♣"),
+        ),
+    )
+
+    result = server.blackjack_start(
+        server.BlackjackStartRequest(user_id=1, bet=100, war_bet=200),
+        authenticated_user=1,
+    )
+
+    assert result["status"] == "playing"
+    assert result["war_result"] == "win"
+    assert result["war_delta"] == 200
+    assert result["war_player_card"]["rank"] == "K"
+    assert result["war_dealer_card"]["rank"] == "Q"
+    # Main stake is down 100 while War is up 200.
+    assert result["balance"] == 10_100
+    assert result["bankroll_delta"] == 100
+
+
 def test_blackjack_natural_pays_three_to_two(tmp_path, monkeypatch):
     path = tmp_path / "blackjack-natural.db"
     _seed_wallet(path)
@@ -212,3 +246,30 @@ def test_roulette_straight_double_zero_pays_36_to_1(tmp_path, monkeypatch):
     assert result["payout_mult"] == 36
     assert result["delta"] == 3_500
     assert result["new_balance"] == 13_500
+
+
+def test_roulette_settles_multiple_bets_on_one_spin(tmp_path, monkeypatch):
+    path = tmp_path / "roulette-multi.db"
+    _seed_wallet(path)
+    monkeypatch.setattr(server, "DB_PATH", str(path))
+    # Wheel slot 2 is red 9: red, odd, and first dozen all win; black loses.
+    monkeypatch.setattr(server.random, "randint", lambda _low, _high: 2)
+
+    result = server.play_roulette(
+        server.RouletteRequest(
+            user_id=1,
+            bets=[
+                server.RouletteBet(amount=100, bet_type="red"),
+                server.RouletteBet(amount=100, bet_type="odd"),
+                server.RouletteBet(amount=100, bet_type="dozen1"),
+                server.RouletteBet(amount=100, bet_type="black"),
+            ],
+        ),
+        authenticated_user=1,
+    )
+
+    assert result["winning_number"] == 9
+    assert result["total_bet"] == 400
+    assert [bet["won"] for bet in result["bets"]] == [True, True, True, False]
+    assert result["delta"] == 300
+    assert result["new_balance"] == 10_300
