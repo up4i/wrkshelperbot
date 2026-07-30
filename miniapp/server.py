@@ -1452,77 +1452,147 @@ _RL_WHEEL = [
     ('R',16),('B',4),('R',23),('B',35),('R',14),('B',2),
 ]
 
-class RouletteRequest(BaseModel):
-    user_id: int
-    bet: int
+class RouletteBet(BaseModel):
+    amount: int
     bet_type: str
     straight_number: int | None = None  # -1 represents 00
+
+
+class RouletteRequest(BaseModel):
+    user_id: int
+    bets: list[RouletteBet] | None = None
+    # Legacy single-bet fields remain accepted for older mini-app clients.
+    bet: int | None = None
+    bet_type: str | None = None
+    straight_number: int | None = None
+
+
+_ROULETTE_BET_TYPES = {
+    "red", "black", "green", "odd", "even", "low", "high",
+    "dozen1", "dozen2", "dozen3", "col1", "col2", "col3",
+    "straight",
+}
+
+
+def _roulette_result_for_bet(
+    bet_type: str,
+    straight_number: int | None,
+    color_code: str,
+    number: int,
+) -> tuple[bool, int]:
+    if bet_type == "red":
+        return color_code == "R", 2
+    if bet_type == "black":
+        return color_code == "B", 2
+    if bet_type == "green":
+        return color_code == "G", 14
+    if bet_type == "odd":
+        return number > 0 and number % 2 == 1, 2
+    if bet_type == "even":
+        return number > 0 and number % 2 == 0, 2
+    if bet_type == "low":
+        return 1 <= number <= 18, 2
+    if bet_type == "high":
+        return 19 <= number <= 36, 2
+    if bet_type == "dozen1":
+        return 1 <= number <= 12, 3
+    if bet_type == "dozen2":
+        return 13 <= number <= 24, 3
+    if bet_type == "dozen3":
+        return 25 <= number <= 36, 3
+    if bet_type == "col1":
+        return number > 0 and number % 3 == 1, 3
+    if bet_type == "col2":
+        return number > 0 and number % 3 == 2, 3
+    if bet_type == "col3":
+        return number > 0 and number % 3 == 0, 3
+    return number == straight_number, 36
 
 
 @app.post("/api/play/roulette")
 def play_roulette(req: RouletteRequest, authenticated_user: AuthenticatedUser):
     _require_actor(authenticated_user, req.user_id)
-    valid = {
-        "red", "black", "green", "odd", "even", "low", "high",
-        "dozen1", "dozen2", "dozen3", "col1", "col2", "col3",
-        "straight",
-    }
-    if req.bet_type not in valid:
-        raise HTTPException(400, f"bet_type must be one of: {', '.join(sorted(valid))}")
-    if req.bet_type == "straight" and (
-        req.straight_number is None
-        or req.straight_number < -1
-        or req.straight_number > 36
-    ):
-        raise HTTPException(400, "straight_number must be 00, 0, or 1–36")
+    wagers = req.bets
+    if not wagers and req.bet is not None and req.bet_type is not None:
+        wagers = [RouletteBet(
+            amount=req.bet,
+            bet_type=req.bet_type,
+            straight_number=req.straight_number,
+        )]
+    if not wagers:
+        raise HTTPException(400, "Choose at least one roulette bet")
+    if len(wagers) > 20:
+        raise HTTPException(400, "A spin can have at most 20 bets")
+
+    seen: set[tuple[str, int | None]] = set()
+    for wager in wagers:
+        if wager.amount < 10:
+            raise HTTPException(400, "Minimum bet is 10 WRK$ per selection")
+        if wager.bet_type not in _ROULETTE_BET_TYPES:
+            raise HTTPException(
+                400,
+                f"bet_type must be one of: {', '.join(sorted(_ROULETTE_BET_TYPES))}",
+            )
+        if wager.bet_type == "straight" and (
+            wager.straight_number is None
+            or wager.straight_number < -1
+            or wager.straight_number > 36
+        ):
+            raise HTTPException(400, "straight_number must be 00, 0, or 1–36")
+        key = (
+            wager.bet_type,
+            wager.straight_number if wager.bet_type == "straight" else None,
+        )
+        if key in seen:
+            raise HTTPException(400, "Duplicate roulette selections are not allowed")
+        seen.add(key)
+
+    total_bet = sum(wager.amount for wager in wagers)
     with db_conn() as db:
-        bal = _deduct_and_check(db, req.user_id, req.bet)
+        bal = _deduct_and_check(db, req.user_id, total_bet)
         slot = random.randint(0, 37)
         color_code, number = _RL_WHEEL[slot]
         winning_color = {"G":"green","R":"red","B":"black"}[color_code]
-        bt = req.bet_type
-        if bt == "red":
-            won, mult = color_code == "R", 2
-        elif bt == "black":
-            won, mult = color_code == "B", 2
-        elif bt == "green":
-            won, mult = color_code == "G", 14
-        elif bt == "odd":
-            won, mult = number > 0 and number % 2 == 1, 2
-        elif bt == "even":
-            won, mult = number > 0 and number % 2 == 0, 2
-        elif bt == "low":
-            won, mult = 1 <= number <= 18, 2
-        elif bt == "high":
-            won, mult = 19 <= number <= 36, 2
-        elif bt == "dozen1":
-            won, mult = 1 <= number <= 12, 3
-        elif bt == "dozen2":
-            won, mult = 13 <= number <= 24, 3
-        elif bt == "dozen3":
-            won, mult = 25 <= number <= 36, 3
-        elif bt == "col1":
-            won, mult = number > 0 and number % 3 == 1, 3
-        elif bt == "col2":
-            won, mult = number > 0 and number % 3 == 2, 3
-        elif bt == "col3":
-            won, mult = number > 0 and number % 3 == 0, 3
-        else:  # straight
-            won, mult = number == req.straight_number, 36
-        delta = req.bet * (mult - 1) if won else -req.bet
+        results = []
+        delta = 0
+        for wager in wagers:
+            won, mult = _roulette_result_for_bet(
+                wager.bet_type,
+                wager.straight_number,
+                color_code,
+                number,
+            )
+            wager_delta = wager.amount * (mult - 1) if won else -wager.amount
+            delta += wager_delta
+            results.append({
+                "bet_type": wager.bet_type,
+                "amount": wager.amount,
+                "straight_number": (
+                    wager.straight_number if wager.bet_type == "straight" else None
+                ),
+                "won": won,
+                "payout_mult": mult if won else 0,
+                "delta": wager_delta,
+            })
         new_bal = bal + delta
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
         if delta > 0:
             _record_stats(db, req.user_id, roulette_won=delta)
         elif delta < 0:
-            _record_stats(db, req.user_id, roulette_lost=req.bet)
+            _record_stats(db, req.user_id, roulette_lost=-delta)
         db.commit()
+        won_results = [result for result in results if result["won"]]
         return {
             "slot": slot,
             "winning_color": winning_color,
             "winning_number": number if number >= 0 else "00",
-            "won": won,
-            "payout_mult": mult if won else 0,
+            "won": bool(won_results),
+            "payout_mult": max(
+                (result["payout_mult"] for result in won_results),
+                default=0,
+            ),
+            "bets": results,
+            "total_bet": total_bet,
             "delta": delta,
             "new_balance": new_bal,
         }
@@ -1966,10 +2036,12 @@ def hack_start(req: HackStartRequest, authenticated_user: AuthenticatedUser):
             raise HTTPException(400, "You already have an active hack session")
         word, clue = random.choice(_WORDLIST)
         balance = row["balance"] or 0
-        reward = random.randint(
+        reward_ceiling = max(10_000, min(int(balance * 0.008), 150_000))
+        reward_floor = min(
+            reward_ceiling,
             max(2_000, int(balance * 0.003)),
-            max(10_000, min(int(balance * 0.008), 150_000)),
         )
+        reward = random.randint(reward_floor, reward_ceiling)
         db.execute(
             "INSERT INTO hack_sessions (user_id, word, clue, reward, attempts, revealed_indices, started_at) "
             "VALUES (?, ?, ?, ?, 5, '0', ?)",
@@ -3824,6 +3896,11 @@ def _bj_card_val(rank: str) -> int:
     return int(rank)
 
 
+def _bj_war_rank(rank: str) -> int:
+    """Rank cards for War with Ace high and face cards kept distinct."""
+    return _BJ_RANKS.index(rank) + 2
+
+
 def _bj_hand_val(hand: list) -> int:
     total = sum(_bj_card_val(r) for r, _ in hand)
     aces = sum(1 for r, _ in hand if r == 'A')
@@ -3848,7 +3925,7 @@ def _bj_playing_state(game: dict, balance: int) -> dict:
         and _bj_card_val(hand[0][0]) == _bj_card_val(hand[1][0])
         and balance >= game["bet"]
     )
-    return {
+    state = {
         "status": "playing",
         "bet": game["bet"],
         "hands": [_bj_fmt(h) for h in game["hands"]],
@@ -3860,7 +3937,15 @@ def _bj_playing_state(game: dict, balance: int) -> dict:
         "can_split": can_split,
         "doubled": game["doubled"],
         "balance": balance,
+        "bankroll_delta": balance - game["starting_balance"],
     }
+    for key in (
+        "pp_result", "pp_delta", "war_result", "war_delta",
+        "war_player_card", "war_dealer_card",
+    ):
+        if game.get(key) is not None:
+            state[key] = game[key]
+    return state
 
 
 def _bj_resolve_game(db, user_id: int, game: dict) -> dict:
@@ -3904,7 +3989,7 @@ def _bj_resolve_game(db, user_id: int, game: dict) -> dict:
     new_balance = row["balance"] if row else 0
     del _bj_games[user_id]
 
-    return {
+    response = {
         "status": "finished",
         "bet": game["bet"],
         "hands": [_bj_fmt(h) for h in game["hands"]],
@@ -3914,14 +3999,23 @@ def _bj_resolve_game(db, user_id: int, game: dict) -> dict:
         "doubled": game["doubled"],
         "results": results,
         "total_delta": total_delta,
+        "session_delta": new_balance - game["starting_balance"],
         "new_balance": new_balance,
     }
+    for key in (
+        "pp_result", "pp_delta", "war_result", "war_delta",
+        "war_player_card", "war_dealer_card",
+    ):
+        if game.get(key) is not None:
+            response[key] = game[key]
+    return response
 
 
 class BlackjackStartRequest(BaseModel):
     user_id: int
     bet: int
     pp_bet: int = 0
+    war_bet: int = 0
 
 
 class BlackjackActionRequest(BaseModel):
@@ -3961,16 +4055,19 @@ def blackjack_start(req: BlackjackStartRequest, authenticated_user: Authenticate
     _require_actor(authenticated_user, req.user_id)
     if req.user_id in _bj_games:
         raise HTTPException(400, "Game already in progress — finish it first")
+    if req.pp_bet < 0 or req.war_bet < 0:
+        raise HTTPException(400, "Side bets cannot be negative")
     with db_conn() as db:
         row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
         if not row:
             raise HTTPException(404, "User not found — use the bot first")
         if req.bet < 10:
             raise HTTPException(400, "Minimum bet is 10 WRK$")
-        total_cost = req.bet + max(0, req.pp_bet)
-        if row["balance"] < total_cost:
+        starting_balance = row["balance"]
+        total_cost = req.bet + req.pp_bet + req.war_bet
+        if starting_balance < total_cost:
             raise HTTPException(400, f"Insufficient balance ({row['balance']:,} WRK$)")
-        balance = row["balance"] - total_cost
+        balance = starting_balance - total_cost
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (balance, req.user_id))
 
         deck = _bj_new_deck()
@@ -3997,6 +4094,23 @@ def blackjack_start(req: BlackjackStartRequest, authenticated_user: Authenticate
             # The side-bet stake was included in total_cost. Credit the full
             # payout on a win; a loss needs no second deduction.
             balance += pp_payout
+            db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (balance, req.user_id))
+
+        # War side game — the player's first card must outrank the dealer's.
+        # Aces are high, face cards keep their natural J/Q/K order, and ties
+        # go to the dealer. A winning stake pays 2x including the returned bet.
+        war_result, war_delta = None, 0
+        war_player_card = war_dealer_card = None
+        if req.war_bet > 0:
+            war_player_card = _bj_fmt([player[0]])[0]
+            war_dealer_card = _bj_fmt([dealer[0]])[0]
+            if _bj_war_rank(player[0][0]) > _bj_war_rank(dealer[0][0]):
+                war_result = "win"
+                war_delta = req.war_bet
+                balance += req.war_bet * 2
+            else:
+                war_result = "lose"
+                war_delta = -req.war_bet
             db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (balance, req.user_id))
 
         player_blackjack = _bj_hand_val(player) == 21
@@ -4033,28 +4147,39 @@ def blackjack_start(req: BlackjackStartRequest, authenticated_user: Authenticate
                     "hand_bet": req.bet,
                 }],
                 "total_delta": main_delta,
+                "session_delta": balance - starting_balance,
                 "new_balance": balance,
             }
             if pp_result is not None:
                 resp["pp_result"] = pp_result
                 resp["pp_delta"] = pp_delta
+            if war_result is not None:
+                resp.update({
+                    "war_result": war_result,
+                    "war_delta": war_delta,
+                    "war_player_card": war_player_card,
+                    "war_dealer_card": war_dealer_card,
+                })
             return resp
 
         db.commit()
 
     _bj_games[req.user_id] = {
         "bet": req.bet,
+        "starting_balance": starting_balance,
         "deck": deck,
         "hands": [player],
         "current_hand": 0,
         "doubled": [False],
         "dealer": dealer,
+        "pp_result": pp_result,
+        "pp_delta": pp_delta if pp_result is not None else None,
+        "war_result": war_result,
+        "war_delta": war_delta if war_result is not None else None,
+        "war_player_card": war_player_card,
+        "war_dealer_card": war_dealer_card,
     }
-    resp = _bj_playing_state(_bj_games[req.user_id], balance)
-    if pp_result is not None:
-        resp["pp_result"] = pp_result
-        resp["pp_delta"] = pp_delta
-    return resp
+    return _bj_playing_state(_bj_games[req.user_id], balance)
 
 
 @app.post("/api/blackjack/action")

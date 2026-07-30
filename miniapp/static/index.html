@@ -2061,8 +2061,22 @@
     to   { transform: rotateY(0deg)  scaleX(1);   opacity: 1; }
   }
   @keyframes bj-deal-in {
-    from { opacity: 0; transform: translateY(-14px); }
-    to   { opacity: 1; transform: translateY(0); }
+    0% {
+      opacity: 0;
+      filter: blur(2px);
+      transform: translate3d(86px,-54px,0) rotateZ(11deg) rotateY(-38deg) scale(.82);
+    }
+    68% {
+      opacity: 1;
+      filter: blur(0);
+      transform: translate3d(-4px,2px,0) rotateZ(-1.5deg) rotateY(2deg) scale(1.025);
+    }
+    100% { opacity: 1; filter: blur(0); transform: translate3d(0,0,0) rotateZ(0) rotateY(0) scale(1); }
+  }
+  @keyframes bj-money-pop {
+    0% { opacity: 0; transform: translateY(9px) scale(.92); }
+    45% { opacity: 1; transform: translateY(-3px) scale(1.05); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
   }
   @keyframes rl-spin { to { transform: rotate(360deg); } }
   .rl-wrap { position:relative; width:200px; height:200px; margin:0 auto 10px; }
@@ -2829,6 +2843,16 @@
   .game-modal--plinko  { --game-accent: #67e8f9; --game-accent-2: #a78bfa; }
   .game-modal--wheel   { --game-accent: #a78bfa; --game-accent-2: #fbbf24; }
   .game-modal--case    { --game-accent: #ec4899; --game-accent-2: #a78bfa; }
+  .game-modal--blackjack {
+    height: min(760px, calc(var(--tg-viewport-stable-height, 100dvh) - var(--safe-top) - 18px));
+    max-height: calc(var(--tg-viewport-stable-height, 100dvh) - var(--safe-top) - 18px);
+    overflow-y: auto;
+  }
+  .game-modal--blackjack #bjContent { min-height: 610px; }
+  .game-modal--craps {
+    height: min(660px, calc(var(--tg-viewport-stable-height, 100dvh) - var(--safe-top) - 18px));
+    max-height: calc(var(--tg-viewport-stable-height, 100dvh) - var(--safe-top) - 18px);
+  }
 
   /* Game lobby cards */
   #gamesGrid .game-card {
@@ -3256,12 +3280,43 @@
   }
   .bj-table {
     min-height: 340px;
+    position: relative;
+    overflow: hidden;
     justify-content: space-between;
     padding: 30px 18px 22px;
     border-radius: 46% 46% 22px 22px / 25% 25% 16px 16px;
   }
   .bj-table::before { content: "BLACKJACK PAYS 3:2 · DEALER STANDS ON 17"; top: 50%; z-index: 0; }
   .bj-table > * { position: relative; z-index: 1; }
+  .bj-dealer-zone { min-height: 116px; justify-content: flex-end; }
+  .bj-dealer-shadow {
+    position: absolute;
+    z-index: 0;
+    top: 8px;
+    left: 50%;
+    width: 172px;
+    height: 112px;
+    transform: translateX(-50%);
+    opacity: .36;
+    filter: drop-shadow(0 12px 18px rgba(0,0,0,.46));
+    pointer-events: none;
+  }
+  .bj-dealer-shadow .head {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 43px;
+    height: 48px;
+    border-radius: 48% 48% 44% 44%;
+    background: linear-gradient(180deg, #060809, #0b1110);
+    transform: translateX(-50%);
+  }
+  .bj-dealer-shadow .shoulders {
+    position: absolute;
+    inset: 38px 0 0;
+    border-radius: 52% 52% 13% 13%;
+    background: radial-gradient(ellipse at 50% 0, #101817 0 18%, #070b0b 19% 72%, transparent 73%);
+  }
   .bj-table > div:not(.divider) {
     width: 100%;
     display: flex;
@@ -3322,6 +3377,66 @@
     border-radius: 15px;
     background: rgba(91,33,182,.08);
   }
+  .bj-side-bets-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 8px;
+  }
+  .bj-side-bets-grid .bj-side-bet-well { margin-top: 0; }
+  .bj-war-copy {
+    min-height: 30px;
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.4;
+    text-align: center;
+  }
+  .bj-side-results {
+    min-height: 62px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 7px;
+    margin: 8px 0;
+  }
+  .bj-side-result {
+    min-width: 0;
+    padding: 8px 7px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    background: rgba(255,255,255,.035);
+    color: #cbd5e1;
+    font-size: 10px;
+    line-height: 1.35;
+    text-align: center;
+    animation: bj-money-pop .36s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .bj-side-result.win { border-color: rgba(52,211,153,.34); color: #a7f3d0; background: rgba(16,185,129,.11); }
+  .bj-side-result.lose { border-color: rgba(251,113,133,.32); color: #fecdd3; background: rgba(190,24,93,.1); }
+  .bj-war-cards { display: flex; justify-content: center; gap: 5px; margin-bottom: 4px; }
+  .bj-war-card {
+    min-width: 27px;
+    padding: 3px 5px;
+    border-radius: 6px;
+    background: #f8fafc;
+    color: #111827;
+    font-family: Georgia, serif;
+    font-size: 11px;
+    font-weight: 900;
+  }
+  .bj-bankroll-meter {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 11px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 13px;
+    background: rgba(0,0,0,.2);
+  }
+  .bj-bankroll-meter .pl { font-size: 17px; font-weight: 900; animation: bj-money-pop .42s cubic-bezier(.2,.8,.2,1) both; }
+  .bj-bankroll-meter .pl.up { color: #6ee7b7; text-shadow: 0 0 18px rgba(16,185,129,.35); }
+  .bj-bankroll-meter .pl.down { color: #fda4af; text-shadow: 0 0 18px rgba(244,63,94,.3); }
+  .bj-bankroll-meter small { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .8px; }
   .bj-side-bet-display {
     min-height: 22px;
     display: grid;
@@ -3346,7 +3461,7 @@
   }
   .bj-strategy summary { color: #cbd5e1; font-weight: 800; cursor: pointer; }
   .bj-strategy p { margin-top: 7px; }
-  .bj-card-deal { animation: bj-deal-in .3s ease both; }
+  .bj-card-deal { animation: bj-deal-in .56s cubic-bezier(.16,.84,.24,1) both; }
   .bj-actions {
     min-height: 46px;
     display: grid;
@@ -3478,6 +3593,21 @@
     color: #e5e7eb;
     font-size: 10px;
   }
+  .roulette-bet-slip {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(251,191,36,.16);
+    border-radius: 12px;
+    background: rgba(251,191,36,.055);
+    color: #d1d5db;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+  .roulette-bet-slip b { color: #fde68a; font-size: 12px; }
   .craps-stage {
     position: relative;
     min-height: 238px;
@@ -3548,23 +3678,35 @@
     transform-style: preserve-3d;
     will-change: transform, filter, opacity;
   }
+  .craps-die-cube {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+  }
   .craps-die-face {
     position: absolute;
     inset: 0;
     display: grid;
     grid-template: repeat(3, 1fr) / repeat(3, 1fr);
     padding: 9px;
-    border: 1px solid rgba(70,48,37,.38);
-    border-radius: 14px;
+    border: 1px solid rgba(70,48,37,.46);
+    border-radius: 12px;
     background:
       radial-gradient(circle at 28% 20%, rgba(255,255,255,.95), transparent 22%),
       linear-gradient(145deg, #fffdf4, #e8e0cf);
     box-shadow:
       inset -5px -6px 9px rgba(92,72,47,.16),
       inset 3px 3px 5px rgba(255,255,255,.8),
-      0 12px 16px rgba(0,0,0,.42);
-    backface-visibility: visible;
+      inset 0 0 0 2px rgba(255,255,255,.34),
+      0 8px 12px rgba(0,0,0,.3);
+    backface-visibility: hidden;
   }
+  .craps-die-face.face-front  { transform: translateZ(31px); }
+  .craps-die-face.face-back   { transform: rotateY(180deg) translateZ(31px); }
+  .craps-die-face.face-right  { transform: rotateY(90deg) translateZ(31px); background: linear-gradient(145deg,#f4eedf,#d7ccb6); }
+  .craps-die-face.face-left   { transform: rotateY(-90deg) translateZ(31px); background: linear-gradient(145deg,#fffdf4,#ddd2bd); }
+  .craps-die-face.face-top    { transform: rotateX(90deg) translateZ(31px); background: linear-gradient(145deg,#fff,#ece4d4); }
+  .craps-die-face.face-bottom { transform: rotateX(-90deg) translateZ(31px); background: linear-gradient(145deg,#e4dac7,#cbbca3); }
   .craps-pip {
     width: 10px;
     height: 10px;
@@ -4669,14 +4811,17 @@
         <button class="roulette-bet-btn" data-roulette-bet="col3" onclick="setRouletteBet('col3',this)">Column 3 · 3×</button>
       </div>
       <div class="roulette-number-row">
-        <select id="rouletteStraightNumber" aria-label="Straight-up number"></select>
+        <select id="rouletteStraightNumber" aria-label="Straight-up number" onchange="updateRouletteSummary()"></select>
         <button class="roulette-bet-btn" data-roulette-bet="straight" onclick="setRouletteBet('straight',this)">Number · 36×</button>
       </div>
     </details>
-    <div class="card-title" style="margin-top:4px">Bet amount</div>
+    <div class="roulette-bet-slip" id="rouletteBetSlip">
+      <span>Select one or more bets</span><b>0 selections</b>
+    </div>
+    <div class="card-title" style="margin-top:4px">Bet per selection</div>
     <div class="bet-presets" id="roulettePresets"></div>
     <div class="bet-row">
-      <input class="input bet-input" id="rouletteBet" type="text" inputmode="numeric" value="100">
+      <input class="input bet-input" id="rouletteBet" type="text" inputmode="numeric" value="100" oninput="updateRouletteSummary()">
       <button class="btn" id="rouletteSpinBtn" onclick="spinRoulette()">SPIN</button>
     </div>
     <div class="balance-display">Balance: <span class="b" id="rouletteBal">—</span> <img src="/emoji/5093898072811898950" style="width:18px;height:18px;vertical-align:middle;margin-left:2px" onerror="this.outerHTML='WRK$'"></div>
@@ -5030,7 +5175,7 @@
 
 <!-- BLACKJACK MODAL -->
 <div class="modal-bg" id="bjModal" onclick="closeBjModal(event)">
-  <div class="modal game-modal game-modal--cards" style="position:relative;max-height:88vh;overflow-y:auto">
+  <div class="modal game-modal game-modal--cards game-modal--blackjack" style="position:relative">
     <button class="modal-close" onclick="document.getElementById('bjModal').classList.remove('open')">✕</button>
     <div class="modal-title" data-subtitle="Private table · blackjack pays 3 to 2">🃏 Blackjack</div>
     <div id="bjContent"><div class="loading">Loading…</div></div>
@@ -6689,7 +6834,7 @@ let _sortableInstance = null;
 let _reorderDebounce = null;
 let _sortableCancelHandler = null;
 
-let rouletteBetType = null;
+const rouletteBetTypes = new Set();
 
 // American roulette wheel segment colors (0, 28, 9, 26, 30, 11, ... order)
 const _RL_COLORS = ['G','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','G','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B','R','B'];
@@ -6773,7 +6918,7 @@ async function _rlLand(slot) {
 
 function openRoulette() {
   if (!state.userId) return alert('Open in Telegram to play.');
-  rouletteBetType = null;
+  rouletteBetTypes.clear();
   document.querySelectorAll('#rouletteModal [data-roulette-bet]').forEach(
     el => el.classList.remove('selected')
   );
@@ -6792,21 +6937,46 @@ function openRoulette() {
   document.getElementById('rouletteBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
   buildPresets('roulettePresets', 'rouletteBet');
   _buildRouletteWheel();
+  updateRouletteSummary();
   document.getElementById('rouletteModal').classList.add('open');
 }
 
 function setRouletteBet(type, selectedEl = null) {
-  rouletteBetType = type;
+  if (rouletteBetTypes.has(type)) rouletteBetTypes.delete(type);
+  else rouletteBetTypes.add(type);
   document.querySelectorAll('#rouletteModal [data-roulette-bet]').forEach(
-    el => el.classList.toggle(
-      'selected',
-      el === selectedEl || el.dataset.rouletteBet === type,
-    )
+    el => el.classList.toggle('selected', rouletteBetTypes.has(el.dataset.rouletteBet))
   );
+  updateRouletteSummary();
+}
+
+function rouletteBetLabel(type) {
+  const labels = {
+    red:'Red', black:'Black', green:'Green', low:'1–18', high:'19–36',
+    even:'Even', odd:'Odd', dozen1:'1st 12', dozen2:'2nd 12', dozen3:'3rd 12',
+    col1:'Column 1', col2:'Column 2', col3:'Column 3',
+  };
+  if (type === 'straight') {
+    const raw = Number(document.getElementById('rouletteStraightNumber')?.value ?? 0);
+    return `Number ${raw === -1 ? '00' : raw}`;
+  }
+  return labels[type] || type;
+}
+
+function updateRouletteSummary() {
+  const slip = document.getElementById('rouletteBetSlip');
+  if (!slip) return;
+  const raw = String(document.getElementById('rouletteBet')?.value || '').replaceAll(',', '').trim();
+  const amount = Math.max(0, Number(raw) || 0);
+  const labels = [...rouletteBetTypes].map(rouletteBetLabel);
+  const total = amount * labels.length;
+  slip.innerHTML = labels.length
+    ? `<span>${labels.map(esc).join(' · ')}</span><b>${labels.length} bet${labels.length === 1 ? '' : 's'} · ${fmt(total)} ${WRK} total</b>`
+    : '<span>Select one or more bets</span><b>0 selections</b>';
 }
 
 async function spinRoulette() {
-  if (!rouletteBetType) return alert('Pick a bet type first.');
+  if (!rouletteBetTypes.size) return alert('Pick one or more bets first.');
   const bet = _parseBet('rouletteBet');
   const errEl = document.getElementById('rouletteErr');
   errEl.textContent = '';
@@ -6821,9 +6991,11 @@ async function spinRoulette() {
       method:'POST',
       json:{
         user_id:+state.userId,
-        bet,
-        bet_type:rouletteBetType,
-        straight_number:rouletteBetType === 'straight' ? straightNumber : null,
+        bets:[...rouletteBetTypes].map(betType => ({
+          amount:bet,
+          bet_type:betType,
+          straight_number:betType === 'straight' ? straightNumber : null,
+        })),
       },
     });
     await _rlLand(data.slot);
@@ -6831,10 +7003,10 @@ async function spinRoulette() {
     const colorEmoji = { red:'🔴', black:'⚫', green:'🟢' }[data.winning_color];
     const numLabel = data.winning_number;
     const delta = data.delta > 0 ? `+${fmt(data.delta)}` : fmt(data.delta);
-    resEl.innerHTML = data.won
-      ? `${colorEmoji} ${numLabel} — You win! ${delta} ${WRK}`
-      : `${colorEmoji} ${numLabel} — You lose. ${delta} ${WRK}`;
-    resEl.className = `result-box show ${data.won ? 'win-box' : 'lose-box'}`;
+    const wonBets = (data.bets || []).filter(item => item.won);
+    const wonLabels = wonBets.map(item => rouletteBetLabel(item.bet_type));
+    resEl.innerHTML = `${colorEmoji} <b>${numLabel}</b> · ${delta} ${WRK}<br><small>${wonLabels.length ? `Winning bets: ${wonLabels.map(esc).join(', ')}` : 'No selections hit this spin'}</small>`;
+    resEl.className = `result-box show ${data.delta > 0 ? 'win-box' : data.delta < 0 ? 'lose-box' : ''}`;
     state.balance = data.new_balance;
     document.getElementById('rouletteBal').textContent = fmt(state.balance);
     refreshHeaderBal();
@@ -6869,10 +7041,23 @@ function _setCrapsDie(el, value) {
   if (!el) return;
   const safeValue = Math.max(1, Math.min(6, Number(value) || 1));
   el.dataset.value = String(safeValue);
-  el.innerHTML = `<div class="craps-die-face">${
-    _CRAPS_PIPS[safeValue].map(([row, col]) =>
+  const oppositePairs = [[1,6],[2,5],[3,4]];
+  const remaining = oppositePairs.filter(pair => !pair.includes(safeValue));
+  const faces = {
+    front: safeValue,
+    back: 7 - safeValue,
+    top: remaining[0][0],
+    bottom: remaining[0][1],
+    right: remaining[1][0],
+    left: remaining[1][1],
+  };
+  const faceHtml = (position, faceValue) => `<div class="craps-die-face face-${position}">${
+    _CRAPS_PIPS[faceValue].map(([row, col]) =>
       `<span class="craps-pip" style="grid-area:${row}/${col}"></span>`
     ).join('')
+  }</div>`;
+  el.innerHTML = `<div class="craps-die-cube">${
+    Object.entries(faces).map(([position, faceValue]) => faceHtml(position, faceValue)).join('')
   }</div>`;
 }
 
@@ -6884,8 +7069,8 @@ async function _animateDice(d1, d2) {
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
     _setCrapsDie(dice[0], d1);
     _setCrapsDie(dice[1], d2);
-    dice[0].style.transform = 'translate(-78px,8px) rotate(-8deg) scale(.96)';
-    dice[1].style.transform = 'translate(18px,-2px) rotate(11deg) scale(.94)';
+    dice[0].style.transform = 'translate(-78px,8px) rotateX(-16deg) rotateY(18deg) rotateZ(-8deg) scale(.96)';
+    dice[1].style.transform = 'translate(18px,-2px) rotateX(-13deg) rotateY(-20deg) rotateZ(11deg) scale(.94)';
     await sleep(180);
     return;
   }
@@ -6932,8 +7117,8 @@ async function _animateDice(d1, d2) {
   _setCrapsDie(dice[0], d1);
   _setCrapsDie(dice[1], d2);
   await Promise.allSettled(animations.map(animation => animation.finished));
-  dice[0].style.transform = 'translate(-78px,8px) rotate(-8deg) scale(.96)';
-  dice[1].style.transform = 'translate(18px,-2px) rotate(11deg) scale(.94)';
+  dice[0].style.transform = 'translate(-78px,8px) rotateX(-16deg) rotateY(18deg) rotateZ(-8deg) scale(.96)';
+  dice[1].style.transform = 'translate(18px,-2px) rotateX(-13deg) rotateY(-20deg) rotateZ(11deg) scale(.94)';
   animations.forEach(animation => animation.cancel());
   haptic();
 }
@@ -6971,8 +7156,8 @@ function _crapsEnterGame(point) {
   const die2 = document.getElementById('crapsDie2');
   _setCrapsDie(die1, 1);
   _setCrapsDie(die2, 6);
-  die1.style.transform = 'translate(-78px,8px) rotate(-8deg) scale(.96)';
-  die2.style.transform = 'translate(18px,-2px) rotate(11deg) scale(.94)';
+  die1.style.transform = 'translate(-78px,8px) rotateX(-16deg) rotateY(18deg) rotateZ(-8deg) scale(.96)';
+  die2.style.transform = 'translate(18px,-2px) rotateX(-13deg) rotateY(-20deg) rotateZ(11deg) scale(.94)';
   document.getElementById('crapsTotal').textContent = '';
   document.getElementById('crapsRollBtn').style.display = '';
   const ra = document.getElementById('crapsGameWrap')?.querySelector('.craps-roll-again');
@@ -8205,7 +8390,7 @@ function buildPresets(containerId, inputId) {
   const bal = state.balance || 1000;
   const presets = [100, 500, 1000, Math.floor(bal * 0.1), Math.floor(bal * 0.5)].filter((v,i,a) => v >= 10 && a.indexOf(v) === i).sort((a,b)=>a-b).slice(0,5);
   document.getElementById(containerId).innerHTML = presets.map(v =>
-    `<span class="preset-btn" onclick="(function(){var el=document.getElementById('${inputId}');el.value='${fmt(v)}';})()">${fmt(v)}</span>`
+    `<span class="preset-btn" onclick="(function(){var el=document.getElementById('${inputId}');el.value='${fmt(v)}';el.dispatchEvent(new Event('input',{bubbles:true}));})()">${fmt(v)}</span>`
   ).join('');
 }
 
@@ -10541,8 +10726,10 @@ function _placeMarbleBet() {
 let bjBusy = false;
 let bjCurrentBet = 0;
 let bjPPBet = 0;
+let bjWarBet = 0;
 let bjLastBet = 0;
 let bjLastPPBet = 0;
+let bjLastWarBet = 0;
 let bjRenderedCounts = [];
 
 function bjAddChip(amount) {
@@ -10552,12 +10739,17 @@ function bjAddChip(amount) {
 }
 
 function bjClearBet() {
-  bjCurrentBet = 0; bjPPBet = 0;
+  bjCurrentBet = 0; bjPPBet = 0; bjWarBet = 0;
   const d1 = document.getElementById('bjBetDisplay'); if (d1) d1.textContent = 'Tap a chip';
   const d2 = document.getElementById('bjPPDisplay');
   if (d2) {
     d2.textContent = 'No Perfect Pair bet';
     d2.classList.remove('placed');
+  }
+  const d3 = document.getElementById('bjWarDisplay');
+  if (d3) {
+    d3.textContent = 'No War bet';
+    d3.classList.remove('placed');
   }
 }
 
@@ -10567,6 +10759,15 @@ function bjAddPP(amount) {
   if (el) {
     el.classList.add('placed');
     el.innerHTML = `✓ Perfect Pair placed: ${fmt(bjPPBet)} ${WRK}`;
+  }
+}
+
+function bjAddWar(amount) {
+  bjWarBet += amount;
+  const el = document.getElementById('bjWarDisplay');
+  if (el) {
+    el.classList.add('placed');
+    el.innerHTML = `⚔️ War placed: ${fmt(bjWarBet)} ${WRK}`;
   }
 }
 
@@ -10590,7 +10791,10 @@ async function openBlackjack() {
 }
 
 function renderBjBetting() {
-  bjBusy = false; bjCurrentBet = bjLastBet; bjPPBet = bjLastPPBet;
+  bjBusy = false;
+  bjCurrentBet = bjLastBet;
+  bjPPBet = bjLastPPBet;
+  bjWarBet = bjLastWarBet;
   bjRenderedCounts = [];
   document.getElementById('bjContent').innerHTML = `
     <div class="bj-bet-section">
@@ -10609,15 +10813,27 @@ function renderBjBetting() {
         <div class="bj-chip c50k"  onclick="bjAddChip(50000)">50K</div>
       </div>
       <div class="bj-bet-display" id="bjBetDisplay">${bjCurrentBet > 0 ? fmt(bjCurrentBet) + ' ' + WRK : 'Tap a chip'}</div>
-      <div class="bj-side-bet-well">
-        <div class="bj-section-label" style="text-align:center">Perfect Pair side bet (optional)</div>
-        <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:6px">Both cards same rank? Perfect 6× / Colored 4× / Mixed 3×</div>
-        <div class="bj-chip-row">
-          <div class="bj-chip c100" onclick="bjAddPP(100)" style="width:46px;height:46px;font-size:10px">PP<br>100</div>
-          <div class="bj-chip c500" onclick="bjAddPP(500)" style="width:46px;height:46px;font-size:10px">PP<br>500</div>
-          <div class="bj-chip c1k"  onclick="bjAddPP(1000)" style="width:46px;height:46px;font-size:10px">PP<br>1K</div>
+      <div class="bj-side-bets-grid">
+        <div class="bj-side-bet-well">
+          <div class="bj-section-label" style="text-align:center">Perfect Pair</div>
+          <div class="bj-war-copy">Same rank: Perfect 6× / Colored 4× / Mixed 3×</div>
+          <div class="bj-chip-row">
+            <div class="bj-chip c100" onclick="bjAddPP(100)" style="width:42px;height:42px;font-size:9px">PP<br>100</div>
+            <div class="bj-chip c500" onclick="bjAddPP(500)" style="width:42px;height:42px;font-size:9px">PP<br>500</div>
+            <div class="bj-chip c1k"  onclick="bjAddPP(1000)" style="width:42px;height:42px;font-size:9px">PP<br>1K</div>
+          </div>
+          <div id="bjPPDisplay" class="bj-side-bet-display${bjLastPPBet > 0 ? ' placed' : ''}">${bjLastPPBet > 0 ? '✓ Pair: ' + fmt(bjLastPPBet) + ' ' + WRK : 'No Perfect Pair bet'}</div>
         </div>
-        <div id="bjPPDisplay" class="bj-side-bet-display${bjLastPPBet > 0 ? ' placed' : ''}">${bjLastPPBet > 0 ? '✓ Perfect Pair placed: ' + fmt(bjLastPPBet) + ' ' + WRK : 'No Perfect Pair bet'}</div>
+        <div class="bj-side-bet-well">
+          <div class="bj-section-label" style="text-align:center">⚔️ War</div>
+          <div class="bj-war-copy">Your first card must outrank the dealer. Ace high; dealer wins ties. Pays 2×.</div>
+          <div class="bj-chip-row">
+            <div class="bj-chip c100" onclick="bjAddWar(100)" style="width:42px;height:42px;font-size:9px">WAR<br>100</div>
+            <div class="bj-chip c500" onclick="bjAddWar(500)" style="width:42px;height:42px;font-size:9px">WAR<br>500</div>
+            <div class="bj-chip c1k"  onclick="bjAddWar(1000)" style="width:42px;height:42px;font-size:9px">WAR<br>1K</div>
+          </div>
+          <div id="bjWarDisplay" class="bj-side-bet-display${bjLastWarBet > 0 ? ' placed' : ''}">${bjLastWarBet > 0 ? '⚔️ War: ' + fmt(bjLastWarBet) + ' ' + WRK : 'No War bet'}</div>
+        </div>
       </div>
       <details class="bj-strategy">
         <summary>Basic strategy quick guide</summary>
@@ -10647,8 +10863,17 @@ async function dealBlackjack() {
   try {
     bjLastBet = bjCurrentBet;
     bjLastPPBet = bjPPBet;
+    bjLastWarBet = bjWarBet;
     bjRenderedCounts = [];
-    const data = await api('/api/blackjack/start', { method: 'POST', json: { user_id: +state.userId, bet, pp_bet: bjPPBet } });
+    const data = await api('/api/blackjack/start', {
+      method: 'POST',
+      json: {
+        user_id: +state.userId,
+        bet,
+        pp_bet: bjPPBet,
+        war_bet: bjWarBet,
+      },
+    });
     if (data.status === 'playing') renderBjPlaying(data);
     else renderBjFinished(data);
   } catch(e) {
@@ -10678,12 +10903,58 @@ function bjCard(card, faceDown = false) {
   return `<div class="play-card${red ? ' red' : ''}"><div class="cr">${card.rank}</div><div class="cs">${card.suit}</div></div>`;
 }
 
+function bjDealerShadowHtml() {
+  return '<div class="bj-dealer-shadow" aria-hidden="true"><span class="head"></span><span class="shoulders"></span></div>';
+}
+
+function bjSideResultsHtml(data) {
+  const pairLabels = {
+    perfect: '💎 Perfect Pair',
+    colored: '🟣 Colored Pair',
+    mixed: '🎭 Mixed Pair',
+    none: 'No pair',
+  };
+  let pair = '<div class="bj-side-result">Perfect Pair<br><small>Not played</small></div>';
+  if (data.pp_result != null) {
+    const won = data.pp_result !== 'none';
+    pair = `<div class="bj-side-result ${won ? 'win' : 'lose'}">
+      ${pairLabels[data.pp_result] || esc(data.pp_result)}<br>
+      <b>${data.pp_delta >= 0 ? '+' : ''}${fmt(data.pp_delta)} ${WRK}</b>
+    </div>`;
+  }
+
+  let war = '<div class="bj-side-result">⚔️ War<br><small>Not played</small></div>';
+  if (data.war_result != null) {
+    const player = data.war_player_card || {};
+    const dealer = data.war_dealer_card || {};
+    const won = data.war_result === 'win';
+    war = `<div class="bj-side-result ${won ? 'win' : 'lose'}">
+      <div class="bj-war-cards">
+        <span class="bj-war-card">You ${esc(String(player.rank || '?'))}${esc(String(player.suit || ''))}</span>
+        <span class="bj-war-card">D ${esc(String(dealer.rank || '?'))}${esc(String(dealer.suit || ''))}</span>
+      </div>
+      <b>War ${won ? 'won' : 'lost'} · ${data.war_delta >= 0 ? '+' : ''}${fmt(data.war_delta)} ${WRK}</b>
+    </div>`;
+  }
+  return `<div class="bj-side-results">${pair}${war}</div>`;
+}
+
+function bjBankrollHtml(delta, balance, finished = false) {
+  const value = Number(delta || 0);
+  const cls = value > 0 ? 'up' : value < 0 ? 'down' : '';
+  const sign = value > 0 ? '+' : '';
+  return `<div class="bj-bankroll-meter">
+    <div><small>${finished ? 'Final session P/L' : 'Live session P/L'}</small><div class="pl ${cls}">${sign}${fmt(value)} ${WRK}</div></div>
+    <div style="text-align:right"><small>Bankroll</small><div style="font-size:14px;font-weight:850">${fmt(balance)} ${WRK}</div></div>
+  </div>`;
+}
+
 function bjHandHtml(cards, value, active = false, previousCount = 0) {
   const vc = value > 21 ? 'bust' : value === 21 ? 'bj21' : '';
   return `<div class="bj-hand-wrap${active ? ' bj-active' : ''}">
     <div class="bj-hand-row">${cards.map((c, i) => {
       const isNew = i >= previousCount;
-      const delay = Math.max(0, i - previousCount) * 130;
+      const delay = Math.max(0, i - previousCount) * 175;
       return isNew
         ? `<div class="bj-card-deal" style="animation-delay:${delay}ms">${bjCard(c)}</div>`
         : bjCard(c);
@@ -10694,6 +10965,10 @@ function bjHandHtml(cards, value, active = false, previousCount = 0) {
 
 function renderBjPlaying(g) {
   bjBusy = false;
+  if (g.balance !== undefined) {
+    state.balance = g.balance;
+    refreshHeaderBal();
+  }
   const dealerHtml = g.dealer_face.map(c => bjCard(c)).join('') + bjCard(null, true);
   const previousCounts = bjRenderedCounts;
   const splitJustHappened = previousCounts.length > 0
@@ -10710,7 +10985,8 @@ function renderBjPlaying(g) {
 
   document.getElementById('bjContent').innerHTML = `
     <div class="bj-table">
-      <div>
+      ${bjDealerShadowHtml()}
+      <div class="bj-dealer-zone">
         <div class="bj-section-label">Dealer — ${g.dealer_value_shown}+?</div>
         <div class="bj-hand-row">${dealerHtml}</div>
       </div>
@@ -10720,6 +10996,8 @@ function renderBjPlaying(g) {
         ${playerHtml}
       </div>
     </div>
+    ${bjSideResultsHtml(g)}
+    ${bjBankrollHtml(g.bankroll_delta, g.balance)}
     <div class="bj-info-row">
       <span>Bet: ${fmt(g.bet)} ${WRK}${g.doubled[g.current_hand] ? ' (2×)' : ''}</span>
       <span>Balance: ${fmt(g.balance)} ${WRK}</span>
@@ -10732,7 +11010,6 @@ function renderBjPlaying(g) {
     </div>
   `;
   bjRenderedCounts = g.hands.map(hand => hand.length);
-  _bjShowPP(g);
 }
 
 function renderBjFinished(data) {
@@ -10766,9 +11043,9 @@ function renderBjFinished(data) {
     return `${label}${OUTCOMES[r.outcome] || r.outcome}${amt}`;
   }).join('<br>');
 
-  const netLine = data.hands.length > 1
-    ? `<br><b>Net: ${data.total_delta >= 0 ? '+' : ''}${fmt(data.total_delta)} ${WRK}</b>` : '';
-  const resClass = data.total_delta > 0 ? 'win-box' : data.total_delta < 0 ? 'lose-box' : '';
+  const sessionDelta = data.session_delta ?? data.total_delta;
+  const netLine = `<br><b>Hand result: ${data.total_delta >= 0 ? '+' : ''}${fmt(data.total_delta)} ${WRK}</b>`;
+  const resClass = sessionDelta > 0 ? 'win-box' : sessionDelta < 0 ? 'lose-box' : '';
 
   // Result and buttons appear after last dealer card lands
   const lastCardDelay = Math.max(0, ((data.dealer_hand || []).length - 2) * 380);
@@ -10777,7 +11054,8 @@ function renderBjFinished(data) {
 
   document.getElementById('bjContent').innerHTML = `
     <div class="bj-table">
-      <div>
+      ${bjDealerShadowHtml()}
+      <div class="bj-dealer-zone">
         <div class="bj-section-label" id="bjDealerLabel">Dealer — ?</div>
         <div class="bj-hand-row">${dealerCardHtml}</div>
       </div>
@@ -10787,27 +11065,15 @@ function renderBjFinished(data) {
         ${playerHtml}
       </div>
     </div>
+    ${bjSideResultsHtml(data)}
+    ${bjBankrollHtml(sessionDelta, data.new_balance, true)}
     <div class="result-box show ${resClass}" style="font-size:14px;line-height:1.7;${fadeIn(resultDelay)}">${resultLines}${netLine}</div>
-    <div class="balance-display" style="${fadeIn(resultDelay + 80)}">Balance: <span class="b">${fmt(data.new_balance)}</span> ${WRK}</div>
-    <button class="btn" style="width:100%;${fadeIn(resultDelay + 160)}" onclick="renderBjBetting()">Play Again</button>
+    <button class="btn" style="width:100%;${fadeIn(resultDelay + 100)}" onclick="renderBjBetting()">Play Again</button>
   `;
   setTimeout(() => {
     const lbl = document.getElementById('bjDealerLabel');
     if (lbl) lbl.textContent = `Dealer — ${data.dealer_value ?? ''}`;
   }, resultDelay - 80);
-  _bjShowPP(data);
-}
-
-function _bjShowPP(data) {
-  if (data.pp_result == null) return;
-  const labels = { perfect:'💎 Perfect Pair!', colored:'🟣 Colored Pair!', mixed:'🎭 Mixed Pair!', none:'No pair' };
-  const isWin = data.pp_result !== 'none';
-  const sign = data.pp_delta >= 0 ? '+' : '';
-  const ppEl = document.createElement('div');
-  ppEl.className = `result-box show ${isWin ? 'win-box' : 'lose-box'}`;
-  ppEl.style.marginBottom = '8px';
-  ppEl.innerHTML = `${labels[data.pp_result]} — side bet: ${sign}${fmt(data.pp_delta)} ${WRK}`;
-  document.getElementById('bjContent').prepend(ppEl);
 }
 
 // ── Live Blackjack ────────────────────────────────────────────────────────────
