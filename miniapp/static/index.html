@@ -1101,7 +1101,7 @@
   .shop-menu-card {
     position: relative;
     min-width: 0;
-    min-height: 104px;
+    min-height: 82px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -1164,6 +1164,40 @@
   }
   .shop-panel { display: none; flex-direction: column; gap: 10px; }
   .shop-panel.active { display: flex; }
+  #marketTabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    overflow: visible;
+    padding: 0;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+  #marketTabs .tab-btn { min-width: 0; padding-inline: 5px; }
+  .market-confirm-backdrop {
+    position: fixed;
+    z-index: 1400;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(2,3,8,.76);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .market-confirm-card {
+    width: min(100%, 420px);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 19px;
+    border: 1px solid rgba(251,191,36,.24);
+    border-radius: 20px;
+    background:
+      radial-gradient(circle at 100% 0, rgba(251,191,36,.13), transparent 42%),
+      #11131d;
+    box-shadow: 0 24px 70px rgba(0,0,0,.62);
+  }
   .shop-panel-hero {
     min-height: 116px;
     display: grid;
@@ -1898,6 +1932,22 @@
   .plinko-risk-btn.selected {
     background: rgba(139,92,246,.2); border-color: var(--primary); color: var(--primary);
   }
+  .plinko-count-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+  .plinko-count-btn {
+    min-height: 34px; border: 1px solid var(--border); border-radius: 9px;
+    background: rgba(255,255,255,.045); color: var(--muted);
+    font: 800 12px system-ui; cursor: pointer;
+  }
+  .plinko-count-btn.selected {
+    border-color: rgba(103,232,249,.65); background: rgba(103,232,249,.13);
+    color: #a5f3fc; box-shadow: 0 5px 14px rgba(34,211,238,.1);
+  }
+  .plinko-total {
+    min-height: 16px; margin-top: -5px; color: var(--muted);
+    font-size: 10px; text-align: right;
+  }
+  .game-modal--plinko .result-box { flex-direction: column; gap: 2px; }
+  .game-modal--plinko .result-box small { color: currentColor; font-size: 10px; opacity: .72; }
 
   /* ── Wheel of Fortune ── */
   .wheel-wrap {
@@ -2435,9 +2485,17 @@
     background: color-mix(in srgb, var(--game-accent) 20%, transparent);
   }
   .game-modal .result-box {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    visibility: hidden;
+    opacity: 0;
     border-radius: 14px;
     backdrop-filter: blur(12px);
+    transition: opacity .16s ease, background-color .16s ease;
   }
+  .game-modal .result-box.show { visibility: visible; opacity: 1; }
   .game-modal--crash   { --game-accent: #34d399; --game-accent-2: #67e8f9; }
   .game-modal--duck    { --game-accent: #38bdf8; --game-accent-2: #facc15; }
   .game-modal--marbles { --game-accent: #a78bfa; --game-accent-2: #f0abfc; }
@@ -2881,7 +2939,15 @@
     padding: 30px 18px 22px;
     border-radius: 46% 46% 22px 22px / 25% 25% 16px 16px;
   }
-  .bj-table::before { content: "DEALER STANDS ON 17"; top: 50%; }
+  .bj-table::before { content: "BLACKJACK PAYS 3:2 · DEALER STANDS ON 17"; top: 50%; z-index: 0; }
+  .bj-table > * { position: relative; z-index: 1; }
+  .bj-table > div:not(.divider) {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
   .bj-table .divider { background: rgba(255,255,255,.1); }
   .bj-section-label { color: rgba(255,255,255,.55); font-size: 9px; font-weight: 850; letter-spacing: 1.1px; }
   .bj-hand-wrap.bj-active {
@@ -2911,6 +2977,62 @@
     background: radial-gradient(ellipse at center, #10613d, #073c29);
     box-shadow: inset 0 0 0 2px rgba(251,191,36,.2), inset 0 0 45px rgba(0,0,0,.25);
   }
+  .bj-rule-strip {
+    display: flex;
+    justify-content: center;
+    gap: 7px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .bj-rule-strip span {
+    padding: 5px 8px;
+    border: 1px solid rgba(251,191,36,.22);
+    border-radius: 999px;
+    background: rgba(251,191,36,.075);
+    color: #fde68a;
+    font-size: 8px;
+    font-weight: 850;
+    letter-spacing: .35px;
+  }
+  .bj-side-bet-well {
+    margin-top: 11px;
+    padding: 11px;
+    border: 1px solid rgba(167,139,250,.18);
+    border-radius: 15px;
+    background: rgba(91,33,182,.08);
+  }
+  .bj-side-bet-display {
+    min-height: 22px;
+    display: grid;
+    place-items: center;
+    margin-top: 5px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .bj-side-bet-display.placed {
+    color: #ddd6fe;
+    font-weight: 800;
+  }
+  .bj-strategy {
+    margin-top: 11px;
+    padding: 9px 10px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 12px;
+    background: rgba(0,0,0,.16);
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.55;
+  }
+  .bj-strategy summary { color: #cbd5e1; font-weight: 800; cursor: pointer; }
+  .bj-strategy p { margin-top: 7px; }
+  .bj-card-deal { animation: bj-deal-in .3s ease both; }
+  .bj-actions {
+    min-height: 46px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+  }
+  .bj-actions .bj-btn { min-width: 0; padding-inline: 5px; }
+  .bj-actions .bj-btn:disabled { opacity: .28; cursor: not-allowed; }
   .bj-chip {
     border: 4px dashed rgba(255,255,255,.44);
     box-shadow: inset 0 0 0 3px rgba(0,0,0,.15), 0 5px 10px rgba(0,0,0,.3);
@@ -2987,6 +3109,54 @@
   .game-modal--roulette .rl-pointer { top: -5px; border-top-color: #fde68a; }
   .game-modal--roulette #rouletteColors { grid-template-columns: repeat(3, 1fr); }
   .game-modal--roulette #rouletteColors .cf-btn { min-width: 0; padding: 12px 4px; font-size: 12px; }
+  .roulette-more-bets {
+    padding: 8px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 13px;
+    background: rgba(0,0,0,.16);
+  }
+  .roulette-more-bets summary {
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 850;
+    cursor: pointer;
+  }
+  .roulette-bet-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .roulette-bet-btn {
+    min-width: 0;
+    padding: 8px 3px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 9px;
+    background: rgba(255,255,255,.035);
+    color: #aab4bd;
+    font-size: 9px;
+    font-weight: 800;
+  }
+  .roulette-bet-btn.selected {
+    border-color: #fbbf24;
+    background: rgba(251,191,36,.12);
+    color: #fde68a;
+  }
+  .roulette-number-row {
+    display: grid;
+    grid-template-columns: minmax(0,1fr) auto;
+    gap: 6px;
+    margin-top: 7px;
+  }
+  .roulette-number-row select {
+    min-width: 0;
+    padding: 8px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 9px;
+    background: #11131c;
+    color: #e5e7eb;
+    font-size: 10px;
+  }
   .craps-stage {
     min-height: 190px;
     display: flex;
@@ -3004,8 +3174,27 @@
     box-shadow: inset 0 0 40px rgba(0,0,0,.35);
   }
   .craps-dice { display: flex; gap: 24px; font-size: 68px; filter: drop-shadow(0 10px 10px rgba(0,0,0,.4)); }
-  .craps-die.rolling { animation: dice-tumble .18s linear infinite; }
-  @keyframes dice-tumble { 50% { transform: translateY(-8px) rotate(14deg); } }
+  .craps-die {
+    display: inline-block;
+    transform-origin: 50% 70%;
+    will-change: transform, filter;
+  }
+  .craps-die.rolling:first-child { animation: dice-tumble-left .58s cubic-bezier(.2,.75,.32,1) infinite; }
+  .craps-die.rolling:last-child { animation: dice-tumble-right .63s cubic-bezier(.2,.75,.32,1) infinite; }
+  @keyframes dice-tumble-left {
+    0% { transform: translate(0,0) rotate(0) scale(1); }
+    28% { transform: translate(-9px,-28px) rotate(-115deg) scale(1.08); }
+    58% { transform: translate(7px,-13px) rotate(135deg) scale(.96); }
+    82% { transform: translate(-3px,-4px) rotate(250deg) scale(1.03); }
+    100% { transform: translate(0,0) rotate(360deg) scale(1); }
+  }
+  @keyframes dice-tumble-right {
+    0% { transform: translate(0,0) rotate(0) scale(1); }
+    25% { transform: translate(10px,-24px) rotate(125deg) scale(1.06); }
+    55% { transform: translate(-6px,-16px) rotate(-140deg) scale(.95); }
+    80% { transform: translate(4px,-5px) rotate(-255deg) scale(1.04); }
+    100% { transform: translate(0,0) rotate(-360deg) scale(1); }
+  }
   .game-modal--slider .slider-bar-wrap {
     height: 64px;
     margin: 6px 0;
@@ -3487,8 +3676,14 @@
     color: #8ed0fa;
     font-size: 10px !important;
   }
-  .profile-collection .gifts-grid { gap: 9px; }
+  .profile-collection .gifts-grid {
+    grid-template-columns: repeat(auto-fill, 108px);
+    justify-content: center;
+    gap: 9px;
+  }
   .profile-collection .gift-card {
+    width: 108px;
+    min-height: 112px;
     min-width: 0;
     padding: 11px 6px;
     overflow: hidden;
@@ -3520,6 +3715,17 @@
   }
   .profile-collection .gift-card .gname { font-size: 10px; }
   .profile-collection .gift-card .gtier { font-size: 9px; text-transform: capitalize; }
+  .profile-collection .gift-card.reorder-compact {
+    min-height: 72px;
+    display: grid;
+    align-content: center;
+    padding: 8px 5px;
+    cursor: grab;
+  }
+  .profile-collection .gift-card.reorder-compact .gem {
+    margin-bottom: 4px;
+    font-size: 18px;
+  }
   .profile-gift-loader {
     grid-column: 1/-1;
     width: 100%;
@@ -3961,17 +4167,17 @@
         </div>
         <div class="wallet-section">
           <div class="wallet-section-head">
-            <div><b>Gifts</b><span>Sell to Rift or list on MKRT</span></div>
-            <span id="walletGiftCount">0</span>
-          </div>
-          <div class="wallet-gift-grid" id="walletGiftGrid"><div class="loading">Loading…</div></div>
-        </div>
-        <div class="wallet-section">
-          <div class="wallet-section-head">
-            <div><b>Anonymous Numbers</b><span>Activate one Secure Number · benefits never stack</span></div>
+            <div><b>Anonymous Numbers</b><span>Kept above large gift collections for quick access</span></div>
             <span id="walletAnonCount">0</span>
           </div>
           <div class="anon-grid wallet-anon-grid" id="walletAnonGrid"></div>
+        </div>
+        <div class="wallet-section">
+          <div class="wallet-section-head">
+            <div><b>Gifts</b><span>Sell to Rift or list on MKRT · shown 40 at a time</span></div>
+            <span id="walletGiftCount">0</span>
+          </div>
+          <div class="wallet-gift-grid" id="walletGiftGrid"><div class="loading">Loading…</div></div>
         </div>
       </section>
     </div>
@@ -4000,17 +4206,36 @@
 <div class="modal-bg" id="rouletteModal" onclick="closeModal('rouletteModal',event)">
   <div class="modal game-modal game-modal--roulette" style="position:relative">
     <button class="modal-close" onclick="closeModal('rouletteModal')">✕</button>
-    <div class="modal-title" data-subtitle="American wheel · up to 14×">🎡 Roulette</div>
+    <div class="modal-title" data-subtitle="American wheel · straight bets pay 36×">🎡 Roulette</div>
     <div class="rl-wrap">
       <div class="rl-pointer"></div>
       <div id="rouletteWheelSvg" class="rl-wheel"></div>
     </div>
     <div class="result-box" id="rouletteResult"></div>
     <div class="cf-choice" id="rouletteColors">
-      <div class="cf-btn" id="rouletteRed" onclick="setRouletteBet('red')" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.5)">🔴 Red ×2</div>
-      <div class="cf-btn" id="rouletteBlack" onclick="setRouletteBet('black')" style="background:rgba(30,30,40,.5);border-color:rgba(100,100,120,.5)">⚫ Black ×2</div>
-      <div class="cf-btn" id="rouletteGreen" onclick="setRouletteBet('green')" style="background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.5)">🟢 Green ×14</div>
+      <div class="cf-btn roulette-bet-choice" data-roulette-bet="red" onclick="setRouletteBet('red',this)" style="background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.5)">🔴 Red ×2</div>
+      <div class="cf-btn roulette-bet-choice" data-roulette-bet="black" onclick="setRouletteBet('black',this)" style="background:rgba(30,30,40,.5);border-color:rgba(100,100,120,.5)">⚫ Black ×2</div>
+      <div class="cf-btn roulette-bet-choice" data-roulette-bet="green" onclick="setRouletteBet('green',this)" style="background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.5)">🟢 Green ×14</div>
     </div>
+    <details class="roulette-more-bets">
+      <summary>More bets · outside and straight</summary>
+      <div class="roulette-bet-grid">
+        <button class="roulette-bet-btn" data-roulette-bet="low" onclick="setRouletteBet('low',this)">1–18 · 2×</button>
+        <button class="roulette-bet-btn" data-roulette-bet="even" onclick="setRouletteBet('even',this)">Even · 2×</button>
+        <button class="roulette-bet-btn" data-roulette-bet="odd" onclick="setRouletteBet('odd',this)">Odd · 2×</button>
+        <button class="roulette-bet-btn" data-roulette-bet="high" onclick="setRouletteBet('high',this)">19–36 · 2×</button>
+        <button class="roulette-bet-btn" data-roulette-bet="dozen1" onclick="setRouletteBet('dozen1',this)">1st 12 · 3×</button>
+        <button class="roulette-bet-btn" data-roulette-bet="dozen2" onclick="setRouletteBet('dozen2',this)">2nd 12 · 3×</button>
+        <button class="roulette-bet-btn" data-roulette-bet="dozen3" onclick="setRouletteBet('dozen3',this)">3rd 12 · 3×</button>
+        <button class="roulette-bet-btn" data-roulette-bet="col1" onclick="setRouletteBet('col1',this)">Column 1 · 3×</button>
+        <button class="roulette-bet-btn" data-roulette-bet="col2" onclick="setRouletteBet('col2',this)">Column 2 · 3×</button>
+        <button class="roulette-bet-btn" data-roulette-bet="col3" onclick="setRouletteBet('col3',this)">Column 3 · 3×</button>
+      </div>
+      <div class="roulette-number-row">
+        <select id="rouletteStraightNumber" aria-label="Straight-up number"></select>
+        <button class="roulette-bet-btn" data-roulette-bet="straight" onclick="setRouletteBet('straight',this)">Number · 36×</button>
+      </div>
+    </details>
     <div class="card-title" style="margin-top:4px">Bet amount</div>
     <div class="bet-presets" id="roulettePresets"></div>
     <div class="bet-row">
@@ -4211,16 +4436,26 @@
       <div class="plinko-risk-btn" id="plinkoMedium" onclick="setPlinkoRisk('medium')">Medium</div>
       <div class="plinko-risk-btn" id="plinkoHigh"   onclick="setPlinkoRisk('high')">High</div>
     </div>
+    <div>
+      <div class="card-title" style="margin-bottom:6px">Balls per drop</div>
+      <div class="plinko-count-row">
+        <button class="plinko-count-btn selected" data-plinko-balls="1" onclick="setPlinkoBalls(1)">1 ball</button>
+        <button class="plinko-count-btn" data-plinko-balls="3" onclick="setPlinkoBalls(3)">3 balls</button>
+        <button class="plinko-count-btn" data-plinko-balls="5" onclick="setPlinkoBalls(5)">5 balls</button>
+        <button class="plinko-count-btn" data-plinko-balls="10" onclick="setPlinkoBalls(10)">10 balls</button>
+      </div>
+    </div>
     <div class="plinko-board-wrap">
       <canvas id="plinkoCanvas" width="320" height="390" aria-label="Plinko ball drop board"></canvas>
     </div>
     <div class="result-box" id="plinkoResult"></div>
-    <div class="card-title" style="margin-top:8px">Bet amount</div>
+    <div class="card-title" style="margin-top:8px">Bet per ball</div>
     <div class="bet-presets" id="plinkoPresets"></div>
     <div class="bet-row">
-      <input class="input bet-input" id="plinkoBet" type="text" inputmode="numeric" value="100">
+      <input class="input bet-input" id="plinkoBet" type="text" inputmode="numeric" value="100" oninput="updatePlinkoTotal()">
       <button class="btn" id="plinkoPlayBtn" onclick="playPlinko()">DROP</button>
     </div>
+    <div class="plinko-total" id="plinkoTotal">Total wager: 100 WRK$</div>
     <div class="balance-display">Balance: <span class="b" id="plinkoBal">—</span> <img src="/emoji/5093898072811898950" style="width:18px;height:18px;vertical-align:middle;margin-left:2px" onerror="this.outerHTML='WRK$'"></div>
     <div class="error-msg" id="plinkoErr"></div>
   </div>
@@ -4658,7 +4893,9 @@ async function refreshBalance() {
 
 function renderHomeAccount(data) {
   const displayName = data.name || `User ${data.user_id}`;
-  const shortName = displayName.replace(/^@/, '').split(/\s+/)[0] || 'there';
+  const shortName = data.identity_masked
+    ? displayName
+    : displayName.replace(/^@/, '').split(/\s+/)[0] || 'there';
   document.getElementById('homeGreeting').textContent = `Ready, ${shortName}?`;
   document.getElementById('homeGreetingSub').textContent = 'Your wallet, games, work, and collectibles are synced with Telegram.';
 
@@ -4882,6 +5119,7 @@ async function loadOwnProfile() {
   if (_sortableInstance) { _sortableInstance.destroy(); _sortableInstance = null; }
   clearTimeout(_reorderDebounce);
   _reorderDebounce = null;
+  destroyGiftAnimations(el);
   el.innerHTML = '<div class="loading">Loading…</div>';
   // Show trades tab button and social tab button for own profile
   const tradesBtn = document.getElementById('tradesTabBtn');
@@ -4913,6 +5151,7 @@ async function loadProfile() {
   const content = document.getElementById('profileContent');
   const loadVersion = ++_profileLoadVersion;
   errEl.textContent = '';
+  destroyGiftAnimations(content);
   content.innerHTML = '<div class="loading">Loading profile…</div>';
   content.style.display = 'flex';
   const url = /^\d+$/.test(raw) ? `/api/profile/${raw}` : `/api/profile/username/${raw.replace(/^@/,'')}`;
@@ -5334,8 +5573,8 @@ async function openRequestGiftPicker() {
 }
 
 function _tradeAmount(id) {
-  const raw = document.getElementById(id).value.replace(/[^\d]/g, '');
-  return raw ? Number(raw) : 0;
+  const amount = _parseAmountValue(document.getElementById(id)?.value || '');
+  return Number.isSafeInteger(amount) ? amount : 0;
 }
 
 function _tradeGiftThumb(gift) {
@@ -5498,12 +5737,44 @@ function _pinnedBadgeHtml(pg) {
 
 function _pinnedAnonHtml(anon) {
   if (!anon) return '';
-  return `<span class="profile-anon-pin" title="Anonymous WRK$ Number">${esc(anon.number)}</span>`;
+  return `<button type="button" class="profile-anon-pin" title="View Anonymous WRK$ Number" onclick="openPinnedAnonInfo()">${esc(anon.number)}</button>`;
 }
 
-function _buildGiftCardHtml(g, isOwn, pinnedGiftId) {
+function openPinnedAnonInfo() {
+  const anon = window._profilePinnedAnon;
+  if (!anon) return;
+  document.getElementById('profileAnonInfo')?.remove();
+  const backdrop = document.createElement('div');
+  backdrop.id = 'profileAnonInfo';
+  backdrop.className = 'market-confirm-backdrop';
+  backdrop.innerHTML = `
+    <div class="market-confirm-card">
+      <div style="font-size:17px;font-weight:850">Anonymous WRK$ Number</div>
+      <div style="font-size:24px;font-weight:900;letter-spacing:1px;color:#fff1c8">${esc(anon.number)}</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.6">
+        This ${esc(anon.rarity || 'standard')} number was originally acquired for
+        <b style="color:var(--gold)">${fmt(anon.price)} ${WRK}</b>.
+        Ownership is verified by WRK$ and its security benefits belong only to the current owner.
+      </div>
+      <button class="btn outline" onclick="document.getElementById('profileAnonInfo').remove()">Close</button>
+    </div>`;
+  backdrop.onclick = event => {
+    if (event.target === backdrop) backdrop.remove();
+  };
+  document.body.appendChild(backdrop);
+}
+
+function _buildGiftCardHtml(g, isOwn, pinnedGiftId, compact = false) {
   if (!window._profileGiftContext) window._profileGiftContext = {};
   window._profileGiftContext[g.id] = { isOwn: !!isOwn, pinnedGiftId: pinnedGiftId || null };
+  if (compact) {
+    return `
+      <div class="gift-card reorder-compact" style="background:${(g.background && BG_HEX[g.background]) || 'var(--card2)'}" onclick="openProfileGiftModal(${g.id})">
+        <div class="gem">${esc(g.model_emoji || '🎁')}</div>
+        <div class="gname">${esc(g.model_name)}</div>
+        <div class="gtier">#${g.gift_number || g.id}</div>
+      </div>`;
+  }
   const tierColor = { common:'', uncommon:'', rare:'rare', epic:'epic', legendary:'legendary' };
   const hasAnim = !!g.custom_emoji_id;
   const innerEmoji = g.custom_emoji_id
@@ -5565,9 +5836,11 @@ function buildProfileHtml(d, isOwn) {
   const avatarHtml = `<img class="avatar" src="${ownPhoto}" alt="${initials}" onerror="avatarError(this,'${initials}')">`;
 
   // store gift data for detail modal
-  if (!window._profileGifts) window._profileGifts = {};
+  window._profileGifts = {};
+  window._profileGiftContext = {};
   window._profileIsOwn = isOwn;
   window._profilePinnedId = d.pinned_gift_id || null;
+  window._profilePinnedAnon = d.pinned_anon || null;
   d.gifts.forEach(g => { window._profileGifts[g.id] = g; });
   if (d.pinned_gift) {
     window._profileGifts[d.pinned_gift.id] = d.pinned_gift;
@@ -5603,13 +5876,10 @@ function buildProfileHtml(d, isOwn) {
       <div class="profile-identity">
         <div class="profile-name-wrap">
           <span class="profile-name">${esc(d.name)}</span>
+          ${d.pinned_gift ? _pinnedBadgeHtml(d.pinned_gift) : ''}
         </div>
         <div class="profile-id">${d.identity_masked ? '🛡 Secure +888 identity' : `Telegram ID ${d.user_id}`}</div>
-        ${d.pinned_gift ? `
-          <div class="profile-pinned-line">
-            <span class="profile-pinned-label">Gift</span>
-            ${_pinnedBadgeHtml(d.pinned_gift)}
-          </div>` : isOwn ? `
+        ${!d.pinned_gift && isOwn ? `
           <div class="profile-pinned-line">
             <span class="profile-pinned-empty">Tap a gift below to pin it to your profile</span>
           </div>` : ''}
@@ -5629,10 +5899,10 @@ function buildProfileHtml(d, isOwn) {
         <div class="pstat"><div class="v purple">${fmt(d.gift_count)}</div><div class="l">Gifts</div></div>
       </div>
       <div class="profile-ranks">
-        <span class="rank-pill">💰 #${fmt(d.balance_rank)}</span>
-        <span class="rank-pill">🔥 #${fmt(d.streak_rank)}</span>
-        <span class="rank-pill">🎁 #${fmt(d.gift_rank)}</span>
-        ${d.networth_rank !== undefined ? `<span class="rank-pill">💎 #${fmt(d.networth_rank)}</span>` : ''}
+        <span class="rank-pill" title="Balance rank">💰 Balance #${fmt(d.balance_rank)}</span>
+        <span class="rank-pill" title="Streak rank">🔥 Streak #${fmt(d.streak_rank)}</span>
+        <span class="rank-pill" title="Gift rank">🎁 Gifts #${fmt(d.gift_rank)}</span>
+        ${d.networth_rank !== undefined ? `<span class="rank-pill" title="Net worth rank">💎 Net worth #${fmt(d.networth_rank)}</span>` : ''}
       </div>
       <div class="profile-feature-grid">
         ${d.net_worth !== undefined ? `
@@ -5690,6 +5960,9 @@ async function toggleReorderMode() {
       document.removeEventListener('touchcancel', _sortableCancelHandler);
       _sortableCancelHandler = null;
     }
+    clearTimeout(_reorderDebounce);
+    _reorderDebounce = null;
+    await _saveGiftOrder();
     _sortableInstance.option('disabled', true);
     _sortableInstance.destroy();
     _sortableInstance = null;
@@ -5698,6 +5971,7 @@ async function toggleReorderMode() {
       c.style.cursor = '';
       c.style.position = '';
     });
+    loadOwnProfile();
     return;
   }
 
@@ -5769,6 +6043,16 @@ async function _loadAllGiftsForReorder(grid) {
   const pinnedId = +(grid.dataset.pinnedId || 0) || null;
   let offset = +(grid.dataset.giftsOffset || 0);
   try {
+    const loaded = [...grid.querySelectorAll('.gift-card[onclick]')]
+      .map(card => {
+        const match = card.getAttribute('onclick')?.match(/openProfileGiftModal\((\d+)\)/);
+        return match ? window._profileGifts?.[+match[1]] : null;
+      })
+      .filter(Boolean);
+    destroyGiftAnimations(grid);
+    grid.innerHTML = loaded
+      .map(gift => _buildGiftCardHtml(gift, isOwn, pinnedId, true))
+      .join('');
     while (_giftsHasMore) {
       _giftsHasMore = false;
       const d = await api(
@@ -5776,9 +6060,10 @@ async function _loadAllGiftsForReorder(grid) {
       );
       d.gifts.forEach(g => {
         if (window._profileGifts) window._profileGifts[g.id] = g;
-        grid.insertAdjacentHTML('beforeend', _buildGiftCardHtml(g, isOwn, pinnedId));
-        const newCard = grid.lastElementChild;
-        if (newCard && newCard.dataset.hasAnim) initAnimatedGift(newCard, newCard.dataset.emojiId);
+        grid.insertAdjacentHTML(
+          'beforeend',
+          _buildGiftCardHtml(g, isOwn, pinnedId, true),
+        );
       });
       offset = d.next_offset;
       grid.dataset.giftsOffset = String(offset);
@@ -5865,6 +6150,15 @@ function _setupGiftsObserver(gridEl) {
 
 const _lottieInstances = new Map();
 
+function destroyGiftAnimations(root = null) {
+  for (const [card, instance] of _lottieInstances.entries()) {
+    if (!card.isConnected || !root || root.contains(card)) {
+      try { instance.destroy(); } catch {}
+      _lottieInstances.delete(card);
+    }
+  }
+}
+
 function initAnimatedGift(cardEl, emojiId) {
   if (!emojiId || !window.lottie) return;
   const container = cardEl.querySelector('.gift-emoji-container');
@@ -5872,7 +6166,7 @@ function initAnimatedGift(cardEl, emojiId) {
   fetch(`/emoji-anim/${emojiId}`)
     .then(r => r.ok ? r.json() : null)
     .then(animData => {
-      if (!animData) return;
+      if (!animData || !cardEl.isConnected) return;
       container.innerHTML = '';
       const inst = lottie.loadAnimation({ container, renderer: 'svg', loop: false, autoplay: false, animationData: animData });
       _lottieInstances.set(cardEl, inst);
@@ -6022,7 +6316,19 @@ async function _rlLand(slot) {
 function openRoulette() {
   if (!state.userId) return alert('Open in Telegram to play.');
   rouletteBetType = null;
-  _RL_COLOR_BTN_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('selected'); });
+  document.querySelectorAll('#rouletteModal [data-roulette-bet]').forEach(
+    el => el.classList.remove('selected')
+  );
+  const numberSelect = document.getElementById('rouletteStraightNumber');
+  if (numberSelect && !numberSelect.options.length) {
+    numberSelect.innerHTML = [
+      '<option value="0">Number 0</option>',
+      '<option value="-1">Number 00</option>',
+      ...Array.from({length:36}, (_, i) =>
+        `<option value="${i + 1}">Number ${i + 1}</option>`
+      ),
+    ].join('');
+  }
   document.getElementById('rouletteResult').className = 'result-box';
   document.getElementById('rouletteErr').textContent = '';
   document.getElementById('rouletteBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
@@ -6031,13 +6337,14 @@ function openRoulette() {
   document.getElementById('rouletteModal').classList.add('open');
 }
 
-const _RL_COLOR_BTN_IDS = ['rouletteRed','rouletteBlack','rouletteGreen'];
-function setRouletteBet(type) {
+function setRouletteBet(type, selectedEl = null) {
   rouletteBetType = type;
-  _RL_COLOR_BTN_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('selected'); });
-  const map = {red:'rouletteRed',black:'rouletteBlack',green:'rouletteGreen'};
-  const el = document.getElementById(map[type]);
-  if (el) el.classList.add('selected');
+  document.querySelectorAll('#rouletteModal [data-roulette-bet]').forEach(
+    el => el.classList.toggle(
+      'selected',
+      el === selectedEl || el.dataset.rouletteBet === type,
+    )
+  );
 }
 
 async function spinRoulette() {
@@ -6045,12 +6352,22 @@ async function spinRoulette() {
   const bet = _parseBet('rouletteBet');
   const errEl = document.getElementById('rouletteErr');
   errEl.textContent = '';
-  document.getElementById('rouletteModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('rouletteSpinBtn').disabled = true;
   document.getElementById('rouletteResult').className = 'result-box';
   _rlStartSpin(); // RAF spin — angle tracked in _rlAngle, no CSS animation needed
   try {
-    const data = await api('/api/play/roulette', { method:'POST', json:{ user_id:+state.userId, bet, bet_type:rouletteBetType } });
+    const straightNumber = Number(
+      document.getElementById('rouletteStraightNumber')?.value ?? 0
+    );
+    const data = await api('/api/play/roulette', {
+      method:'POST',
+      json:{
+        user_id:+state.userId,
+        bet,
+        bet_type:rouletteBetType,
+        straight_number:rouletteBetType === 'straight' ? straightNumber : null,
+      },
+    });
     await _rlLand(data.slot);
     const resEl = document.getElementById('rouletteResult');
     const colorEmoji = { red:'🔴', black:'⚫', green:'🟢' }[data.winning_color];
@@ -6060,10 +6377,6 @@ async function spinRoulette() {
       ? `${colorEmoji} ${numLabel} — You win! ${delta} ${WRK}`
       : `${colorEmoji} ${numLabel} — You lose. ${delta} ${WRK}`;
     resEl.className = `result-box show ${data.won ? 'win-box' : 'lose-box'}`;
-    const _existingRlAgain = resEl.nextElementSibling;
-    if (_existingRlAgain && _existingRlAgain.classList.contains('btn')) _existingRlAgain.remove();
-    resEl.insertAdjacentHTML('afterend',
-      `<button class="btn outline" style="width:100%;margin-top:8px" onclick="rlPlayAgain(${bet})">⚡ Spin Again</button>`);
     state.balance = data.new_balance;
     document.getElementById('rouletteBal').textContent = fmt(state.balance);
     refreshHeaderBal();
@@ -6150,6 +6463,9 @@ async function startCraps() {
     document.getElementById('crapsBal').textContent = fmt(state.balance);
     refreshHeaderBal();
     _crapsEnterGame(null);
+    // The button the player pressed already says ROLL, so make it the
+    // come-out roll instead of asking for a second, redundant click.
+    await rollCraps();
   } catch (e) {
     document.getElementById('crapsErr').textContent = e.message || 'Error';
   } finally {
@@ -6438,7 +6754,6 @@ async function spinSlots() {
   const bet = _parseBet('slotBet');
   const errEl = document.getElementById('slotsErr');
   errEl.textContent = '';
-  document.getElementById('slotsModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('slotsResult').className = 'result-box';
   slotsSpinning = true;
   document.getElementById('spinBtn').disabled = true;
@@ -6477,10 +6792,6 @@ async function spinSlots() {
     const deltaStr = data.delta > 0 ? `+${fmt(data.delta)} ${WRK}` : data.delta < 0 ? `${fmt(data.delta)} ${WRK}` : '';
     resEl.innerHTML = deltaStr ? `${labels[data.result]} — ${deltaStr}` : labels[data.result];
     resEl.className = `result-box show ${isWin ? 'win-box' : isPush ? '' : 'lose-box'}`;
-    const _existingSlotsAgain = resEl.nextElementSibling;
-    if (_existingSlotsAgain && _existingSlotsAgain.classList.contains('btn')) _existingSlotsAgain.remove();
-    resEl.insertAdjacentHTML('afterend',
-      `<button class="btn outline" style="width:100%;margin-top:8px" onclick="slotsPlayAgain(${bet})">⚡ Spin Again</button>`);
 
     state.balance = data.new_balance;
     document.getElementById('slotsBal').textContent = fmt(data.new_balance);
@@ -6529,7 +6840,6 @@ async function flipCoin() {
   const bet = _parseBet('cfBet');
   const errEl = document.getElementById('cfErr');
   errEl.textContent = '';
-  document.getElementById('cfModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('cfFlipBtn').disabled = true;
   document.getElementById('cfResult').className = 'result-box';
 
@@ -6539,24 +6849,23 @@ async function flipCoin() {
   frontEl.textContent = state.cfChoice === 'heads' ? '🌝' : '🌚';
   backEl.textContent = state.cfChoice === 'heads' ? '🌚' : '🌝';
 
-  coinEl.classList.add('flipping');
-
   try {
     const data = await api('/api/play/coinflip', { method:'POST', json:{ user_id:+state.userId, bet, choice:state.cfChoice } });
+    // Put the paid result on the face that will naturally settle toward the
+    // player, then run the complete animation. This avoids swapping the face
+    // after the coin has already appeared to land.
+    coinEl.classList.remove('flipping');
+    frontEl.textContent = data.result === 'heads' ? '🌝' : '🌚';
+    backEl.textContent = data.result === 'heads' ? '🌚' : '🌝';
+    void coinEl.offsetWidth;
+    coinEl.classList.add('flipping');
     await sleep(1200);
     coinEl.classList.remove('flipping');
-    const headsEmoji = '🌝', tailsEmoji = '🌚';
-    frontEl.textContent = data.result === 'heads' ? headsEmoji : tailsEmoji;
-    backEl.textContent = data.result === 'heads' ? tailsEmoji : headsEmoji;
 
     const resEl = document.getElementById('cfResult');
     const delta = data.delta > 0 ? `+${fmt(data.delta)}` : fmt(data.delta);
     resEl.innerHTML = data.won ? `✅ ${data.result.toUpperCase()}! You win! ${delta} ${WRK}` : `❌ ${data.result.toUpperCase()}. You lose. ${delta} ${WRK}`;
     resEl.className = `result-box show ${data.won ? 'win-box' : 'lose-box'}`;
-    const _existingCfAgain = resEl.nextElementSibling;
-    if (_existingCfAgain && _existingCfAgain.classList.contains('btn')) _existingCfAgain.remove();
-    resEl.insertAdjacentHTML('afterend',
-      `<button class="btn outline" style="width:100%;margin-top:8px" onclick="cfPlayAgain(${bet})">⚡ Flip Again</button>`);
 
     state.balance = data.new_balance;
     document.getElementById('cfBal').textContent = fmt(data.new_balance);
@@ -6660,7 +6969,6 @@ async function playSlider() {
   const errEl = document.getElementById('sliderErr');
   errEl.textContent = '';
   if (!bet || bet < 10) { errEl.innerHTML = 'Minimum bet is 10 ' + WRK; return; }
-  document.getElementById('sliderModal').querySelectorAll('.slider-again-btn').forEach(b => b.remove());
   document.getElementById('sliderPlayBtn').disabled = true;
   document.getElementById('sliderBarWrap').style.pointerEvents = 'none';
   document.getElementById('sliderResult').className = 'result-box';
@@ -6683,8 +6991,6 @@ async function playSlider() {
       ? `✅ Landed green! ${delta} ${WRK} (${data.payout_mult}×)`
       : `❌ Landed red. ${delta} ${WRK}`;
     resEl.className = `result-box show ${data.won ? 'win-box' : 'lose-box'}`;
-    resEl.insertAdjacentHTML('afterend',
-      `<button class="btn outline slider-again-btn" style="width:100%;margin-top:8px" onclick="sliderPlayAgain(${bet})">⚡ Play Again</button>`);
     state.balance = data.new_balance;
     document.getElementById('sliderBal').textContent = fmt(state.balance);
     refreshHeaderBal();
@@ -6706,6 +7012,7 @@ function sliderPlayAgain(bet) {
 
 // ── Plinko ────────────────────────────────────────────────────────────────────
 let _plinkoRisk = 'medium';
+let _plinkoBalls = 1;
 
 // Multipliers match the server exactly
 const _PLINKO_MULTS = {
@@ -6739,9 +7046,11 @@ function _plDraw(scene = {}) {
   const {
     litPeg = null,
     ball = null,
+    balls = [],
     trail = [],
     impact = null,
     hitSlot,
+    hitSlots = [],
     slotPulse = 0,
   } = scene;
   ctx.clearRect(0, 0, _PL.W, _PL.H);
@@ -6806,7 +7115,7 @@ function _plDraw(scene = {}) {
   ctx.stroke();
   for (let s = 0; s < 9; s++) {
     const sx = _PL.XS + s*_PL.XS;
-    const isHit = hitSlot === s;
+    const isHit = hitSlot === s || hitSlots.includes(s);
     const pulse = isHit ? Math.max(.45, slotPulse) : 0;
     if (isHit) {
       ctx.shadowColor = `rgba(251,191,36,${.35 + pulse*.4})`;
@@ -6855,11 +7164,11 @@ function _plDraw(scene = {}) {
     }
   }
 
-  // Ball: shaded and slightly squashed at impact to sell the rebound.
-  if (ball) {
-    const squash = Math.max(0, Math.min(.24, ball.squash || 0));
+  // Balls: shaded and slightly squashed at impact to sell each rebound.
+  [...balls, ...(ball ? [ball] : [])].forEach(currentBall => {
+    const squash = Math.max(0, Math.min(.24, currentBall.squash || 0));
     ctx.save();
-    ctx.translate(ball.x, ball.y);
+    ctx.translate(currentBall.x, currentBall.y);
     ctx.scale(1+squash, 1-squash);
     ctx.beginPath();
     ctx.arc(0, 0, _PL.BR, 0, Math.PI*2);
@@ -6874,7 +7183,7 @@ function _plDraw(scene = {}) {
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.restore();
-  }
+  });
 }
 
 function _buildPlinkoBoard(highlightSlot) {
@@ -6915,7 +7224,7 @@ function _plSegmentPoint(segment, t) {
   };
 }
 
-async function _animatePlinkoBall(path, paidSlot) {
+function _plTimeline(path, paidSlot) {
   if (!Array.isArray(path) || path.length !== 8) throw new Error('Invalid Plinko drop result.');
   const safePath = path.map(Boolean);
   const hits = _plPathPegs(safePath);
@@ -6953,6 +7262,17 @@ async function _animatePlinkoBall(path, paidSlot) {
     target: null,
   });
 
+  const starts = [];
+  let total = 0;
+  segments.forEach(segment => {
+    starts.push(total);
+    total += segment.duration;
+  });
+  return { segments, starts, total, slot };
+}
+
+async function _animatePlinkoBall(path, paidSlot) {
+  const { segments, starts, total, slot } = _plTimeline(path, paidSlot);
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
     _plDraw({
       ball: { x:_PL.XS + slot*_PL.XS, y:_PL.SY+11 },
@@ -6961,13 +7281,6 @@ async function _animatePlinkoBall(path, paidSlot) {
     });
     return;
   }
-
-  const starts = [];
-  let total = 0;
-  segments.forEach(segment => {
-    starts.push(total);
-    total += segment.duration;
-  });
 
   return new Promise(resolve => {
     const t0 = performance.now();
@@ -7028,6 +7341,79 @@ async function _animatePlinkoBall(path, paidSlot) {
   });
 }
 
+async function _animatePlinkoBalls(drops) {
+  if (!Array.isArray(drops) || !drops.length) throw new Error('Invalid Plinko drop result.');
+  if (drops.length === 1) return _animatePlinkoBall(drops[0].path, drops[0].slot);
+
+  const stagger = 165;
+  const timelines = drops.map((drop, index) => ({
+    ..._plTimeline(drop.path, drop.slot),
+    delay: index * stagger,
+    index,
+  }));
+  const totalDuration = Math.max(...timelines.map(timeline => timeline.delay + timeline.total));
+  const landedBall = timeline => ({
+    x: _PL.XS + timeline.slot*_PL.XS + ((timeline.index % 3) - 1) * 3.5,
+    y: _PL.SY + 11 - Math.floor(timeline.index / 3) * 4,
+  });
+
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    _plDraw({
+      balls: timelines.map(landedBall),
+      hitSlots: [...new Set(timelines.map(timeline => timeline.slot))],
+      slotPulse: 1,
+    });
+    return;
+  }
+
+  return new Promise(resolve => {
+    const t0 = performance.now();
+    function frame(now) {
+      const elapsed = now - t0;
+      const visibleBalls = [];
+      const hitSlots = [];
+
+      timelines.forEach(timeline => {
+        const local = elapsed - timeline.delay;
+        if (local < 0) return;
+        if (local >= timeline.total) {
+          visibleBalls.push(landedBall(timeline));
+          hitSlots.push(timeline.slot);
+          return;
+        }
+        let segmentIndex = timeline.segments.length - 1;
+        for (let i = 0; i < timeline.segments.length; i++) {
+          if (local <= timeline.starts[i] + timeline.segments[i].duration) {
+            segmentIndex = i;
+            break;
+          }
+        }
+        const segment = timeline.segments[segmentIndex];
+        const segmentElapsed = local - timeline.starts[segmentIndex];
+        const progress = Math.max(0, Math.min(1, segmentElapsed / segment.duration));
+        const position = _plSegmentPoint(segment, progress);
+        const squash = progress > .9 ? Math.sin((progress-.9)*Math.PI/.1)*.2 : 0;
+        visibleBalls.push({ x: position.x, y: position.y, squash });
+        if (segmentIndex === timeline.segments.length - 1 && progress > .68) {
+          hitSlots.push(timeline.slot);
+        }
+      });
+
+      _plDraw({
+        balls: visibleBalls,
+        hitSlots: [...new Set(hitSlots)],
+        slotPulse: hitSlots.length ? 1 : 0,
+      });
+      if (elapsed < totalDuration) {
+        requestAnimationFrame(frame);
+      } else {
+        window.setTimeout(resolve, 240);
+      }
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
 function openPlinko() {
   if (!state.userId) return alert('Open in Telegram to play.');
   document.getElementById('plinkoResult').className = 'result-box';
@@ -7035,9 +7421,13 @@ function openPlinko() {
   document.getElementById('plinkoBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
   buildPresets('plinkoPresets', 'plinkoBet');
   _plinkoRisk = 'medium';
+  _plinkoBalls = 1;
   ['low','medium','high'].forEach(r =>
     document.getElementById('plinko' + r.charAt(0).toUpperCase() + r.slice(1))
       .classList.toggle('selected', r === 'medium'));
+  document.querySelectorAll('[data-plinko-balls]').forEach(button =>
+    button.classList.toggle('selected', Number(button.dataset.plinkoBalls) === 1));
+  updatePlinkoTotal();
   document.getElementById('plinkoModal').classList.add('open');
   requestAnimationFrame(_buildPlinkoBoard);
 }
@@ -7051,23 +7441,52 @@ function setPlinkoRisk(risk) {
   _buildPlinkoBoard();
 }
 
+function setPlinkoBalls(count) {
+  _plinkoBalls = Math.max(1, Math.min(10, Number(count) || 1));
+  document.querySelectorAll('[data-plinko-balls]').forEach(button =>
+    button.classList.toggle('selected', Number(button.dataset.plinkoBalls) === _plinkoBalls));
+  const playButton = document.getElementById('plinkoPlayBtn');
+  if (playButton) playButton.textContent = _plinkoBalls === 1 ? 'DROP' : `DROP ${_plinkoBalls}`;
+  updatePlinkoTotal();
+}
+
+function updatePlinkoTotal() {
+  const input = document.getElementById('plinkoBet');
+  const total = document.getElementById('plinkoTotal');
+  if (!input || !total) return;
+  const bet = _parseAmountValue(input.value);
+  total.textContent = Number.isFinite(bet) && bet > 0
+    ? `Total wager: ${fmt(bet * _plinkoBalls)} ${WRK_TEXT}`
+    : 'Enter a bet per ball';
+}
+
 async function playPlinko() {
   const bet = _parseBet('plinkoBet');
   const errEl = document.getElementById('plinkoErr');
   errEl.textContent = '';
-  document.getElementById('plinkoModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('plinkoPlayBtn').disabled = true;
   document.getElementById('plinkoResult').className = 'result-box';
   _buildPlinkoBoard();
   try {
-    const data = await api('/api/play/plinko', { method: 'POST', json: { user_id: +state.userId, bet, risk: _plinkoRisk } });
-    await _animatePlinkoBall(data.path, data.slot);
-    _buildPlinkoBoard(data.slot);
+    const data = await api('/api/play/plinko', {
+      method: 'POST',
+      json: { user_id: +state.userId, bet, risk: _plinkoRisk, balls: _plinkoBalls },
+    });
+    const drops = Array.isArray(data.drops) ? data.drops : [data];
+    await _animatePlinkoBalls(drops);
+    _plDraw({
+      balls: drops.map((drop, index) => ({
+        x: _PL.XS + drop.slot*_PL.XS + ((index % 3) - 1) * 3.5,
+        y: _PL.SY + 11 - Math.floor(index / 3) * 4,
+      })),
+      hitSlots: [...new Set(drops.map(drop => drop.slot))],
+      slotPulse: 1,
+    });
     const resEl = document.getElementById('plinkoResult');
-    resEl.innerHTML = `${data.multiplier}× — ${data.delta>=0?'+':''}${fmt(data.delta)} ${WRK}`;
-    resEl.className = `result-box show ${data.delta>=0?'win-box':'lose-box'}`;
-    resEl.insertAdjacentHTML('afterend',
-      `<button class="btn outline" style="width:100%;margin-top:8px" onclick="plinkoPlayAgain(${bet})">⚡ Drop Again</button>`);
+    const delta = Number(data.total_delta ?? data.delta);
+    const multipliers = drops.map(drop => `${drop.multiplier}×`).join(' · ');
+    resEl.innerHTML = `<strong>${drops.length} ${drops.length === 1 ? 'ball' : 'balls'} · ${delta>=0?'+':''}${fmt(delta)} ${WRK}</strong><small>${multipliers}</small>`;
+    resEl.className = `result-box show ${delta>=0?'win-box':'lose-box'}`;
     state.balance = data.new_balance;
     document.getElementById('plinkoBal').textContent = fmt(state.balance);
     refreshHeaderBal();
@@ -7150,7 +7569,6 @@ async function spinWheel() {
   const bet = _parseBet('wheelBet');
   const errEl = document.getElementById('wheelErr');
   errEl.textContent = '';
-  document.getElementById('wheelModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('wheelSpinBtn').disabled = true;
   document.getElementById('wheelResult').className = 'result-box';
 
@@ -7164,10 +7582,6 @@ async function spinWheel() {
       ? `☠ Bankrupt! ${fmt(data.delta)} ${WRK}`
       : `${data.multiplier}× — ${sign}${fmt(data.delta)} ${WRK}`;
     resEl.className = `result-box show ${data.delta >= 0 ? 'win-box' : 'lose-box'}`;
-    const _existingWheelAgain = resEl.nextElementSibling;
-    if (_existingWheelAgain && _existingWheelAgain.classList.contains('btn')) _existingWheelAgain.remove();
-    resEl.insertAdjacentHTML('afterend',
-      `<button class="btn outline" style="width:100%;margin-top:8px" onclick="wheelPlayAgain(${bet})">⚡ Spin Again</button>`);
     state.balance = data.new_balance;
     document.getElementById('wheelBal').textContent = fmt(state.balance);
     refreshHeaderBal();
@@ -7243,7 +7657,6 @@ async function _animateCaseReel() {
 async function playCase() {
   const errEl = document.getElementById('caseErr');
   errEl.textContent = '';
-  document.getElementById('caseModal').querySelectorAll('.btn.outline').forEach(b => b.remove());
   document.getElementById('caseOpenBtn').disabled = true;
   document.getElementById('caseResult').className = 'result-box';
   _buildCaseReel(null, null, null, null);
@@ -7266,8 +7679,6 @@ async function playCase() {
       resEl.innerHTML = `<span style="color:${tierColor};font-weight:800">${data.tier.toUpperCase()}</span> — +${fmt(data.wrk_reward)} ${WRK}`;
     }
     resEl.className = 'result-box show win-box';
-    resEl.insertAdjacentHTML('afterend',
-      `<button class="btn outline" style="width:100%;margin-top:8px" onclick="caseOpenAgain()">📦 Open Again</button>`);
     state.balance = data.new_balance;
     document.getElementById('caseBal').textContent = fmt(state.balance);
     refreshHeaderBal();
@@ -7291,22 +7702,28 @@ function closeModal(id, evt) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function _parseAmountValue(value) {
+  const raw = String(value || '').replace(/,/g, '').trim().toLowerCase();
+  const match = raw.match(/^(\d+(?:\.\d+)?)\s*([kmb])?$/);
+  if (!match) return NaN;
+  const multiplier = match[2] === 'b'
+    ? 1_000_000_000
+    : match[2] === 'm'
+    ? 1_000_000
+    : match[2] === 'k'
+    ? 1_000
+    : 1;
+  const amount = Math.floor(Number(match[1]) * multiplier);
+  return Number.isSafeInteger(amount) && amount >= 0 ? amount : NaN;
+}
+
 function _formatBetInput(el) {
-  const raw = el.value.replace(/,/g, '').trim().toLowerCase();
-  const m = raw.match(/^(\d+(?:\.\d+)?)\s*([kmb])?$/);
-  if (!m) { el.value = ''; return; }
-  const num = parseFloat(m[1]);
-  const mult = m[2] === 'b' ? 1_000_000_000 : m[2] === 'm' ? 1_000_000 : m[2] === 'k' ? 1_000 : 1;
-  const val = Math.floor(num * mult);
-  if (isNaN(val) || val < 0) { el.value = ''; return; }
-  el.value = val.toLocaleString('en-US');
+  const amount = _parseAmountValue(el.value);
+  if (!Number.isSafeInteger(amount)) { el.value = ''; return; }
+  el.value = amount.toLocaleString('en-US');
 }
 function _parseBet(id) {
-  const raw = (document.getElementById(id)?.value || '').replace(/,/g, '').trim().toLowerCase();
-  const m = raw.match(/^(\d+(?:\.\d+)?)\s*([kmb])?$/);
-  if (!m) return NaN;
-  const mult = m[2] === 'b' ? 1_000_000_000 : m[2] === 'm' ? 1_000_000 : m[2] === 'k' ? 1_000 : 1;
-  return Math.floor(parseFloat(m[1]) * mult);
+  return _parseAmountValue(document.getElementById(id)?.value || '');
 }
 
 function buildPresets(containerId, inputId) {
@@ -7425,6 +7842,8 @@ let workState = {
   totalEarned: 0,
   totalTaps: 0,
   syncing: false,
+  syncQueued: false,
+  completed: false,
   cooldownInterval: null,
   jobEmoji: '💼',
 };
@@ -7495,6 +7914,7 @@ function renderWorkPage(s) {
 
   // ── active shift ──
   if (s.session) {
+    workState.completed = false;
     workState.totalTaps = s.session.taps + workState.localTaps;
     workState.totalEarned = s.session.earned + workState.localEarned;
     const pct = Math.min(100, Math.round(workState.totalTaps / 50 * 100));
@@ -7565,6 +7985,8 @@ async function startShift() {
   workState.localEarned = 0;
   workState.totalTaps = 0;
   workState.totalEarned = 0;
+  workState.syncQueued = false;
+  workState.completed = false;
   try {
     const s = await api('/api/work/start', { method:'POST', json:{ user_id:+state.userId } });
     workState.status = s;
@@ -7576,7 +7998,7 @@ async function startShift() {
 
 function handleTap(evt) {
   const s = workState.status;
-  if (!s || !s.session) return;
+  if (!s || !s.session || workState.completed) return;
   if (workState.totalTaps >= 50) return;
 
   const lo = s.job.earn_low;
@@ -7597,7 +8019,7 @@ function handleTap(evt) {
 
   spawnFloatText(`+${fmt(earned)}`, evt.clientX, evt.clientY);
 
-  if (workState.localTaps % 5 === 0) {
+  if (workState.localTaps >= 5 || workState.totalTaps >= 50) {
     syncBatch();
   }
 }
@@ -7613,17 +8035,24 @@ function spawnFloatText(text, x, y) {
 }
 
 async function syncBatch() {
-  if (workState.syncing || workState.localTaps === 0) return;
+  if (workState.completed || workState.localTaps === 0) return;
+  if (workState.syncing) {
+    workState.syncQueued = true;
+    return;
+  }
   workState.syncing = true;
+  workState.syncQueued = false;
   const batchTaps = workState.localTaps;
   const batchEarned = workState.localEarned;
   workState.localTaps = 0;
   workState.localEarned = 0;
+  let synced = false;
   try {
     const result = await api('/api/work/sync', {
       method: 'POST',
       json: { user_id: +state.userId, taps_delta: batchTaps, earned_delta: batchEarned },
     });
+    synced = true;
     if (result.auto_ended) {
       handleShiftComplete(result);
       return;
@@ -7636,12 +8065,24 @@ async function syncBatch() {
     workState.localEarned += batchEarned;
   } finally {
     workState.syncing = false;
+    const shouldDrain = synced
+      && !workState.completed
+      && workState.localTaps > 0
+      && (
+        workState.syncQueued
+        || workState.localTaps >= 5
+        || workState.totalTaps >= 50
+      );
+    if (shouldDrain) queueMicrotask(syncBatch);
   }
 }
 
 async function collectShift() {
   while (workState.syncing) await sleep(50);
+  if (workState.completed) return;
   if (workState.localTaps > 0) await syncBatch();
+  while (workState.syncing) await sleep(50);
+  if (workState.completed) return;
   try {
     const result = await api('/api/work/end', { method:'POST', json:{ user_id:+state.userId } });
     handleShiftComplete(result);
@@ -7651,8 +8092,12 @@ async function collectShift() {
 }
 
 function handleShiftComplete(result) {
+  if (workState.completed) return;
+  workState.completed = true;
+  workState.syncQueued = false;
   workState.localTaps = 0;
   workState.localEarned = 0;
+  if (workState.status) workState.status.session = null;
   state.balance = result.new_balance;
   refreshHeaderBal();
 
@@ -7685,6 +8130,7 @@ let _anonSearch = '';
 let _anonSearchTimer = null;
 let _shopWallet = null;
 let _mkrtListingGiftId = null;
+let _walletGiftVisible = 40;
 
 function openShopHub() {
   setShopSection(_shopSection || 'rift', true);
@@ -7736,15 +8182,20 @@ function _shopConfirm(title, detailHtml, confirmText, onConfirm, danger = false)
   document.getElementById('marketConfirmBar')?.remove();
   const bar = document.createElement('div');
   bar.id = 'marketConfirmBar';
-  bar.style.cssText = 'position:fixed;bottom:calc(var(--nav-h) + 12px);left:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;z-index:1200;display:flex;flex-direction:column;gap:10px;box-shadow:0 -4px 24px rgba(0,0,0,.5)';
+  bar.className = 'market-confirm-backdrop';
   bar.innerHTML = `
-    <div style="font-size:14px;font-weight:800">${title}</div>
-    <div style="font-size:12px;color:var(--muted);line-height:1.45">${detailHtml}</div>
-    <div style="display:flex;gap:8px">
-      <button class="btn outline shop-confirm-cancel" style="flex:1">Cancel</button>
-      <button class="btn ${danger ? 'red-btn' : 'green-btn'} shop-confirm-ok" style="flex:1">${confirmText}</button>
-    </div>
-    <div class="error-msg shop-confirm-error"></div>`;
+    <div class="market-confirm-card">
+      <div style="font-size:17px;font-weight:850">${title}</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.55">${detailHtml}</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn outline shop-confirm-cancel" style="flex:1">Cancel</button>
+        <button class="btn ${danger ? 'red-btn' : 'green-btn'} shop-confirm-ok" style="flex:1">${confirmText}</button>
+      </div>
+      <div class="error-msg shop-confirm-error"></div>
+    </div>`;
+  bar.onclick = event => {
+    if (event.target === bar) bar.remove();
+  };
   bar.querySelector('.shop-confirm-cancel').onclick = () => bar.remove();
   bar.querySelector('.shop-confirm-ok').onclick = async event => {
     const btn = event.currentTarget;
@@ -7798,7 +8249,7 @@ async function loadMkrt(reset = false) {
         ? `<img class="market-emoji-img" src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<div class=\\'market-emoji\\'>${esc(g.model_emoji || '🎁')}</div>'">`
         : `<div class="market-emoji">${esc(g.model_emoji || '🎁')}</div>`;
       return `
-        <article class="market-card mkrt-card" style="background:${bg}">
+        <article class="market-card mkrt-card" style="background:${bg}" onclick="openMkrtListingDetail(${g.listing_id})">
           <div class="market-glow"></div>
           <div class="market-num-badge">#${g.gift_number}</div>
           ${emoji}
@@ -7808,8 +8259,8 @@ async function loadMkrt(reset = false) {
           <div class="market-price">${fmtK(g.price)} ${WRK}</div>
           <div class="mkrt-card-actions">
             ${isOwn
-              ? `<button class="market-buy-btn cancel" onclick="cancelMkrtListing(${g.listing_id})">Cancel listing</button>`
-              : `<button class="market-buy-btn" onclick="confirmMkrtBuy(${g.listing_id})">Buy from collector</button>`}
+              ? `<button class="market-buy-btn cancel" onclick="event.stopPropagation();cancelMkrtListing(${g.listing_id})">Cancel listing</button>`
+              : `<button class="market-buy-btn" onclick="event.stopPropagation();confirmMkrtBuy(${g.listing_id})">Buy from collector</button>`}
           </div>
         </article>`;
     }).join('');
@@ -7826,6 +8277,40 @@ async function loadMkrt(reset = false) {
   } catch (e) {
     grid.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
   }
+}
+
+function openMkrtListingDetail(listingId) {
+  const item = _mkrtItems.find(g => g.listing_id === listingId);
+  if (!item) return;
+  if (_gdLottie) { _gdLottie.destroy(); _gdLottie = null; }
+
+  const hero = document.getElementById('giftDetailHero');
+  hero.style.background = BG_HEX[item.background] || '#161717';
+  const emojiEl = document.getElementById('giftDetailEmoji');
+  emojiEl.innerHTML = item.custom_emoji_id
+    ? `<img src="/emoji/${esc(item.custom_emoji_id)}" alt="🎁" onerror="this.outerHTML='<span>🎁</span>'">`
+    : `<span>${esc(item.model_emoji || '🎁')}</span>`;
+  document.getElementById('giftDetailTitle').textContent =
+    `${item.model_name} #${item.gift_number}`;
+  document.getElementById('giftDetailRows').innerHTML = `
+    <div class="gift-detail-row"><span class="lbl">Collection</span><span class="val">${esc(fmtCollection(item.collection))}</span></div>
+    <div class="gift-detail-row"><span class="lbl">Background</span><span class="val">${esc(fmtBackground(item.background))}</span></div>
+    <div class="gift-detail-row"><span class="lbl">Seller</span><span class="val">${esc(item.seller_name)}</span></div>
+    <div class="gift-detail-row"><span class="lbl">MKRT Price</span><span class="val gold">${fmt(item.price)} ${WRK}</span></div>`;
+
+  const action = document.getElementById('giftDetailBuyBtn');
+  const isOwn = +state.userId === +item.seller_id;
+  action.style.display = '';
+  action.disabled = false;
+  action.className = isOwn ? 'btn red-btn' : 'btn green-btn';
+  action.style.cssText = 'width:100%;padding:14px;font-size:16px;font-weight:800';
+  action.textContent = isOwn ? 'Cancel MKRT listing' : `Buy for ${fmt(item.price)} WRK$`;
+  action.onclick = async () => {
+    closeGiftDetail();
+    if (isOwn) await cancelMkrtListing(listingId);
+    else confirmMkrtBuy(listingId);
+  };
+  document.getElementById('giftDetailModal').classList.add('open');
 }
 
 function confirmMkrtBuy(listingId) {
@@ -8064,7 +8549,7 @@ function renderSecurityCenter(security) {
 
 function _securityInputAmount() {
   const el = document.getElementById('securityVaultAmount');
-  const amount = Number((el?.value || '').replace(/[^\d]/g, ''));
+  const amount = _parseAmountValue(el?.value || '');
   return Number.isSafeInteger(amount) ? amount : 0;
 }
 
@@ -8137,6 +8622,58 @@ async function toggleSecurityMask(enabled) {
   } catch (e) { _shopToast(e.message, 'error'); }
 }
 
+function _walletGiftCardHtml(g) {
+  const listed = !!g.listing_id;
+  return `
+    <article class="wallet-gift-card">
+      <div class="wallet-gift-top">
+        <div class="wallet-gift-emoji">${_shopGiftEmoji(g)}</div>
+        <div class="wallet-gift-copy">
+          <div class="wallet-gift-name">${esc(g.model_name)} #${g.gift_number}</div>
+          <div class="wallet-gift-sub">${esc(fmtCollection(g.collection))} · ${esc(fmtBackground(g.background))}</div>
+        </div>
+      </div>
+      <div class="wallet-gift-value">${g.is_admin_gift
+        ? 'Admin collectible · <b>locked</b>'
+        : listed
+        ? `Listed for <b>${fmtK(g.listing_price)} ${WRK}</b>`
+        : `Rift buyback <b>${fmtK(g.buyback_price)} ${WRK}</b>`}</div>
+      <div class="wallet-gift-actions">
+        ${g.is_admin_gift
+          ? '<button class="cancel" disabled>Not tradeable or sellable</button>'
+          : g.staked
+          ? '<button class="cancel" disabled>Staked · unavailable</button>'
+          : listed
+          ? `<button class="cancel" onclick="cancelMkrtListing(${g.listing_id})">Cancel MKRT listing</button>`
+          : `<button class="sell" onclick="confirmRiftSell(${g.id})">Sell to Rift</button>
+             <button class="list" onclick="openMkrtListModal(${g.id})">List on MKRT</button>`}
+      </div>
+    </article>`;
+}
+
+function renderWalletGifts() {
+  const grid = document.getElementById('walletGiftGrid');
+  const gifts = _shopWallet?.gifts || [];
+  if (!grid) return;
+  if (!gifts.length) {
+    grid.innerHTML = '<div class="empty">No gifts in your wallet yet</div>';
+    return;
+  }
+  const visible = gifts.slice(0, _walletGiftVisible);
+  grid.innerHTML = visible.map(_walletGiftCardHtml).join('');
+  if (visible.length < gifts.length) {
+    grid.insertAdjacentHTML(
+      'beforeend',
+      `<button class="btn outline market-load-more" style="grid-column:1/-1" onclick="loadMoreWalletGifts()">Load 40 more · ${fmt(gifts.length - visible.length)} remaining</button>`,
+    );
+  }
+}
+
+function loadMoreWalletGifts() {
+  _walletGiftVisible += 40;
+  renderWalletGifts();
+}
+
 async function loadShopWallet() {
   const giftGrid = document.getElementById('walletGiftGrid');
   const anonGrid = document.getElementById('walletAnonGrid');
@@ -8151,42 +8688,14 @@ async function loadShopWallet() {
   try {
     const data = await api(`/api/wallet?user_id=${state.userId}`);
     _shopWallet = data;
+    _walletGiftVisible = 40;
     state.balance = data.balance;
     refreshHeaderBal();
     document.getElementById('shopWalletBalance').innerHTML = `${fmtK(data.balance)} ${WRK}`;
     document.getElementById('walletGiftCount').textContent = fmt(data.gifts.length);
     document.getElementById('walletAnonCount').textContent = fmt(data.anon_numbers.length);
     renderSecurityCenter(data.security);
-    giftGrid.innerHTML = data.gifts.length
-      ? data.gifts.map(g => {
-          const listed = !!g.listing_id;
-          return `
-            <article class="wallet-gift-card">
-              <div class="wallet-gift-top">
-                <div class="wallet-gift-emoji">${_shopGiftEmoji(g)}</div>
-                <div class="wallet-gift-copy">
-                  <div class="wallet-gift-name">${esc(g.model_name)} #${g.gift_number}</div>
-                  <div class="wallet-gift-sub">${esc(fmtCollection(g.collection))} · ${esc(fmtBackground(g.background))}</div>
-                </div>
-              </div>
-              <div class="wallet-gift-value">${g.is_admin_gift
-                ? 'Admin collectible · <b>locked</b>'
-                : listed
-                ? `Listed for <b>${fmtK(g.listing_price)} ${WRK}</b>`
-                : `Rift buyback <b>${fmtK(g.buyback_price)} ${WRK}</b>`}</div>
-              <div class="wallet-gift-actions">
-                ${g.is_admin_gift
-                  ? '<button class="cancel" disabled>Not tradeable or sellable</button>'
-                  : g.staked
-                  ? '<button class="cancel" disabled>Staked · unavailable</button>'
-                  : listed
-                  ? `<button class="cancel" onclick="cancelMkrtListing(${g.listing_id})">Cancel MKRT listing</button>`
-                  : `<button class="sell" onclick="confirmRiftSell(${g.id})">Sell to Rift</button>
-                     <button class="list" onclick="openMkrtListModal(${g.id})">List on MKRT</button>`}
-              </div>
-            </article>`;
-        }).join('')
-      : '<div class="empty">No gifts in your wallet yet</div>';
+    renderWalletGifts();
     anonGrid.innerHTML = data.anon_numbers.length
       ? data.anon_numbers.map(item => _anonCardHtml(item, true)).join('')
       : '<div class="empty">No anonymous numbers yet — visit Fragsmint.</div>';
@@ -8239,7 +8748,7 @@ function closeMkrtListModal() {
 
 async function submitMkrtListing() {
   if (!_mkrtListingGiftId) return;
-  const price = Number(document.getElementById('mkrtListPrice').value.replace(/,/g,''));
+  const price = _parseAmountValue(document.getElementById('mkrtListPrice').value);
   const err = document.getElementById('mkrtListErr');
   if (!Number.isSafeInteger(price) || price < 10) {
     err.textContent = 'Enter a whole-number price of at least 10 WRK$.';
@@ -8404,15 +8913,21 @@ function confirmBuy(collection, modelNumber, background, name, price, stock) {
   if (existing) existing.remove();
   const bar = document.createElement('div');
   bar.id = 'marketConfirmBar';
-  bar.style.cssText = 'position:fixed;bottom:calc(var(--nav-h) + 12px);left:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;z-index:200;display:flex;flex-direction:column;gap:10px;box-shadow:0 -4px 24px rgba(0,0,0,.5)';
+  bar.className = 'market-confirm-backdrop';
   bar.innerHTML = `
-    <div style="font-size:14px;font-weight:700">Buy <span style="color:var(--gold)">${esc(fmtCollection(collection))} — ${esc(name)}</span> (${fmtBackground(background)})?</div>
-    <div style="font-size:13px;color:var(--muted)">Cost: <b style="color:#fff">${fmt(price)} ${WRK}</b> · Your balance: <b style="color:var(--gold)">${fmt(state.balance)} ${WRK}</b></div>
-    <div style="display:flex;gap:8px">
-      <button class="btn outline" style="flex:1" onclick="document.getElementById('marketConfirmBar').remove()">Cancel</button>
-      <button class="btn green-btn" style="flex:1" onclick="executeBuy('${collection}',${modelNumber},'${background}',this)">Confirm</button>
+    <div class="market-confirm-card">
+      <div style="font-size:17px;font-weight:850">Confirm Rift purchase</div>
+      <div style="font-size:14px;font-weight:700">Buy <span style="color:var(--gold)">${esc(fmtCollection(collection))} — ${esc(name)}</span> (${fmtBackground(background)})?</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.5">Cost: <b style="color:#fff">${fmt(price)} ${WRK}</b><br>Your balance: <b style="color:var(--gold)">${fmt(state.balance)} ${WRK}</b></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn outline" style="flex:1" onclick="document.getElementById('marketConfirmBar').remove()">Cancel</button>
+        <button class="btn green-btn" style="flex:1" onclick="executeBuy('${collection}',${modelNumber},'${background}',this)">Confirm purchase</button>
+      </div>
     </div>
   `;
+  bar.onclick = event => {
+    if (event.target === bar) bar.remove();
+  };
   document.body.appendChild(bar);
 }
 
@@ -8437,7 +8952,8 @@ async function executeBuy(collection, modelNumber, background, btn) {
   } catch(e) {
     btn.disabled = false;
     btn.textContent = 'Confirm';
-    document.getElementById('marketConfirmBar').insertAdjacentHTML('beforeend', `<div class="error-msg">${esc(e.message)}</div>`);
+    document.querySelector('#marketConfirmBar .market-confirm-card')
+      ?.insertAdjacentHTML('beforeend', `<div class="error-msg">${esc(e.message)}</div>`);
   }
 }
 
@@ -8973,6 +9489,8 @@ function _showDuckBetArea() {
 function _selectDuck(idx) {
   if (_duckLastPhase !== 'waiting' || _duckMyBet > 0) return;
   _duckSelected = idx;
+  const errEl = document.getElementById('duckErr');
+  if (errEl) errEl.textContent = '';
   if (_duckLastState) _updateDuckDisplay(_duckLastState);
 }
 
@@ -8981,6 +9499,7 @@ function _placeDuckBet() {
   const bet = _parseBet('duckBetInput');
   if (!bet || bet < 10) { document.getElementById('duckErr').innerHTML = 'Min 10 ' + WRK; return; }
   if (!duckWs || duckWs.readyState !== 1) return;
+  document.getElementById('duckErr').textContent = '';
   duckWs.send(JSON.stringify({ type: 'bet', user_id: +state.userId, duck_idx: _duckSelected, amount: bet }));
 }
 
@@ -9168,6 +9687,7 @@ let bjCurrentBet = 0;
 let bjPPBet = 0;
 let bjLastBet = 0;
 let bjLastPPBet = 0;
+let bjRenderedCounts = [];
 
 function bjAddChip(amount) {
   bjCurrentBet += amount;
@@ -9178,13 +9698,20 @@ function bjAddChip(amount) {
 function bjClearBet() {
   bjCurrentBet = 0; bjPPBet = 0;
   const d1 = document.getElementById('bjBetDisplay'); if (d1) d1.textContent = 'Tap a chip';
-  const d2 = document.getElementById('bjPPDisplay'); if (d2) d2.textContent = 'No PP side bet';
+  const d2 = document.getElementById('bjPPDisplay');
+  if (d2) {
+    d2.textContent = 'No Perfect Pair bet';
+    d2.classList.remove('placed');
+  }
 }
 
 function bjAddPP(amount) {
   bjPPBet += amount;
   const el = document.getElementById('bjPPDisplay');
-  if (el) el.innerHTML = `PP side bet: ${fmt(bjPPBet)} ${WRK}`;
+  if (el) {
+    el.classList.add('placed');
+    el.innerHTML = `✓ Perfect Pair placed: ${fmt(bjPPBet)} ${WRK}`;
+  }
 }
 
 function closeBjModal(evt) {
@@ -9208,9 +9735,15 @@ async function openBlackjack() {
 
 function renderBjBetting() {
   bjBusy = false; bjCurrentBet = bjLastBet; bjPPBet = bjLastPPBet;
+  bjRenderedCounts = [];
   document.getElementById('bjContent').innerHTML = `
     <div class="bj-bet-section">
       <div class="bj-section-label" style="text-align:center;margin-bottom:8px">Place your bet</div>
+      <div class="bj-rule-strip">
+        <span>BLACKJACK PAYS 3:2</span>
+        <span>DEALER STANDS ON 17</span>
+        <span>DOUBLE & SPLIT WHEN AVAILABLE</span>
+      </div>
       <div class="bj-chip-row">
         <div class="bj-chip c100"  onclick="bjAddChip(100)">100</div>
         <div class="bj-chip c500"  onclick="bjAddChip(500)">500</div>
@@ -9220,7 +9753,7 @@ function renderBjBetting() {
         <div class="bj-chip c50k"  onclick="bjAddChip(50000)">50K</div>
       </div>
       <div class="bj-bet-display" id="bjBetDisplay">${bjCurrentBet > 0 ? fmt(bjCurrentBet) + ' ' + WRK : 'Tap a chip'}</div>
-      <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+      <div class="bj-side-bet-well">
         <div class="bj-section-label" style="text-align:center">Perfect Pair side bet (optional)</div>
         <div style="font-size:12px;color:var(--muted);text-align:center;margin-bottom:6px">Both cards same rank? Perfect 6× / Colored 4× / Mixed 3×</div>
         <div class="bj-chip-row">
@@ -9228,8 +9761,12 @@ function renderBjBetting() {
           <div class="bj-chip c500" onclick="bjAddPP(500)" style="width:46px;height:46px;font-size:10px">PP<br>500</div>
           <div class="bj-chip c1k"  onclick="bjAddPP(1000)" style="width:46px;height:46px;font-size:10px">PP<br>1K</div>
         </div>
-        <div id="bjPPDisplay" style="text-align:center;font-size:12px;color:var(--muted)">${bjLastPPBet > 0 ? 'PP side bet: ' + fmt(bjLastPPBet) + ' ' + WRK : 'No PP side bet'}</div>
+        <div id="bjPPDisplay" class="bj-side-bet-display${bjLastPPBet > 0 ? ' placed' : ''}">${bjLastPPBet > 0 ? '✓ Perfect Pair placed: ' + fmt(bjLastPPBet) + ' ' + WRK : 'No Perfect Pair bet'}</div>
       </div>
+      <details class="bj-strategy">
+        <summary>Basic strategy quick guide</summary>
+        <p>Always split Aces and 8s. Never split 5s or 10s. Stand on hard 17+. Double 11 when allowed; with 10, double against dealer 2–9. With 12–16, stand against dealer 2–6 and hit against 7–Ace.</p>
+      </details>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="btn outline bj-btn" onclick="bjClearBet()" style="flex:1">Clear</button>
         <button class="btn bj-btn" onclick="dealBlackjack()" style="flex:2">Deal 🃏</button>
@@ -9254,6 +9791,7 @@ async function dealBlackjack() {
   try {
     bjLastBet = bjCurrentBet;
     bjLastPPBet = bjPPBet;
+    bjRenderedCounts = [];
     const data = await api('/api/blackjack/start', { method: 'POST', json: { user_id: +state.userId, bet, pp_bet: bjPPBet } });
     if (data.status === 'playing') renderBjPlaying(data);
     else renderBjFinished(data);
@@ -9284,10 +9822,16 @@ function bjCard(card, faceDown = false) {
   return `<div class="play-card${red ? ' red' : ''}"><div class="cr">${card.rank}</div><div class="cs">${card.suit}</div></div>`;
 }
 
-function bjHandHtml(cards, value, active = false) {
+function bjHandHtml(cards, value, active = false, previousCount = 0) {
   const vc = value > 21 ? 'bust' : value === 21 ? 'bj21' : '';
   return `<div class="bj-hand-wrap${active ? ' bj-active' : ''}">
-    <div class="bj-hand-row">${cards.map(c => bjCard(c)).join('')}</div>
+    <div class="bj-hand-row">${cards.map((c, i) => {
+      const isNew = i >= previousCount;
+      const delay = Math.max(0, i - previousCount) * 130;
+      return isNew
+        ? `<div class="bj-card-deal" style="animation-delay:${delay}ms">${bjCard(c)}</div>`
+        : bjCard(c);
+    }).join('')}</div>
     <div class="bj-val ${vc}">${value > 21 ? '💥' : ''}${value}</div>
   </div>`;
 }
@@ -9295,7 +9839,17 @@ function bjHandHtml(cards, value, active = false) {
 function renderBjPlaying(g) {
   bjBusy = false;
   const dealerHtml = g.dealer_face.map(c => bjCard(c)).join('') + bjCard(null, true);
-  const playerHtml = g.hands.map((h, i) => bjHandHtml(h, g.player_values[i], i === g.current_hand)).join('');
+  const previousCounts = bjRenderedCounts;
+  const splitJustHappened = previousCounts.length > 0
+    && previousCounts.length !== g.hands.length;
+  const playerHtml = g.hands.map((h, i) =>
+    bjHandHtml(
+      h,
+      g.player_values[i],
+      i === g.current_hand,
+      splitJustHappened ? 1 : (previousCounts[i] || 0),
+    )
+  ).join('');
   const splitLabel = g.hands.length > 1 ? ` — Hand ${g.current_hand + 1} of 2` : '';
 
   document.getElementById('bjContent').innerHTML = `
@@ -9317,10 +9871,11 @@ function renderBjPlaying(g) {
     <div class="bj-actions">
       <button class="btn bj-btn" onclick="bjAction('hit')">👊 Hit</button>
       <button class="btn bj-btn" onclick="bjAction('stand')">✋ Stand</button>
-      ${g.can_double ? `<button class="btn bj-btn outline" onclick="bjAction('double')">2️⃣ Double</button>` : ''}
-      ${g.can_split ? `<button class="btn bj-btn outline" onclick="bjAction('split')">✂️ Split</button>` : ''}
+      <button class="btn bj-btn outline" onclick="bjAction('double')" ${g.can_double ? '' : 'disabled'}>2️⃣ Double</button>
+      <button class="btn bj-btn outline" onclick="bjAction('split')" ${g.can_split ? '' : 'disabled'}>✂️ Split</button>
     </div>
   `;
+  bjRenderedCounts = g.hands.map(hand => hand.length);
   _bjShowPP(g);
 }
 

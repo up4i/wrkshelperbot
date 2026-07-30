@@ -164,7 +164,29 @@ CREATE TABLE IF NOT EXISTS game_stats (
     blackjack_lost  INTEGER NOT NULL DEFAULT 0,
     crash_won       INTEGER NOT NULL DEFAULT 0,
     crash_lost      INTEGER NOT NULL DEFAULT 0,
-    crash_best_mult REAL    NOT NULL DEFAULT 0
+    crash_best_mult REAL    NOT NULL DEFAULT 0,
+    duck_won        INTEGER NOT NULL DEFAULT 0,
+    duck_lost       INTEGER NOT NULL DEFAULT 0,
+    marbles_won     INTEGER NOT NULL DEFAULT 0,
+    marbles_lost    INTEGER NOT NULL DEFAULT 0,
+    livebj_won      INTEGER NOT NULL DEFAULT 0,
+    livebj_lost     INTEGER NOT NULL DEFAULT 0,
+    poker_won       INTEGER NOT NULL DEFAULT 0,
+    poker_lost      INTEGER NOT NULL DEFAULT 0,
+    roulette_won    INTEGER NOT NULL DEFAULT 0,
+    roulette_lost   INTEGER NOT NULL DEFAULT 0,
+    plinko_won      INTEGER NOT NULL DEFAULT 0,
+    plinko_lost     INTEGER NOT NULL DEFAULT 0,
+    wheel_won       INTEGER NOT NULL DEFAULT 0,
+    wheel_lost      INTEGER NOT NULL DEFAULT 0,
+    slider_won      INTEGER NOT NULL DEFAULT 0,
+    slider_lost     INTEGER NOT NULL DEFAULT 0,
+    craps_won       INTEGER NOT NULL DEFAULT 0,
+    craps_lost      INTEGER NOT NULL DEFAULT 0,
+    highlow_won     INTEGER NOT NULL DEFAULT 0,
+    highlow_lost    INTEGER NOT NULL DEFAULT 0,
+    cases_won       INTEGER NOT NULL DEFAULT 0,
+    cases_lost      INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS bot_roles (
     user_id INTEGER PRIMARY KEY,
@@ -203,6 +225,23 @@ async def _migrate(db) -> None:
         if col_name not in econ_cols:
             await db.execute(f"ALTER TABLE economy ADD COLUMN {col}")
             await db.commit()
+
+    async with db.execute("PRAGMA table_info(game_stats)") as cur:
+        game_stat_cols = {row[1] async for row in cur}
+    for col in (
+        "duck_won", "duck_lost", "marbles_won", "marbles_lost",
+        "livebj_won", "livebj_lost", "poker_won", "poker_lost",
+        "roulette_won", "roulette_lost", "plinko_won", "plinko_lost",
+        "wheel_won", "wheel_lost", "slider_won", "slider_lost",
+        "craps_won", "craps_lost", "highlow_won", "highlow_lost",
+        "cases_won", "cases_lost",
+    ):
+        if col not in game_stat_cols:
+            await db.execute(
+                f"ALTER TABLE game_stats ADD COLUMN {col} "
+                "INTEGER NOT NULL DEFAULT 0"
+            )
+    await db.commit()
 
     async with db.execute("PRAGMA table_info(gift_instances)") as cur:
         gift_cols = {row[1] async for row in cur}

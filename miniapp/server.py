@@ -845,7 +845,12 @@ def update_pinned_stat(req: PinnedStatRequest, authenticated_user: Authenticated
 @app.post("/api/profile/reorder")
 def profile_reorder(req: ReorderRequest, authenticated_user: AuthenticatedUser):
     _require_actor(authenticated_user, req.user_id)
+    if not req.gift_ids:
+        raise HTTPException(400, "Gift order cannot be empty")
+    if len(req.gift_ids) != len(set(req.gift_ids)):
+        raise HTTPException(400, "Gift order contains duplicates")
     with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
         # Verify all gift_ids belong to this user
         placeholders = ",".join("?" * len(req.gift_ids))
         owned = db.execute(
@@ -854,11 +859,14 @@ def profile_reorder(req: ReorderRequest, authenticated_user: AuthenticatedUser):
         ).fetchall()
         if len(owned) != len(req.gift_ids):
             raise HTTPException(403, "One or more gifts don't belong to this user")
-        for idx, gift_id in enumerate(req.gift_ids):
-            db.execute(
-                "UPDATE gift_instances SET sort_index = ? WHERE id = ? AND owner_id = ?",
+        db.executemany(
+            "UPDATE gift_instances SET sort_index = ? "
+            "WHERE id = ? AND owner_id = ?",
+            [
                 (idx, gift_id, req.user_id)
-            )
+                for idx, gift_id in enumerate(req.gift_ids)
+            ],
+        )
         db.commit()
     return {"ok": True}
 
@@ -1389,15 +1397,26 @@ _RL_WHEEL = [
 class RouletteRequest(BaseModel):
     user_id: int
     bet: int
-    bet_type: str  # red|black|green|odd|even|dozen1|dozen2|dozen3|col1|col2|col3
+    bet_type: str
+    straight_number: int | None = None  # -1 represents 00
 
 
 @app.post("/api/play/roulette")
 def play_roulette(req: RouletteRequest, authenticated_user: AuthenticatedUser):
     _require_actor(authenticated_user, req.user_id)
-    valid = {"red","black","green","odd","even","dozen1","dozen2","dozen3","col1","col2","col3"}
+    valid = {
+        "red", "black", "green", "odd", "even", "low", "high",
+        "dozen1", "dozen2", "dozen3", "col1", "col2", "col3",
+        "straight",
+    }
     if req.bet_type not in valid:
         raise HTTPException(400, f"bet_type must be one of: {', '.join(sorted(valid))}")
+    if req.bet_type == "straight" and (
+        req.straight_number is None
+        or req.straight_number < -1
+        or req.straight_number > 36
+    ):
+        raise HTTPException(400, "straight_number must be 00, 0, or 1–36")
     with db_conn() as db:
         bal = _deduct_and_check(db, req.user_id, req.bet)
         slot = random.randint(0, 37)
@@ -1414,6 +1433,10 @@ def play_roulette(req: RouletteRequest, authenticated_user: AuthenticatedUser):
             won, mult = number > 0 and number % 2 == 1, 2
         elif bt == "even":
             won, mult = number > 0 and number % 2 == 0, 2
+        elif bt == "low":
+            won, mult = 1 <= number <= 18, 2
+        elif bt == "high":
+            won, mult = 19 <= number <= 36, 2
         elif bt == "dozen1":
             won, mult = 1 <= number <= 12, 3
         elif bt == "dozen2":
@@ -1424,8 +1447,10 @@ def play_roulette(req: RouletteRequest, authenticated_user: AuthenticatedUser):
             won, mult = number > 0 and number % 3 == 1, 3
         elif bt == "col2":
             won, mult = number > 0 and number % 3 == 2, 3
-        else:  # col3
+        elif bt == "col3":
             won, mult = number > 0 and number % 3 == 0, 3
+        else:  # straight
+            won, mult = number == req.straight_number, 36
         delta = req.bet * (mult - 1) if won else -req.bet
         new_bal = bal + delta
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
@@ -1499,6 +1524,7 @@ class PlinkoRequest(BaseModel):
     user_id: int
     bet: int
     risk: str  # low | medium | high
+    balls: int = 1
 
 
 @app.post("/api/play/plinko")
@@ -1506,26 +1532,48 @@ def play_plinko(req: PlinkoRequest, authenticated_user: AuthenticatedUser):
     _require_actor(authenticated_user, req.user_id)
     if req.risk not in _PLINKO_MULTS:
         raise HTTPException(400, "risk must be low, medium, or high")
+    if req.balls < 1 or req.balls > 10:
+        raise HTTPException(400, "balls must be between 1 and 10")
+    if req.bet < 10:
+        raise HTTPException(400, "Minimum bet is 10 WRK$ per ball")
+    total_bet = req.bet * req.balls
     with db_conn() as db:
-        bal = _deduct_and_check(db, req.user_id, req.bet)
-        path = [random.choice([False, True]) for _ in range(_PLINKO_ROWS)]
-        slot = sum(1 for p in path if p)   # 0 = all-left, 8 = all-right
-        mult = _PLINKO_MULTS[req.risk][slot]
-        delta = int(req.bet * mult) - req.bet
-        new_bal = bal + delta
+        bal = _deduct_and_check(db, req.user_id, total_bet)
+        drops = []
+        won = 0
+        lost = 0
+        for _ in range(req.balls):
+            path = [random.choice([False, True]) for _ in range(_PLINKO_ROWS)]
+            slot = sum(1 for p in path if p)   # 0 = all-left, 8 = all-right
+            mult = _PLINKO_MULTS[req.risk][slot]
+            delta = int(req.bet * mult) - req.bet
+            if delta > 0:
+                won += delta
+            elif delta < 0:
+                lost += req.bet
+            drops.append({
+                "path": path,
+                "slot": slot,
+                "multiplier": mult,
+                "delta": delta,
+            })
+        total_delta = sum(drop["delta"] for drop in drops)
+        new_bal = bal + total_delta
         db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
-        if delta > 0:
-            _record_stats(db, req.user_id, plinko_won=delta)
-        elif delta < 0:
-            _record_stats(db, req.user_id, plinko_lost=req.bet)
+        if won or lost:
+            _record_stats(db, req.user_id, plinko_won=won, plinko_lost=lost)
         db.commit()
-        return {
-            "path": path,
-            "slot": slot,
-            "multiplier": mult,
-            "delta": delta,
+        result = {
+            "balls": req.balls,
+            "bet_per_ball": req.bet,
+            "total_bet": total_bet,
+            "drops": drops,
+            "total_delta": total_delta,
             "new_balance": new_bal,
         }
+        # Keep the original one-ball response fields for older clients.
+        result.update(drops[0])
+        return result
 
 
 # ── Wheel of Fortune ──────────────────────────────────────────────────────────
@@ -3215,34 +3263,58 @@ def blackjack_start(req: BlackjackStartRequest, authenticated_user: Authenticate
         pp_result, pp_delta = None, 0
         if req.pp_bet and req.pp_bet > 0:
             c1, c2 = player[0], player[1]
-            if c1["rank"] == c2["rank"]:
+            if c1[0] == c2[0]:
                 red = {"♥", "♦"}
-                if c1["suit"] == c2["suit"]:
+                if c1[1] == c2[1]:
                     pp_result, pp_mult = "perfect", 6
-                elif (c1["suit"] in red) == (c2["suit"] in red):
+                elif (c1[1] in red) == (c2[1] in red):
                     pp_result, pp_mult = "colored", 4
                 else:
                     pp_result, pp_mult = "mixed", 3
                 pp_delta = req.pp_bet * (pp_mult - 1)
+                pp_payout = req.pp_bet * pp_mult
             else:
                 pp_result, pp_delta = "none", -req.pp_bet
-            balance += pp_delta
+                pp_payout = 0
+            # The side-bet stake was included in total_cost. Credit the full
+            # payout on a win; a loss needs no second deduction.
+            balance += pp_payout
             db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (balance, req.user_id))
 
-        if _bj_hand_val(player) == 21:
-            winnings = int(req.bet * 1.5)
-            balance += winnings
+        player_blackjack = _bj_hand_val(player) == 21
+        dealer_blackjack = _bj_hand_val(dealer) == 21
+        if player_blackjack or dealer_blackjack:
+            if player_blackjack and dealer_blackjack:
+                outcome, main_delta, main_payout = "push", 0, req.bet
+            elif player_blackjack:
+                outcome = "blackjack"
+                main_delta = int(req.bet * 1.5)
+                main_payout = req.bet + main_delta
+            else:
+                outcome, main_delta, main_payout = "lose", -req.bet, 0
+            balance += main_payout
             db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (balance, req.user_id))
-            db.commit()
+            if main_delta > 0:
+                _record_stats(db, req.user_id, blackjack_won=main_delta)
+            elif main_delta < 0:
+                _record_stats(db, req.user_id, blackjack_lost=-main_delta)
+            else:
+                db.commit()
             resp = {
-                "status": "blackjack",
+                "status": "blackjack" if outcome == "blackjack" else "finished",
                 "bet": req.bet,
                 "hands": [_bj_fmt(player)],
                 "dealer_hand": _bj_fmt(dealer),
-                "player_values": [21],
+                "player_values": [_bj_hand_val(player)],
                 "dealer_value": _bj_hand_val(dealer),
-                "results": [{"outcome": "blackjack", "delta": winnings, "player_value": 21, "hand_bet": req.bet}],
-                "total_delta": winnings,
+                "doubled": [False],
+                "results": [{
+                    "outcome": outcome,
+                    "delta": main_delta,
+                    "player_value": _bj_hand_val(player),
+                    "hand_bet": req.bet,
+                }],
+                "total_delta": main_delta,
                 "new_balance": balance,
             }
             if pp_result is not None:
@@ -3300,10 +3372,16 @@ def blackjack_action(req: BlackjackActionRequest, authenticated_user: Authentica
         if req.action == "double":
             if len(hand) != 2 or balance < game["bet"]:
                 raise HTTPException(400, "Can't double now")
+            db.execute(
+                "UPDATE economy SET balance = balance - ? WHERE user_id = ?",
+                (game["bet"], req.user_id),
+            )
+            balance -= game["bet"]
             game["doubled"][ci] = True
             hand.append(game["deck"].pop())
             if ci < len(game["hands"]) - 1:
                 game["current_hand"] += 1
+                db.commit()
                 return _bj_playing_state(game, balance)
             return _bj_resolve_game(db, req.user_id, game)
 
@@ -3323,6 +3401,7 @@ def blackjack_action(req: BlackjackActionRequest, authenticated_user: Authentica
             # Deduct extra bet for split
             db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (game["bet"], req.user_id))
             balance -= game["bet"]
+            db.commit()
             return _bj_playing_state(game, balance)
 
     return _bj_playing_state(game, balance)  # unreachable but satisfies linter
