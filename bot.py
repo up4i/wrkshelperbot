@@ -3,7 +3,7 @@ import os
 import traceback
 from logging.handlers import RotatingFileHandler
 
-from telegram import Update
+from telegram import BotCommand, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 import config
@@ -17,7 +17,7 @@ from handlers.moderation import (
     cmd_warn, cmd_dwarn, cmd_warns, cmd_resetwarns,
     cmd_report, cmd_purge, cmd_promote, cmd_demote,
 )
-from handlers.setup import cmd_setup, setup_callback, cmd_connect, cmd_start, dsetup_callback
+from handlers.setup import cmd_setup, setup_callback, cmd_connect, cmd_start, cmd_app, dsetup_callback
 from handlers.autoreply import cmd_addautoreply, cmd_removeautoreply, cmd_autoreplies, on_message_autoreply
 from handlers.protection import (
     cmd_setflood, cmd_setfloodaction, cmd_antiflood,
@@ -70,6 +70,33 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+_PUBLIC_COMMANDS = [
+    ("app", "Open the WRK$ mini-app"),
+    ("help", "Browse all bot commands"),
+    ("balance", "Check your WRK$ wallet"),
+    ("daily", "Claim your daily WRK$"),
+    ("profile", "View a player profile"),
+    ("work", "Start a tap-to-earn shift"),
+    ("jobs", "View jobs and progression"),
+    ("leaderboard", "Open the WRK$ leaderboards"),
+    ("give", "Send WRK$ to another user"),
+    ("rob", "Attempt to rob another player"),
+    ("hack", "Start a wallet hacking puzzle"),
+    ("slots", "Play slots"),
+    ("coinflip", "Flip for WRK$"),
+    ("dice", "Roll dice against the house"),
+    ("blackjack", "Play blackjack"),
+    ("crash", "Join a multiplayer crash round"),
+    ("cashout", "Cash out of the crash round"),
+    ("inventory", "Browse your gift inventory"),
+    ("gift", "Show one of your gifts"),
+    ("pin", "Pin a gift to your profile"),
+    ("shop", "Browse the WRK$ gift shop"),
+    ("offer", "Offer WRK$ for another user's gift"),
+    ("offers", "View pending gift offers"),
+    ("setup", "Configure the bot for this group"),
+]
+
 
 def build_app() -> Application:
     app = Application.builder().token(config.BOT_TOKEN).build()
@@ -117,6 +144,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("inactives",        cmd_inactives))
     app.add_handler(CommandHandler("connect",          cmd_connect))
     app.add_handler(CommandHandler("start",            cmd_start, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("app",              cmd_app))
     app.add_handler(CommandHandler("addautoreply",       cmd_addautoreply))
     app.add_handler(CommandHandler("removeautoreply",    cmd_removeautoreply))
     app.add_handler(CommandHandler("autoreplies",        cmd_autoreplies))
@@ -135,6 +163,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("balance",     cmd_balance))
     app.add_handler(CommandHandler("bal",         cmd_balance))
     app.add_handler(CommandHandler("b",           cmd_balance))
+    app.add_handler(CommandHandler("wallet",      cmd_balance))
     app.add_handler(CommandHandler("daily",       cmd_daily))
     app.add_handler(CommandHandler("leaderboard", cmd_leaderboard))
     app.add_handler(CommandHandler("lb",          cmd_leaderboard))
@@ -167,6 +196,7 @@ def build_app() -> Application:
     app.add_handler(CommandHandler("gift",       cmd_gift))
     app.add_handler(CommandHandler("pin",        cmd_pin))
     app.add_handler(CommandHandler("shop",       cmd_shop))
+    app.add_handler(CommandHandler("market",     cmd_shop))
     app.add_handler(CommandHandler("buy",        cmd_buy))
     app.add_handler(CommandHandler("sell",       cmd_sell))
     app.add_handler(CommandHandler("offer",      cmd_offer))
@@ -230,6 +260,13 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def post_init(app: Application) -> None:
     await init_db(config.DB_PATH)
+    try:
+        await app.bot.set_my_commands([
+            BotCommand(command, description)
+            for command, description in _PUBLIC_COMMANDS
+        ])
+    except Exception as exc:
+        log.warning("Could not publish Telegram command menu: %s", exc)
     log.info("DB initialized at %s", config.DB_PATH)
 
 

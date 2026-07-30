@@ -10,10 +10,17 @@ from handlers.economy import (
     _roulette_result,
     _craps_come_out,
     _highlow_result,
+    _resolve_bet,
 )
 
 
 # --- Daily ---
+
+def test_resolve_bet_supports_short_amounts_and_all():
+    assert _resolve_bet("50k", 80_000) == 50_000
+    assert _resolve_bet("2.5m", 3_000_000) == 2_500_000
+    assert _resolve_bet("all", 80_000) == 80_000
+    assert _resolve_bet("-1k", 80_000) is None
 
 def test_streak_multiplier_days_1_to_6():
     for d in range(1, 7):

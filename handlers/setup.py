@@ -253,7 +253,19 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
 
     if not ctx.args or not ctx.args[0].startswith("setup_"):
-        await msg.reply_text("👋 Add me to a group and use /setup or /connect to configure me.")
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💎 Open WRK$ Mini App", url=config.MINI_APP_URL)],
+            [InlineKeyboardButton(
+                "➕ Add me to a group",
+                url=f"https://t.me/{ctx.bot.username}?startgroup=true",
+            )],
+        ])
+        await msg.reply_text(
+            "👋 Welcome to WRK$.\n\n"
+            "Open the mini-app for games, your wallet, markets, profiles, and live tables. "
+            "Group admins can use /setup after adding me.",
+            reply_markup=keyboard,
+        )
         return
 
     try:
@@ -279,6 +291,16 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"⚙️ *Configuring: {group_name}*",
         parse_mode="Markdown",
         reply_markup=_main_menu(group_name, prefix),
+    )
+
+
+async def cmd_app(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("💎 Open WRK$ Mini App", url=config.MINI_APP_URL)
+    ]])
+    await update.effective_message.reply_text(
+        "Your games, wallet, markets, trades, and profile are all in the WRK$ mini-app.",
+        reply_markup=keyboard,
     )
 
 

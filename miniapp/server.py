@@ -1538,6 +1538,9 @@ def play_plinko(req: PlinkoRequest, authenticated_user: AuthenticatedUser):
         raise HTTPException(400, "Minimum bet is 10 WRK$ per ball")
     total_bet = req.bet * req.balls
     with db_conn() as db:
+        # Rapid one-ball drops arrive on separate request threads. Serialize the
+        # wallet read/settlement so two presses cannot spend the same balance.
+        db.execute("BEGIN IMMEDIATE")
         bal = _deduct_and_check(db, req.user_id, total_bet)
         drops = []
         won = 0
@@ -3727,16 +3730,39 @@ def cancel_trade(offer_id: int, req: TradeActionRequest, authenticated_user: Aut
 # ── Lobby WebSocket ───────────────────────────────────────────────────────────
 
 _lobby_connections: set[WebSocket] = set()
+_lobby_event_seq = 0
+_lobby_recent_events: list[dict] = []
 
 
 async def _lobby_broadcast(msg: dict) -> None:
+    global _lobby_event_seq
+    _lobby_event_seq += 1
+    event = {
+        **msg,
+        "event_id": _lobby_event_seq,
+        "created_at": int(time.time()),
+    }
+    _lobby_recent_events.append(event)
+    del _lobby_recent_events[:-30]
     dead = set()
     for ws in list(_lobby_connections):
         try:
-            await ws.send_json(msg)
+            await ws.send_json(event)
         except Exception:
             dead.add(ws)
-    _lobby_connections -= dead
+    _lobby_connections.difference_update(dead)
+
+
+@app.get("/api/lobby/events")
+def lobby_events(authenticated_user: AuthenticatedUser, after: int = 0):
+    cutoff = int(time.time()) - 45
+    events = [
+        event for event in _lobby_recent_events
+        if event["event_id"] > max(0, after)
+        and event["created_at"] >= cutoff
+        and event.get("user_id") != authenticated_user
+    ]
+    return {"events": events, "latest_event_id": _lobby_event_seq}
 
 
 # ── Crash ─────────────────────────────────────────────────────────────────────
@@ -4434,9 +4460,13 @@ async def crash_ws(ws: WebSocket):
                     db.commit()
                 _crash.bets[uid] = {"bet": amount, "cashed_out": False}
                 if len(_crash.names) == 1:
-                    asyncio.create_task(_lobby_broadcast(
-                        {"type": "player_joined", "game": "crash", "game_label": "Crash", "user": _crash.names[uid]}
-                    ))
+                    await _lobby_broadcast({
+                        "type": "player_joined",
+                        "game": "crash",
+                        "game_label": "Crash",
+                        "user": _crash.names[uid],
+                        "user_id": uid,
+                    })
                 await ws.send_json({"type": "bet_placed", "bet": amount, "new_balance": new_bal})
 
             elif data.get("type") == "cashout":
@@ -4622,9 +4652,13 @@ async def duck_ws(ws: WebSocket):
                     db.commit()
                 _duck.bets[uid] = {"duck_idx": duck_idx, "bet": amount, "name": public_name}
                 if len(_duck.bets) == 1:
-                    asyncio.create_task(_lobby_broadcast(
-                        {"type": "player_joined", "game": "duck", "game_label": "Duck Racing", "user": _duck.bets[uid]["name"]}
-                    ))
+                    await _lobby_broadcast({
+                        "type": "player_joined",
+                        "game": "duck",
+                        "game_label": "Duck Racing",
+                        "user": _duck.bets[uid]["name"],
+                        "user_id": uid,
+                    })
                 await ws.send_json({"type": "bet_placed", "duck_idx": duck_idx, "bet": amount, "new_balance": new_bal})
 
     except WebSocketDisconnect:
@@ -4844,9 +4878,13 @@ async def marbles_ws(ws: WebSocket):
 
                 _marble.bets[uid] = bet_entry
                 if len(_marble.bets) == 1:
-                    asyncio.create_task(_lobby_broadcast(
-                        {"type": "player_joined", "game": "marbles", "game_label": "Marbles", "user": bet_entry["name"]}
-                    ))
+                    await _lobby_broadcast({
+                        "type": "player_joined",
+                        "game": "marbles",
+                        "game_label": "Marbles",
+                        "user": bet_entry["name"],
+                        "user_id": uid,
+                    })
                 await ws.send_json({"type": "bet_placed", "new_balance": new_bal, "color": bet_entry["color"]})
                 await _marble_broadcast({"type": "state", **_marble_snapshot()})
 
@@ -5104,9 +5142,13 @@ async def livebj_ws(ws: WebSocket):
                     db.commit()
                 _livebj.seats.append({"user_id": uid, "name": public_name, "bet": bet, "hand": [], "status": "waiting", "doubled": False})
                 if len(_livebj.seats) == 1:
-                    asyncio.create_task(_lobby_broadcast(
-                        {"type": "player_joined", "game": "livebj", "game_label": "Live Blackjack", "user": _livebj.seats[-1]["name"]}
-                    ))
+                    await _lobby_broadcast({
+                        "type": "player_joined",
+                        "game": "livebj",
+                        "game_label": "Live Blackjack",
+                        "user": _livebj.seats[-1]["name"],
+                        "user_id": uid,
+                    })
                 await ws.send_json({"type": "joined", "bet": bet, "new_balance": new_bal})
                 await _livebj_broadcast_state()
 
@@ -5453,9 +5495,13 @@ async def poker_ws(ws: WebSocket):
                     db.commit()
                 _poker.connections[uid] = ws
                 _poker.seats.append({"user_id": uid, "name": public_name, "chips": _POKER_BUYIN, "hole_cards": [], "status": "waiting", "current_bet": 0})
-                asyncio.create_task(_lobby_broadcast(
-                    {"type": "player_joined", "game": "poker", "game_label": "Poker", "user": _poker.seats[-1]["name"]}
-                ))
+                await _lobby_broadcast({
+                    "type": "player_joined",
+                    "game": "poker",
+                    "game_label": "Poker",
+                    "user": _poker.seats[-1]["name"],
+                    "user_id": uid,
+                })
                 await ws.send_json({"type": "joined", "chips": _POKER_BUYIN, "new_balance": new_bal})
                 await _poker_broadcast({"type": "state", **_poker_snapshot()})
 
@@ -5558,9 +5604,12 @@ async def lobby_ws(ws: WebSocket):
     if authenticated_user is None:
         return
     _lobby_connections.add(ws)
+    await ws.send_json({"type": "lobby_ready", "event_id": _lobby_event_seq})
     try:
         while True:
-            await ws.receive_text()
+            message = await ws.receive_text()
+            if message == "ping":
+                await ws.send_json({"type": "pong"})
     except Exception:
         pass
     finally:

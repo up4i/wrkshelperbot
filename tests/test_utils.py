@@ -1,5 +1,5 @@
 import pytest
-from utils import parse_duration, format_duration, display_name
+from utils import parse_amount, parse_duration, format_duration, display_name
 
 def test_parse_duration_minutes():
     assert parse_duration("30m") == 1800
@@ -17,6 +17,18 @@ def test_parse_duration_invalid():
 
 def test_parse_duration_case_insensitive():
     assert parse_duration("1H") == 3600
+
+def test_parse_amount_short_forms_and_commas():
+    assert parse_amount("50k") == 50_000
+    assert parse_amount("2.5M") == 2_500_000
+    assert parse_amount("1,250") == 1_250
+    assert parse_amount("1b") == 1_000_000_000
+
+def test_parse_amount_validation_and_negative_admin_delta():
+    assert parse_amount("-50k") is None
+    assert parse_amount("-50k", allow_negative=True) == -50_000
+    assert parse_amount("all") is None
+    assert parse_amount("12x") is None
 
 def test_format_duration_days():
     assert format_duration(86400) == "1d"

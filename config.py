@@ -18,3 +18,4 @@ except ValueError:
 
 DB_PATH: str = os.getenv("DB_PATH", os.path.expanduser("~/.local/share/wrkshelperbot/data.db"))
 LOG_FILE: str = os.getenv("LOG_FILE", os.path.expanduser("~/.local/share/wrkshelperbot/bot.log"))
+MINI_APP_URL: str = os.getenv("MINI_APP_URL", "https://t.me/wrkshelperbot/app")

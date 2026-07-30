@@ -11,7 +11,7 @@ from telegram.ext import ContextTypes
 import config
 import db
 import emojis
-from utils import display_name
+from utils import display_name, parse_amount
 
 log = logging.getLogger(__name__)
 
@@ -116,9 +116,7 @@ def _fmt(wallet: dict) -> str:
 def _resolve_bet(arg: str, balance: int) -> int | None:
     if arg.lower() == "all":
         return balance
-    if arg.isdigit():
-        return int(arg)
-    return None
+    return parse_amount(arg)
 
 
 async def _ensure_wallet(user: object, db_path: str) -> dict:
@@ -652,8 +650,9 @@ async def cmd_givewrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not await db.is_eco_admin(config.DB_PATH, update.effective_user.id, config.OWNER_ID):
         return
 
-    if len(ctx.args) < 2 or not ctx.args[1].lstrip("-").isdigit():
-        await msg.reply_text("Usage: `/givewrk @username <amount>`", parse_mode="Markdown")
+    amount = parse_amount(ctx.args[1], allow_negative=True) if len(ctx.args) >= 2 else None
+    if amount is None:
+        await msg.reply_text("Usage: `/givewrk @username <amount>` — supports `50k`, `2.5m`, etc.", parse_mode="Markdown")
         return
 
     target_row = await _resolve_target_user(config.DB_PATH, msg.chat.id, ctx.args[0])
@@ -661,7 +660,6 @@ async def cmd_givewrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❌ User not found.")
         return
 
-    amount = int(ctx.args[1])
     await db.upsert_wallet(config.DB_PATH, target_row["user_id"], None, None)
     new_bal = await db.update_balance(config.DB_PATH, target_row["user_id"], amount)
     name = target_row.get("full_name") or ctx.args[0]
@@ -674,8 +672,9 @@ async def cmd_setwrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not await db.is_eco_admin(config.DB_PATH, update.effective_user.id, config.OWNER_ID):
         return
 
-    if len(ctx.args) < 2 or not ctx.args[1].isdigit():
-        await msg.reply_text("Usage: `/setwrk @username <amount>`", parse_mode="Markdown")
+    new_amount = parse_amount(ctx.args[1]) if len(ctx.args) >= 2 else None
+    if new_amount is None:
+        await msg.reply_text("Usage: `/setwrk @username <amount>` — supports `50k`, `2.5m`, etc.", parse_mode="Markdown")
         return
 
     target_row = await _resolve_target_user(config.DB_PATH, msg.chat.id, ctx.args[0])
@@ -686,7 +685,6 @@ async def cmd_setwrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     target_id = target_row["user_id"]
     await db.upsert_wallet(config.DB_PATH, target_id, None, None)
     wallet = await db.get_wallet(config.DB_PATH, target_id)
-    new_amount = int(ctx.args[1])
     delta = new_amount - wallet["balance"]
     new_bal = await db.update_balance(config.DB_PATH, target_id, delta)
     name = target_row.get("full_name") or ctx.args[0]
@@ -701,11 +699,11 @@ async def cmd_give(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     wallet = await _ensure_wallet(user, config.DB_PATH)
 
-    if len(ctx.args) < 2 or not ctx.args[1].isdigit():
-        await msg.reply_text("Usage: `/give @username <amount>`", parse_mode="Markdown")
+    amount = parse_amount(ctx.args[1]) if len(ctx.args) >= 2 else None
+    if amount is None:
+        await msg.reply_text("Usage: `/give @username <amount>` — supports `50k`, `2.5m`, etc.", parse_mode="Markdown")
         return
 
-    amount = int(ctx.args[1])
     if amount <= 0:
         await msg.reply_text("❌ Amount must be positive.")
         return

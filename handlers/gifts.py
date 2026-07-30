@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes
 
 import config
 import db
-from utils import display_name, is_admin
+from utils import display_name, is_admin, parse_amount
 
 log = logging.getLogger(__name__)
 
@@ -606,10 +606,10 @@ async def cmd_offer(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     target_username = args[0]
-    if not args[1].isdigit():
-        await msg.reply_text("❌ Amount must be a number.")
+    wrk_amount = parse_amount(args[1])
+    if wrk_amount is None or wrk_amount <= 0:
+        await msg.reply_text("❌ Amount must be positive. Short forms like 50k and 2.5m are supported.")
         return
-    wrk_amount = int(args[1])
     collection, rest = _parse_args(args[for_idx + 1:])
     if not rest or not rest[0].isdigit():
         await msg.reply_text("❌ Gift number must be a number.")

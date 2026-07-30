@@ -1932,19 +1932,26 @@
   .plinko-risk-btn.selected {
     background: rgba(139,92,246,.2); border-color: var(--primary); color: var(--primary);
   }
-  .plinko-count-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
-  .plinko-count-btn {
-    min-height: 34px; border: 1px solid var(--border); border-radius: 9px;
-    background: rgba(255,255,255,.045); color: var(--muted);
-    font: 800 12px system-ui; cursor: pointer;
-  }
-  .plinko-count-btn.selected {
-    border-color: rgba(103,232,249,.65); background: rgba(103,232,249,.13);
-    color: #a5f3fc; box-shadow: 0 5px 14px rgba(34,211,238,.1);
-  }
   .plinko-total {
     min-height: 16px; margin-top: -5px; color: var(--muted);
     font-size: 10px; text-align: right;
+  }
+  #plinkoPlayBtn {
+    position: relative;
+    overflow: hidden;
+    touch-action: manipulation;
+    user-select: none;
+  }
+  #plinkoPlayBtn.dropping::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,.2);
+    animation: plinko-press .22s ease-out;
+  }
+  @keyframes plinko-press {
+    from { opacity: 1; transform: scale(.65); }
+    to { opacity: 0; transform: scale(1.25); }
   }
   .game-modal--plinko .result-box { flex-direction: column; gap: 2px; }
   .game-modal--plinko .result-box small { color: currentColor; font-size: 10px; opacity: .72; }
@@ -3158,42 +3165,120 @@
     font-size: 10px;
   }
   .craps-stage {
-    min-height: 190px;
+    position: relative;
+    min-height: 238px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 20px;
-    border: 1px solid rgba(251,113,133,.2);
+    justify-content: flex-start;
+    gap: 5px;
+    overflow: hidden;
+    padding: 18px 15px 12px;
+    border: 8px solid #29151a;
     border-radius: 22px;
     background:
-      linear-gradient(45deg, rgba(255,255,255,.02) 25%, transparent 25% 75%, rgba(255,255,255,.02) 75%),
-      radial-gradient(ellipse at center, #611c35, #260d1c);
-    background-size: 24px 24px, auto;
-    box-shadow: inset 0 0 40px rgba(0,0,0,.35);
+      linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+      radial-gradient(ellipse at 50% 35%, #753149, #3b1427 72%);
+    background-size: 20px 20px, 20px 20px, auto;
+    box-shadow:
+      inset 0 0 0 2px rgba(251,191,36,.18),
+      inset 0 0 55px rgba(0,0,0,.42),
+      0 12px 28px rgba(0,0,0,.3);
+    perspective: 650px;
   }
-  .craps-dice { display: flex; gap: 24px; font-size: 68px; filter: drop-shadow(0 10px 10px rgba(0,0,0,.4)); }
+  .craps-stage::before {
+    content: "PASS LINE";
+    position: absolute;
+    right: 13px;
+    bottom: 9px;
+    padding: 4px 8px;
+    border: 1px solid rgba(251,191,36,.22);
+    border-radius: 999px;
+    color: rgba(254,243,199,.38);
+    font-size: 7px;
+    font-weight: 900;
+    letter-spacing: 1.3px;
+  }
+  .craps-stage::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: 13px;
+    background: linear-gradient(#4a262d, #1c0d12);
+    box-shadow: 0 -2px rgba(255,255,255,.07), inset 0 4px 9px rgba(0,0,0,.32);
+  }
+  .craps-status {
+    position: relative;
+    z-index: 4;
+    min-height: 20px;
+    color: #fff5f6;
+    font-size: 13px;
+    font-weight: 750;
+    text-align: center;
+  }
+  .craps-dice {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    height: 142px;
+    transform-style: preserve-3d;
+  }
   .craps-die {
-    display: inline-block;
-    transform-origin: 50% 70%;
-    will-change: transform, filter;
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    width: 62px;
+    height: 62px;
+    transform-origin: 50% 50%;
+    transform-style: preserve-3d;
+    will-change: transform, filter, opacity;
   }
-  .craps-die.rolling:first-child { animation: dice-tumble-left .58s cubic-bezier(.2,.75,.32,1) infinite; }
-  .craps-die.rolling:last-child { animation: dice-tumble-right .63s cubic-bezier(.2,.75,.32,1) infinite; }
-  @keyframes dice-tumble-left {
-    0% { transform: translate(0,0) rotate(0) scale(1); }
-    28% { transform: translate(-9px,-28px) rotate(-115deg) scale(1.08); }
-    58% { transform: translate(7px,-13px) rotate(135deg) scale(.96); }
-    82% { transform: translate(-3px,-4px) rotate(250deg) scale(1.03); }
-    100% { transform: translate(0,0) rotate(360deg) scale(1); }
+  .craps-die-face {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+    padding: 9px;
+    border: 1px solid rgba(70,48,37,.38);
+    border-radius: 14px;
+    background:
+      radial-gradient(circle at 28% 20%, rgba(255,255,255,.95), transparent 22%),
+      linear-gradient(145deg, #fffdf4, #e8e0cf);
+    box-shadow:
+      inset -5px -6px 9px rgba(92,72,47,.16),
+      inset 3px 3px 5px rgba(255,255,255,.8),
+      0 12px 16px rgba(0,0,0,.42);
+    backface-visibility: visible;
   }
-  @keyframes dice-tumble-right {
-    0% { transform: translate(0,0) rotate(0) scale(1); }
-    25% { transform: translate(10px,-24px) rotate(125deg) scale(1.06); }
-    55% { transform: translate(-6px,-16px) rotate(-140deg) scale(.95); }
-    80% { transform: translate(4px,-5px) rotate(-255deg) scale(1.04); }
-    100% { transform: translate(0,0) rotate(-360deg) scale(1); }
+  .craps-pip {
+    width: 10px;
+    height: 10px;
+    place-self: center;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #5a2833, #170a0e 68%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.55), 0 1px rgba(255,255,255,.2);
+  }
+  .craps-die[data-value="1"] .craps-pip { background: radial-gradient(circle at 35% 30%, #ff6b83, #8d142d 68%); }
+  .craps-total {
+    position: relative;
+    z-index: 4;
+    min-height: 24px;
+    color: #fde68a;
+    font-size: 14px;
+    font-weight: 850;
+    letter-spacing: .3px;
+  }
+  .craps-throw-callout {
+    position: absolute;
+    z-index: 1;
+    right: 12px;
+    top: 52px;
+    color: rgba(255,255,255,.18);
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 1.2px;
+    transform: rotate(-8deg);
   }
   .game-modal--slider .slider-bar-wrap {
     height: 64px;
@@ -4253,11 +4338,13 @@
     <button class="modal-close" onclick="closeModal('crapsModal')">✕</button>
     <div class="modal-title" data-subtitle="Roll the point · dodge the seven">🎲 Street Craps</div>
     <div class="craps-stage">
-      <div id="crapsStatus" style="text-align:center;font-size:15px;font-weight:600;margin-bottom:4px"></div>
+      <div class="craps-status" id="crapsStatus"></div>
+      <div class="craps-throw-callout">THROW ZONE</div>
       <div class="craps-dice">
-        <span class="craps-die" id="crapsDie1">⚀</span><span class="craps-die" id="crapsDie2">⚅</span>
+        <div class="craps-die" id="crapsDie1"></div>
+        <div class="craps-die" id="crapsDie2"></div>
       </div>
-      <div style="font-size:16px;font-weight:700;min-height:20px" id="crapsTotal"></div>
+      <div class="craps-total" id="crapsTotal"></div>
     </div>
     <div id="crapsBetWrap">
       <div class="card-title">Bet amount</div>
@@ -4436,15 +4523,6 @@
       <div class="plinko-risk-btn" id="plinkoMedium" onclick="setPlinkoRisk('medium')">Medium</div>
       <div class="plinko-risk-btn" id="plinkoHigh"   onclick="setPlinkoRisk('high')">High</div>
     </div>
-    <div>
-      <div class="card-title" style="margin-bottom:6px">Balls per drop</div>
-      <div class="plinko-count-row">
-        <button class="plinko-count-btn selected" data-plinko-balls="1" onclick="setPlinkoBalls(1)">1 ball</button>
-        <button class="plinko-count-btn" data-plinko-balls="3" onclick="setPlinkoBalls(3)">3 balls</button>
-        <button class="plinko-count-btn" data-plinko-balls="5" onclick="setPlinkoBalls(5)">5 balls</button>
-        <button class="plinko-count-btn" data-plinko-balls="10" onclick="setPlinkoBalls(10)">10 balls</button>
-      </div>
-    </div>
     <div class="plinko-board-wrap">
       <canvas id="plinkoCanvas" width="320" height="390" aria-label="Plinko ball drop board"></canvas>
     </div>
@@ -4453,9 +4531,9 @@
     <div class="bet-presets" id="plinkoPresets"></div>
     <div class="bet-row">
       <input class="input bet-input" id="plinkoBet" type="text" inputmode="numeric" value="100" oninput="updatePlinkoTotal()">
-      <button class="btn" id="plinkoPlayBtn" onclick="playPlinko()">DROP</button>
+      <button class="btn" id="plinkoPlayBtn" onclick="playPlinko()">DROP BALL</button>
     </div>
-    <div class="plinko-total" id="plinkoTotal">Total wager: 100 WRK$</div>
+    <div class="plinko-total" id="plinkoTotal">100 WRK$ per ball · tap repeatedly to keep dropping</div>
     <div class="balance-display">Balance: <span class="b" id="plinkoBal">—</span> <img src="/emoji/5093898072811898950" style="width:18px;height:18px;vertical-align:middle;margin-left:2px" onerror="this.outerHTML='WRK$'"></div>
     <div class="error-msg" id="plinkoErr"></div>
   </div>
@@ -4731,6 +4809,18 @@ function clearSession() {
   if (_presenceInterval) {
     clearInterval(_presenceInterval);
     _presenceInterval = null;
+  }
+  if (_lobbyHeartbeat) {
+    clearInterval(_lobbyHeartbeat);
+    _lobbyHeartbeat = null;
+  }
+  if (_lobbyPollTimer) {
+    clearInterval(_lobbyPollTimer);
+    _lobbyPollTimer = null;
+  }
+  if (_lobbyWs) {
+    try { _lobbyWs.close(); } catch {}
+    _lobbyWs = null;
   }
   localStorage.removeItem('wrkUserId');
   localStorage.removeItem('wrkSessionToken');
@@ -6398,22 +6488,86 @@ function rlPlayAgain(bet) {
 
 // ── High-Low ──────────────────────────────────────────────────────────────────
 // ── Street Craps ──────────────────────────────────────────────────────────────
-const _DICE_EMOJI = ['','⚀','⚁','⚂','⚃','⚄','⚅'];
+const _CRAPS_PIPS = {
+  1: [[2,2]],
+  2: [[1,1],[3,3]],
+  3: [[1,1],[2,2],[3,3]],
+  4: [[1,1],[1,3],[3,1],[3,3]],
+  5: [[1,1],[1,3],[2,2],[3,1],[3,3]],
+  6: [[1,1],[1,3],[2,1],[2,3],[3,1],[3,3]],
+};
+
+function _setCrapsDie(el, value) {
+  if (!el) return;
+  const safeValue = Math.max(1, Math.min(6, Number(value) || 1));
+  el.dataset.value = String(safeValue);
+  el.innerHTML = `<div class="craps-die-face">${
+    _CRAPS_PIPS[safeValue].map(([row, col]) =>
+      `<span class="craps-pip" style="grid-area:${row}/${col}"></span>`
+    ).join('')
+  }</div>`;
+}
 
 async function _animateDice(d1, d2) {
-  const el1 = document.getElementById('crapsDie1');
-  const el2 = document.getElementById('crapsDie2');
-  el1.classList.add('rolling');
-  el2.classList.add('rolling');
-  for (let i = 0; i < 14; i++) {
-    el1.textContent = _DICE_EMOJI[Math.ceil(Math.random() * 6)];
-    el2.textContent = _DICE_EMOJI[Math.ceil(Math.random() * 6)];
-    await new Promise(r => setTimeout(r, 55));
+  const dice = [
+    document.getElementById('crapsDie1'),
+    document.getElementById('crapsDie2'),
+  ];
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    _setCrapsDie(dice[0], d1);
+    _setCrapsDie(dice[1], d2);
+    dice[0].style.transform = 'translate(-78px,8px) rotate(-8deg) scale(.96)';
+    dice[1].style.transform = 'translate(18px,-2px) rotate(11deg) scale(.94)';
+    await sleep(180);
+    return;
   }
-  el1.textContent = _DICE_EMOJI[d1];
-  el2.textContent = _DICE_EMOJI[d2];
-  el1.classList.remove('rolling');
-  el2.classList.remove('rolling');
+  if (!dice.every(die => typeof die?.animate === 'function')) {
+    _setCrapsDie(dice[0], d1);
+    _setCrapsDie(dice[1], d2);
+    await sleep(350);
+    return;
+  }
+
+  _setCrapsDie(dice[0], Math.ceil(Math.random()*6));
+  _setCrapsDie(dice[1], Math.ceil(Math.random()*6));
+  const paths = [
+    [
+      { transform:'translate(142px,92px) rotate(15deg) rotateX(0deg) scale(1.24)', filter:'blur(.7px)', offset:0 },
+      { transform:'translate(78px,-72px) rotate(-155deg) rotateX(150deg) scale(1.10)', filter:'blur(.3px)', offset:.25 },
+      { transform:'translate(-28px,-88px) rotate(-390deg) rotateX(310deg) scale(.91)', filter:'blur(.2px)', offset:.52 },
+      { transform:'translate(-86px,10px) rotate(-590deg) rotateX(490deg) scale(.94)', filter:'blur(0)', offset:.72 },
+      { transform:'translate(-70px,-30px) rotate(-666deg) rotateX(540deg) scale(.98)', offset:.82 },
+      { transform:'translate(-82px,3px) rotate(-710deg) rotateX(690deg) scale(.94)', offset:.91 },
+      { transform:'translate(-78px,8px) rotate(-728deg) rotateX(720deg) scale(.96)', filter:'blur(0)', offset:1 },
+    ],
+    [
+      { transform:'translate(164px,82px) rotate(-20deg) rotateY(0deg) scale(1.20)', filter:'blur(.7px)', offset:0 },
+      { transform:'translate(108px,-58px) rotate(170deg) rotateY(-170deg) scale(1.06)', filter:'blur(.3px)', offset:.22 },
+      { transform:'translate(32px,-105px) rotate(405deg) rotateY(-350deg) scale(.9)', filter:'blur(.2px)', offset:.49 },
+      { transform:'translate(8px,-2px) rotate(610deg) rotateY(-520deg) scale(.93)', filter:'blur(0)', offset:.7 },
+      { transform:'translate(29px,-35px) rotate(685deg) rotateY(-610deg) scale(.98)', offset:.8 },
+      { transform:'translate(14px,-4px) rotate(710deg) rotateY(-690deg) scale(.92)', offset:.91 },
+      { transform:'translate(18px,-2px) rotate(731deg) rotateY(-720deg) scale(.94)', filter:'blur(0)', offset:1 },
+    ],
+  ];
+  const animations = dice.map((die, index) => die.animate(paths[index], {
+    duration: index ? 1320 : 1260,
+    delay: index ? 75 : 0,
+    easing: 'cubic-bezier(.18,.68,.22,1)',
+    fill: 'forwards',
+  }));
+  const tumbleTimer = window.setInterval(() => {
+    dice.forEach(die => _setCrapsDie(die, Math.ceil(Math.random()*6)));
+  }, 82);
+  await sleep(890);
+  clearInterval(tumbleTimer);
+  _setCrapsDie(dice[0], d1);
+  _setCrapsDie(dice[1], d2);
+  await Promise.allSettled(animations.map(animation => animation.finished));
+  dice[0].style.transform = 'translate(-78px,8px) rotate(-8deg) scale(.96)';
+  dice[1].style.transform = 'translate(18px,-2px) rotate(11deg) scale(.94)';
+  animations.forEach(animation => animation.cancel());
+  haptic();
 }
 
 async function openCraps() {
@@ -6445,8 +6599,12 @@ function _crapsEnterGame(point) {
   document.getElementById('crapsStatus').textContent = point
     ? `Point: ${point} — roll it again before a 7!`
     : 'Come-out roll — hit 7 or 11 to win!';
-  document.getElementById('crapsDie1').textContent = '🎲';
-  document.getElementById('crapsDie2').textContent = '🎲';
+  const die1 = document.getElementById('crapsDie1');
+  const die2 = document.getElementById('crapsDie2');
+  _setCrapsDie(die1, 1);
+  _setCrapsDie(die2, 6);
+  die1.style.transform = 'translate(-78px,8px) rotate(-8deg) scale(.96)';
+  die2.style.transform = 'translate(18px,-2px) rotate(11deg) scale(.94)';
   document.getElementById('crapsTotal').textContent = '';
   document.getElementById('crapsRollBtn').style.display = '';
   const ra = document.getElementById('crapsGameWrap')?.querySelector('.craps-roll-again');
@@ -6476,8 +6634,6 @@ async function startCraps() {
 async function rollCraps() {
   document.getElementById('crapsRollBtn').disabled = true;
   document.getElementById('crapsErr').textContent = '';
-  document.getElementById('crapsDie1').textContent = '⬜';
-  document.getElementById('crapsDie2').textContent = '⬜';
   document.getElementById('crapsTotal').textContent = '';
   try {
     const data = await api('/api/play/craps/roll', { method:'POST', json:{ user_id:+state.userId } });
@@ -7012,7 +7168,11 @@ function sliderPlayAgain(bet) {
 
 // ── Plinko ────────────────────────────────────────────────────────────────────
 let _plinkoRisk = 'medium';
-let _plinkoBalls = 1;
+let _plinkoInflight = 0;
+let _plinkoDropId = 0;
+let _plinkoRaf = null;
+let _plinkoActiveDrops = [];
+let _plinkoSession = { landed: 0, wagered: 0, net: 0 };
 
 // Multipliers match the server exactly
 const _PLINKO_MULTS = {
@@ -7168,6 +7328,7 @@ function _plDraw(scene = {}) {
   [...balls, ...(ball ? [ball] : [])].forEach(currentBall => {
     const squash = Math.max(0, Math.min(.24, currentBall.squash || 0));
     ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, currentBall.alpha ?? 1));
     ctx.translate(currentBall.x, currentBall.y);
     ctx.scale(1+squash, 1-squash);
     ctx.beginPath();
@@ -7271,147 +7432,93 @@ function _plTimeline(path, paidSlot) {
   return { segments, starts, total, slot };
 }
 
-async function _animatePlinkoBall(path, paidSlot) {
-  const { segments, starts, total, slot } = _plTimeline(path, paidSlot);
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-    _plDraw({
-      ball: { x:_PL.XS + slot*_PL.XS, y:_PL.SY+11 },
-      hitSlot: slot,
-      slotPulse: 1,
-    });
-    return;
-  }
+function _plinkoAnimationFrame(now) {
+  const visibleBalls = [];
+  const hitSlots = [];
+  const landedCallbacks = [];
 
-  return new Promise(resolve => {
-    const t0 = performance.now();
-    const trail = [];
-    let lastTrailAt = -Infinity;
-
-    function frame(now) {
-      const elapsed = Math.min(now - t0, total);
-      let si = segments.length - 1;
-      for (let i = 0; i < segments.length; i++) {
-        if (elapsed <= starts[i] + segments[i].duration) { si = i; break; }
+  _plinkoActiveDrops.forEach(drop => {
+    const elapsed = now - drop.startedAt;
+    if (elapsed >= drop.total) {
+      if (drop.landedAt === null) {
+        drop.landedAt = now;
+        landedCallbacks.push(drop.onLand);
       }
-      const segment = segments[si];
-      const localElapsed = elapsed - starts[si];
-      const t = Math.max(0, Math.min(1, localElapsed/segment.duration));
-      const pos = _plSegmentPoint(segment, t);
-
-      if (now-lastTrailAt > 26) {
-        trail.push(pos);
-        if (trail.length > 9) trail.shift();
-        lastTrailAt = now;
-      }
-
-      const impact = segment.launch && localElapsed < 125 ? {
-        x: segment.launch.peg.x,
-        y: segment.launch.peg.y,
-        progress: localElapsed/125,
-        direction: segment.launch.direction,
-      } : null;
-      const litPeg = t > .82 && segment.target
-        ? segment.target.peg
-        : (impact ? segment.launch.peg : null);
-      const landing = si === segments.length-1;
-      const landingProgress = landing ? Math.max(0, (t-.68)/.32) : 0;
-      const squash = t > .9 ? Math.sin((t-.9)*Math.PI/.1)*.2 : 0;
-
-      _plDraw({
-        litPeg,
-        ball: { x:pos.x, y:pos.y, squash },
-        trail,
-        impact,
-        hitSlot: landingProgress > 0 ? slot : undefined,
-        slotPulse: landingProgress,
-      });
-
-      if (elapsed < total) {
-        requestAnimationFrame(frame);
-      } else {
-        _plDraw({
-          ball: { x:_PL.XS + slot*_PL.XS, y:_PL.SY+11 },
-          hitSlot: slot,
-          slotPulse: 1,
+      const age = now - drop.landedAt;
+      if (age <= 650) {
+        visibleBalls.push({
+          x: _PL.XS + drop.slot*_PL.XS + ((drop.id % 3)-1)*3,
+          y: _PL.SY + 11,
+          alpha: 1 - Math.max(0, age-360)/290,
         });
-        window.setTimeout(resolve, 240);
+        hitSlots.push(drop.slot);
+      }
+      return;
+    }
+
+    let segmentIndex = drop.segments.length - 1;
+    for (let i = 0; i < drop.segments.length; i++) {
+      if (elapsed <= drop.starts[i] + drop.segments[i].duration) {
+        segmentIndex = i;
+        break;
       }
     }
-    requestAnimationFrame(frame);
+    const segment = drop.segments[segmentIndex];
+    const segmentElapsed = elapsed - drop.starts[segmentIndex];
+    const progress = Math.max(0, Math.min(1, segmentElapsed/segment.duration));
+    const position = _plSegmentPoint(segment, progress);
+    const squash = progress > .9
+      ? Math.sin((progress-.9)*Math.PI/.1)*.2
+      : 0;
+    visibleBalls.push({ x:position.x, y:position.y, squash });
+    if (segmentIndex === drop.segments.length-1 && progress > .68) {
+      hitSlots.push(drop.slot);
+    }
   });
+
+  _plinkoActiveDrops = _plinkoActiveDrops.filter(
+    drop => drop.landedAt === null || now-drop.landedAt <= 650
+  );
+  _plDraw({
+    balls: visibleBalls,
+    hitSlots: [...new Set(hitSlots)],
+    slotPulse: hitSlots.length ? 1 : 0,
+  });
+  landedCallbacks.forEach(callback => callback?.());
+
+  if (_plinkoActiveDrops.length) {
+    _plinkoRaf = requestAnimationFrame(_plinkoAnimationFrame);
+  } else {
+    _plinkoRaf = null;
+    _buildPlinkoBoard();
+  }
+  updatePlinkoTotal();
 }
 
-async function _animatePlinkoBalls(drops) {
-  if (!Array.isArray(drops) || !drops.length) throw new Error('Invalid Plinko drop result.');
-  if (drops.length === 1) return _animatePlinkoBall(drops[0].path, drops[0].slot);
-
-  const stagger = 165;
-  const timelines = drops.map((drop, index) => ({
-    ..._plTimeline(drop.path, drop.slot),
-    delay: index * stagger,
-    index,
-  }));
-  const totalDuration = Math.max(...timelines.map(timeline => timeline.delay + timeline.total));
-  const landedBall = timeline => ({
-    x: _PL.XS + timeline.slot*_PL.XS + ((timeline.index % 3) - 1) * 3.5,
-    y: _PL.SY + 11 - Math.floor(timeline.index / 3) * 4,
+function _queuePlinkoDrop(drop, onLand) {
+  const timeline = _plTimeline(drop.path, drop.slot);
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  _plinkoActiveDrops.push({
+    ...timeline,
+    id: ++_plinkoDropId,
+    startedAt: performance.now() - (reduceMotion ? timeline.total : 0),
+    landedAt: null,
+    onLand,
   });
+  if (!_plinkoRaf) _plinkoRaf = requestAnimationFrame(_plinkoAnimationFrame);
+}
 
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-    _plDraw({
-      balls: timelines.map(landedBall),
-      hitSlots: [...new Set(timelines.map(timeline => timeline.slot))],
-      slotPulse: 1,
-    });
-    return;
-  }
-
-  return new Promise(resolve => {
-    const t0 = performance.now();
-    function frame(now) {
-      const elapsed = now - t0;
-      const visibleBalls = [];
-      const hitSlots = [];
-
-      timelines.forEach(timeline => {
-        const local = elapsed - timeline.delay;
-        if (local < 0) return;
-        if (local >= timeline.total) {
-          visibleBalls.push(landedBall(timeline));
-          hitSlots.push(timeline.slot);
-          return;
-        }
-        let segmentIndex = timeline.segments.length - 1;
-        for (let i = 0; i < timeline.segments.length; i++) {
-          if (local <= timeline.starts[i] + timeline.segments[i].duration) {
-            segmentIndex = i;
-            break;
-          }
-        }
-        const segment = timeline.segments[segmentIndex];
-        const segmentElapsed = local - timeline.starts[segmentIndex];
-        const progress = Math.max(0, Math.min(1, segmentElapsed / segment.duration));
-        const position = _plSegmentPoint(segment, progress);
-        const squash = progress > .9 ? Math.sin((progress-.9)*Math.PI/.1)*.2 : 0;
-        visibleBalls.push({ x: position.x, y: position.y, squash });
-        if (segmentIndex === timeline.segments.length - 1 && progress > .68) {
-          hitSlots.push(timeline.slot);
-        }
-      });
-
-      _plDraw({
-        balls: visibleBalls,
-        hitSlots: [...new Set(hitSlots)],
-        slotPulse: hitSlots.length ? 1 : 0,
-      });
-      if (elapsed < totalDuration) {
-        requestAnimationFrame(frame);
-      } else {
-        window.setTimeout(resolve, 240);
-      }
-    }
-    requestAnimationFrame(frame);
-  });
+function _renderPlinkoSession(lastDrop) {
+  _plinkoSession.landed++;
+  _plinkoSession.wagered += Number(lastDrop.bet || 0);
+  _plinkoSession.net += Number(lastDrop.delta || 0);
+  const resEl = document.getElementById('plinkoResult');
+  const sign = _plinkoSession.net >= 0 ? '+' : '';
+  resEl.innerHTML = `
+    <strong>${_plinkoSession.landed} ${_plinkoSession.landed === 1 ? 'ball' : 'balls'} · ${sign}${fmt(_plinkoSession.net)} ${WRK}</strong>
+    <small>Last: ${lastDrop.multiplier}× · ${lastDrop.delta>=0?'+':''}${fmt(lastDrop.delta)} ${WRK_TEXT}</small>`;
+  resEl.className = `result-box show ${_plinkoSession.net>=0?'win-box':'lose-box'}`;
+  haptic(lastDrop.delta >= 0 ? 'success' : 'selection');
 }
 
 function openPlinko() {
@@ -7421,18 +7528,24 @@ function openPlinko() {
   document.getElementById('plinkoBal').textContent = state.balance !== null ? fmt(state.balance) : '…';
   buildPresets('plinkoPresets', 'plinkoBet');
   _plinkoRisk = 'medium';
-  _plinkoBalls = 1;
+  _plinkoSession = { landed: 0, wagered: 0, net: 0 };
+  _plinkoActiveDrops = [];
+  if (_plinkoRaf) cancelAnimationFrame(_plinkoRaf);
+  _plinkoRaf = null;
   ['low','medium','high'].forEach(r =>
     document.getElementById('plinko' + r.charAt(0).toUpperCase() + r.slice(1))
       .classList.toggle('selected', r === 'medium'));
-  document.querySelectorAll('[data-plinko-balls]').forEach(button =>
-    button.classList.toggle('selected', Number(button.dataset.plinkoBalls) === 1));
   updatePlinkoTotal();
   document.getElementById('plinkoModal').classList.add('open');
   requestAnimationFrame(_buildPlinkoBoard);
 }
 
 function setPlinkoRisk(risk) {
+  if (_plinkoInflight || _plinkoActiveDrops.length) {
+    document.getElementById('plinkoErr').textContent = 'Let the current balls land before changing risk.';
+    return;
+  }
+  document.getElementById('plinkoErr').textContent = '';
   _plinkoRisk = risk;
   ['low','medium','high'].forEach(r => {
     document.getElementById('plinko' + r.charAt(0).toUpperCase() + r.slice(1))
@@ -7441,22 +7554,14 @@ function setPlinkoRisk(risk) {
   _buildPlinkoBoard();
 }
 
-function setPlinkoBalls(count) {
-  _plinkoBalls = Math.max(1, Math.min(10, Number(count) || 1));
-  document.querySelectorAll('[data-plinko-balls]').forEach(button =>
-    button.classList.toggle('selected', Number(button.dataset.plinkoBalls) === _plinkoBalls));
-  const playButton = document.getElementById('plinkoPlayBtn');
-  if (playButton) playButton.textContent = _plinkoBalls === 1 ? 'DROP' : `DROP ${_plinkoBalls}`;
-  updatePlinkoTotal();
-}
-
 function updatePlinkoTotal() {
   const input = document.getElementById('plinkoBet');
   const total = document.getElementById('plinkoTotal');
   if (!input || !total) return;
   const bet = _parseAmountValue(input.value);
+  const falling = _plinkoInflight + _plinkoActiveDrops.filter(drop => drop.landedAt === null).length;
   total.textContent = Number.isFinite(bet) && bet > 0
-    ? `Total wager: ${fmt(bet * _plinkoBalls)} ${WRK_TEXT}`
+    ? `${fmt(bet)} ${WRK_TEXT} per ball · tap repeatedly${falling ? ` · ${falling} falling` : ''}`
     : 'Enter a bet per ball';
 }
 
@@ -7464,42 +7569,41 @@ async function playPlinko() {
   const bet = _parseBet('plinkoBet');
   const errEl = document.getElementById('plinkoErr');
   errEl.textContent = '';
-  document.getElementById('plinkoPlayBtn').disabled = true;
-  document.getElementById('plinkoResult').className = 'result-box';
-  _buildPlinkoBoard();
+  if (!Number.isSafeInteger(bet) || bet < 10) {
+    errEl.textContent = 'Minimum bet is 10 WRK$ per ball.';
+    return;
+  }
+  const button = document.getElementById('plinkoPlayBtn');
+  button.classList.remove('dropping');
+  void button.offsetWidth;
+  button.classList.add('dropping');
+  setTimeout(() => button.classList.remove('dropping'), 230);
+  _plinkoInflight++;
+  updatePlinkoTotal();
+  haptic();
   try {
     const data = await api('/api/play/plinko', {
       method: 'POST',
-      json: { user_id: +state.userId, bet, risk: _plinkoRisk, balls: _plinkoBalls },
+      json: { user_id: +state.userId, bet, risk: _plinkoRisk },
     });
-    const drops = Array.isArray(data.drops) ? data.drops : [data];
-    await _animatePlinkoBalls(drops);
-    _plDraw({
-      balls: drops.map((drop, index) => ({
-        x: _PL.XS + drop.slot*_PL.XS + ((index % 3) - 1) * 3.5,
-        y: _PL.SY + 11 - Math.floor(index / 3) * 4,
-      })),
-      hitSlots: [...new Set(drops.map(drop => drop.slot))],
-      slotPulse: 1,
-    });
-    const resEl = document.getElementById('plinkoResult');
-    const delta = Number(data.total_delta ?? data.delta);
-    const multipliers = drops.map(drop => `${drop.multiplier}×`).join(' · ');
-    resEl.innerHTML = `<strong>${drops.length} ${drops.length === 1 ? 'ball' : 'balls'} · ${delta>=0?'+':''}${fmt(delta)} ${WRK}</strong><small>${multipliers}</small>`;
-    resEl.className = `result-box show ${delta>=0?'win-box':'lose-box'}`;
-    state.balance = data.new_balance;
+    const drop = Array.isArray(data.drops) ? data.drops[0] : data;
+    const delta = Number(drop.delta);
+    state.balance = Number.isFinite(state.balance)
+      ? state.balance + delta
+      : data.new_balance;
     document.getElementById('plinkoBal').textContent = fmt(state.balance);
     refreshHeaderBal();
-  } catch (e) { errEl.textContent = e.message; }
-  document.getElementById('plinkoPlayBtn').disabled = false;
-}
-
-function plinkoPlayAgain(bet) {
-  document.getElementById('plinkoBet').value = bet;
-  document.getElementById('plinkoResult').className = 'result-box';
-  const pa = document.getElementById('plinkoModal').querySelector('.btn.outline');
-  if (pa) pa.remove();
-  playPlinko();
+    _queuePlinkoDrop(drop, () => _renderPlinkoSession({
+      ...drop,
+      bet,
+    }));
+  } catch (e) {
+    errEl.textContent = e.message;
+    haptic('error');
+  } finally {
+    _plinkoInflight--;
+    updatePlinkoTotal();
+  }
 }
 
 // ── Wheel of Fortune ──────────────────────────────────────────────────────────
@@ -10272,28 +10376,81 @@ boot();
 const _GAME_ICONS = { crash: '🚀', duck: '🦆', marbles: '🔮', livebj: '🃏', poker: '♠️' };
 let _lobbyWs = null;
 let _lobbyToastTimer = null;
+let _lobbyHideTimer = null;
+let _lobbyHeartbeat = null;
+let _lobbyPollTimer = null;
+let _lobbyLastEventId = 0;
 
 function connectLobbyWs() {
   if (!state.userId) return;
+  _startLobbyPolling();
   if (_lobbyWs && _lobbyWs.readyState <= 1) return;
   _lobbyWs = authenticatedSocket('/ws/lobby');
+  _lobbyWs.onopen = () => {
+    if (_lobbyHeartbeat) clearInterval(_lobbyHeartbeat);
+    const ping = () => {
+      if (_lobbyWs?.readyState === WebSocket.OPEN) _lobbyWs.send('ping');
+    };
+    ping();
+    _lobbyHeartbeat = setInterval(ping, 20_000);
+  };
   _lobbyWs.onmessage = (e) => {
     try {
       const data = JSON.parse(e.data);
-      if (data.type === 'player_joined') showLobbyToast(data);
+      if (data.type === 'lobby_ready') {
+        _lobbyLastEventId = Math.max(_lobbyLastEventId, Number(data.event_id) || 0);
+      } else if (data.type === 'player_joined') {
+        _handleLobbyEvent(data);
+      }
     } catch {}
   };
   _lobbyWs.onclose = (event) => {
+    if (_lobbyHeartbeat) {
+      clearInterval(_lobbyHeartbeat);
+      _lobbyHeartbeat = null;
+    }
+    _lobbyWs = null;
     if (!websocketCanReconnect(event)) return;
     setTimeout(connectLobbyWs, 5000);
   };
 }
 
+function _handleLobbyEvent(data) {
+  const eventId = Number(data.event_id) || 0;
+  if (eventId && eventId <= _lobbyLastEventId) return;
+  if (eventId) _lobbyLastEventId = eventId;
+  if (+data.user_id === +state.userId) return;
+  showLobbyToast(data);
+}
+
+async function _pollLobbyEvents() {
+  if (!state.userId) return;
+  try {
+    const data = await api(`/api/lobby/events?after=${_lobbyLastEventId}`);
+    for (const event of data.events || []) _handleLobbyEvent(event);
+    _lobbyLastEventId = Math.max(
+      _lobbyLastEventId,
+      Number(data.latest_event_id) || 0,
+    );
+  } catch {}
+}
+
+function _startLobbyPolling() {
+  if (_lobbyPollTimer) return;
+  setTimeout(_pollLobbyEvents, 1500);
+  _lobbyPollTimer = setInterval(_pollLobbyEvents, 8_000);
+}
+
 function showLobbyToast(data) {
   const toast = document.getElementById('lobbyToast');
+  if (!toast) {
+    setTimeout(() => showLobbyToast(data), 100);
+    return;
+  }
   document.getElementById('lobbyToastIcon').textContent = _GAME_ICONS[data.game] || '🎮';
-  document.getElementById('lobbyToastTitle').textContent = `${data.user} bet on ${data.game_label}`;
-  document.getElementById('lobbyToastSub').textContent = 'Tap to join';
+  document.getElementById('lobbyToastTitle').textContent = `${data.user} opened ${data.game_label}`;
+  document.getElementById('lobbyToastSub').textContent = 'A live game is waiting · tap to join';
+  clearTimeout(_lobbyHideTimer);
   toast.classList.remove('show');
   toast.style.display = 'flex';
   void toast.offsetHeight; // force reflow so CSS transition fires
@@ -10305,8 +10462,10 @@ function showLobbyToast(data) {
 
 function hideLobbyToast() {
   const toast = document.getElementById('lobbyToast');
+  if (!toast) return;
   toast.classList.remove('show');
-  setTimeout(() => { toast.style.display = 'none'; }, 300);
+  clearTimeout(_lobbyHideTimer);
+  _lobbyHideTimer = setTimeout(() => { toast.style.display = 'none'; }, 300);
 }
 
 function navigateToGame(game) {
