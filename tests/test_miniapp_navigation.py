@@ -28,3 +28,14 @@ def test_primary_navigation_stays_focused_and_wallet_has_sections():
     for section in ("overview", "gifts", "numbers"):
         assert f'data-wallet="{section}"' in html
         assert f'data-wallet-panel="{section}"' in html
+
+
+def test_underground_lives_under_earn_and_links_from_anon_wallet():
+    html = INDEX_HTML.read_text()
+
+    for section in ("work", "underground"):
+        assert f'data-earn="{section}"' in html
+        assert f'data-earn-panel="{section}"' in html
+    assert 'onclick="goUnderground()"' in html
+    assert "A +888 number only replaces the public identity" in html
+    assert "/api/underground/status" in html

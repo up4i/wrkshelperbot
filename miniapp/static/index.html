@@ -881,6 +881,286 @@
   .cooldown-label { font-size: 13px; color: var(--muted); }
   .cooldown-timer { font-size: 36px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--primary); }
 
+  /* ── Underground ── */
+  .earn-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0,1fr));
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 15px;
+    background: rgba(255,255,255,.028);
+  }
+  .earn-tab {
+    min-height: 42px;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    background: transparent;
+    color: #7f8b97;
+    font: 800 11px system-ui;
+    cursor: pointer;
+  }
+  .earn-tab.active {
+    border-color: rgba(155,123,255,.25);
+    background: rgba(155,123,255,.11);
+    color: #c9bbff;
+  }
+  .earn-authenticated { display: none; flex-direction: column; }
+  .earn-panel { display: none; flex-direction: column; gap: 14px; }
+  .earn-panel.active { display: flex; }
+  .ug-shell { display: flex; flex-direction: column; gap: 11px; }
+  .ug-cover {
+    position: relative;
+    overflow: hidden;
+    padding: 17px;
+    border: 1px solid rgba(103,232,249,.17);
+    border-radius: 21px;
+    background:
+      radial-gradient(circle at 100% 0, rgba(236,72,153,.15), transparent 39%),
+      radial-gradient(circle at 0 100%, rgba(34,211,238,.11), transparent 43%),
+      linear-gradient(145deg, #15141f, #0b0c13);
+  }
+  .ug-cover::after {
+    content: "◉";
+    position: absolute;
+    top: -29px;
+    right: 5px;
+    color: rgba(255,255,255,.035);
+    font-size: 130px;
+    font-weight: 950;
+    pointer-events: none;
+  }
+  .ug-cover-top {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .ug-kicker {
+    color: #67e8f9;
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 1.15px;
+    text-transform: uppercase;
+  }
+  .ug-alias { margin-top: 4px; font-size: 20px; font-weight: 900; letter-spacing: -.35px; }
+  .ug-cover-badge {
+    flex: none;
+    padding: 6px 9px;
+    border: 1px solid rgba(103,232,249,.22);
+    border-radius: 10px;
+    background: rgba(103,232,249,.08);
+    color: #9beaf5;
+    font-size: 8px;
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+  .ug-cover-badge.public {
+    border-color: rgba(251,191,36,.2);
+    background: rgba(251,191,36,.07);
+    color: #f7d98b;
+  }
+  .ug-cover-copy {
+    position: relative;
+    z-index: 1;
+    margin-top: 8px;
+    color: #7f8b97;
+    font-size: 9px;
+    line-height: 1.45;
+  }
+  .ug-heat { position: relative; z-index: 1; margin-top: 14px; }
+  .ug-heat-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #9da8b2;
+    font-size: 9px;
+  }
+  .ug-heat-head b { color: #fda4af; font-size: 10px; }
+  .ug-heat-track {
+    height: 7px;
+    margin-top: 6px;
+    overflow: hidden;
+    border-radius: 8px;
+    background: rgba(255,255,255,.06);
+  }
+  .ug-heat-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #67e8f9, #f59e0b 58%, #fb7185);
+    transition: width .25s ease;
+  }
+  .ug-fairness {
+    display: flex;
+    gap: 9px;
+    padding: 10px 12px;
+    border: 1px solid rgba(52,211,153,.14);
+    border-radius: 14px;
+    background: rgba(52,211,153,.045);
+    color: #7f918c;
+    font-size: 9px;
+    line-height: 1.45;
+  }
+  .ug-fairness b { display: block; color: #99e3ba; font-size: 10px; }
+  .ug-fairness > span { color: #86efac; font-size: 16px; }
+  .ug-tabs {
+    display: grid;
+    grid-template-columns: repeat(3,minmax(0,1fr));
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 14px;
+    background: rgba(255,255,255,.025);
+  }
+  .ug-tab {
+    min-height: 37px;
+    padding: 5px 3px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: #74808b;
+    font: 800 9px system-ui;
+    cursor: pointer;
+  }
+  .ug-tab.active { background: rgba(236,72,153,.1); color: #f9a8d4; }
+  .ug-compose {
+    display: none;
+    gap: 8px;
+    padding: 13px;
+    border: 1px solid rgba(236,72,153,.16);
+    border-radius: 16px;
+    background: rgba(236,72,153,.035);
+  }
+  .ug-compose.open { display: grid; }
+  .ug-compose select,
+  .ug-compose input {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding: 9px 11px;
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 11px;
+    background: #151620;
+    color: #eef0f5;
+    font-size: 11px;
+    outline: none;
+  }
+  .ug-compose-note { color: #727e89; font-size: 8px; line-height: 1.45; }
+  .ug-action-row { display: grid; grid-template-columns: 1fr auto; gap: 7px; }
+  .ug-board-list { display: grid; gap: 8px; }
+  .ug-bounty {
+    padding: 13px;
+    border: 1px solid rgba(255,255,255,.075);
+    border-radius: 16px;
+    background: linear-gradient(145deg, rgba(255,255,255,.035), rgba(255,255,255,.015));
+  }
+  .ug-bounty-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .ug-bounty-target { min-width: 0; font-size: 13px; font-weight: 850; }
+  .ug-bounty-target span {
+    display: block;
+    margin-bottom: 3px;
+    color: #7d8994;
+    font-size: 7px;
+    letter-spacing: .8px;
+    text-transform: uppercase;
+  }
+  .ug-bounty-amount { flex: none; color: #f6d98e; font-size: 12px; font-weight: 900; }
+  .ug-bounty-meta { margin-top: 6px; color: #74808b; font-size: 8px; line-height: 1.4; }
+  .ug-anon { color: #75ddea; }
+  .ug-bounty-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .ug-bounty-actions button {
+    min-height: 33px;
+    flex: 1;
+    border: 1px solid rgba(236,72,153,.2);
+    border-radius: 10px;
+    background: rgba(236,72,153,.08);
+    color: #f9a8d4;
+    font: 850 9px system-ui;
+    cursor: pointer;
+  }
+  .ug-bounty-actions button.cancel { border-color:rgba(251,113,133,.17); color:#fda4af; }
+  .ug-bounty-actions button:disabled { opacity: .45; cursor: default; }
+  .ug-section-label {
+    margin-top: 4px;
+    color: #7a8691;
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: .95px;
+    text-transform: uppercase;
+  }
+  .ug-empty {
+    padding: 24px 14px;
+    border: 1px dashed rgba(255,255,255,.1);
+    border-radius: 15px;
+    color: #74808b;
+    font-size: 10px;
+    line-height: 1.5;
+    text-align: center;
+  }
+  .ug-wanted-row {
+    display: grid;
+    grid-template-columns: 26px minmax(0,1fr) auto;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 11px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 13px;
+    background: rgba(255,255,255,.025);
+  }
+  .ug-wanted-rank { color: #7f8b97; font-size: 10px; font-weight: 900; }
+  .ug-wanted-name { overflow:hidden; font-size:11px; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
+  .ug-wanted-name small { display:block; margin-top:2px; color:#74808b; font-size:7px; }
+  .ug-wanted-heat { color:#fda4af; font-size:11px; font-weight:900; }
+  .ug-contract {
+    overflow: hidden;
+    border: 1px solid rgba(103,232,249,.2);
+    border-radius: 19px;
+    background:
+      radial-gradient(circle at 50% 0, rgba(103,232,249,.1), transparent 42%),
+      #10121a;
+  }
+  .ug-contract-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px;
+    border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+  .ug-contract-head b { display:block; font-size:14px; }
+  .ug-contract-head span { display:block; margin-top:3px; color:#77838f; font-size:8px; }
+  .ug-contract-timer { color:#f6d98e !important; font-size:12px !important; font-weight:900; }
+  .ug-trace { padding: 14px; }
+  .ug-trace-status { min-height: 18px; color:#8b98a3; font-size:9px; text-align:center; }
+  .ug-trace-progress { display:flex; justify-content:center; gap:5px; margin:9px 0 12px; }
+  .ug-trace-dot { width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.1); }
+  .ug-trace-dot.filled { background:#67e8f9; box-shadow:0 0 8px rgba(103,232,249,.6); }
+  .ug-signal-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .ug-signal {
+    min-height: 62px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 14px;
+    background: rgba(255,255,255,.035);
+    color: #cbd5dd;
+    font-size: 22px;
+    cursor: pointer;
+    transition: transform .1s, background .1s, box-shadow .1s;
+  }
+  .ug-signal[data-signal="violet"] { --signal:#a78bfa; }
+  .ug-signal[data-signal="cyan"] { --signal:#67e8f9; }
+  .ug-signal[data-signal="gold"] { --signal:#fbbf24; }
+  .ug-signal[data-signal="rose"] { --signal:#fb7185; }
+  .ug-signal.flash,
+  .ug-signal:active {
+    transform: scale(.96);
+    border-color: var(--signal);
+    background: color-mix(in srgb, var(--signal) 18%, transparent);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--signal) 35%, transparent);
+  }
+  .ug-signal:disabled { cursor:default; opacity:.55; }
+
   /* ── Market ── */
   .market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .market-card {
@@ -4125,8 +4405,12 @@
     <!-- WORK / JOBS -->
     <div class="page" id="page-work">
       <div>
-        <div class="section-title">Work</div>
-        <div class="section-sub">Tap to earn — shifts unlock higher-paying jobs</div>
+        <div class="section-title" id="earnPageTitle">Earn</div>
+        <div class="section-sub" id="earnPageSub">Work a shift or make a riskier move</div>
+      </div>
+      <div class="earn-tabs" id="earnTabs" role="tablist" aria-label="Earn sections">
+        <button class="earn-tab active" type="button" role="tab" aria-selected="true" data-earn="work" onclick="setEarnSection('work')">💼 Work</button>
+        <button class="earn-tab" type="button" role="tab" aria-selected="false" data-earn="underground" onclick="setEarnSection('underground')">◉ Underground</button>
       </div>
 
       <!-- login wall -->
@@ -4141,33 +4425,43 @@
         </div>
       </div>
 
-      <!-- dynamic job content (hidden until logged in) -->
-      <div id="workContent" style="display:none;flex-direction:column;gap:14px"></div>
-      <!-- Daily Reward section -->
-      <div class="card" id="dailySection" style="display:none;margin-bottom:12px">
-        <div class="card-title">📅 Daily Reward</div>
-        <div id="dailyStatus" style="color:var(--muted);font-size:13px;margin-bottom:10px">Loading…</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn" id="dailyClaimBtn" onclick="claimDaily()" disabled style="flex:1">Claim Daily</button>
-          <div style="font-size:12px;color:var(--muted)" id="dailyStreakLabel"></div>
-        </div>
-        <div class="result-box" id="dailyResult" style="margin-top:8px"></div>
-      </div>
-      <!-- Criminal activity (shown when logged in) -->
-      <div id="workCrimeWrap" style="display:none;flex-direction:column;gap:10px">
-        <div class="section-title" style="font-size:14px;margin-top:8px">🕵️ Criminal Activity</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div class="game-card" onclick="openHack()">
-            <div class="gicon">🖥️</div>
-            <div class="gname">Hack</div>
-            <div class="gdesc">Crack the word, drain a wallet</div>
+      <div class="earn-authenticated" id="earnAuthenticated">
+        <section class="earn-panel active" role="tabpanel" data-earn-panel="work">
+          <!-- dynamic job content (hidden until logged in) -->
+          <div id="workContent" style="display:flex;flex-direction:column;gap:14px"></div>
+          <!-- Daily Reward section -->
+          <div class="card" id="dailySection">
+            <div class="card-title">📅 Daily Reward</div>
+            <div id="dailyStatus" style="color:var(--muted);font-size:13px;margin-bottom:10px">Loading…</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn" id="dailyClaimBtn" onclick="claimDaily()" disabled style="flex:1">Claim Daily</button>
+              <div style="font-size:12px;color:var(--muted)" id="dailyStreakLabel"></div>
+            </div>
+            <div class="result-box" id="dailyResult" style="margin-top:8px"></div>
           </div>
-          <div class="game-card" onclick="openRob()">
-            <div class="gicon">🔫</div>
-            <div class="gname">Rob</div>
-            <div class="gdesc">Pick a target and take the bag</div>
+          <!-- Criminal activity -->
+          <div id="workCrimeWrap" style="display:flex;flex-direction:column;gap:10px">
+            <div class="section-title" style="font-size:14px;margin-top:8px">🕵️ Criminal Activity</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div class="game-card" onclick="openHack()">
+                <div class="gicon">🖥️</div>
+                <div class="gname">Hack</div>
+                <div class="gdesc">Crack the word · gain Heat</div>
+              </div>
+              <div class="game-card" onclick="openRob()">
+                <div class="gicon">🔫</div>
+                <div class="gname">Rob</div>
+                <div class="gdesc">Take the bag · gain Heat</div>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
+
+        <section class="earn-panel" role="tabpanel" data-earn-panel="underground">
+          <div id="undergroundContent">
+            <div class="loading">Opening a secure channel…</div>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -4215,6 +4509,11 @@
       </section>
 
       <section class="wallet-panel" role="tabpanel" data-wallet-panel="numbers">
+        <button class="rift-buyback-link mkrt-link" type="button" onclick="goUnderground()">
+          <span>◉</span>
+          <span><b>Enter the Underground</b><small>Your active +888 number becomes your protected operating alias</small></span>
+          <span>›</span>
+        </button>
         <div class="wallet-section">
           <div class="wallet-section-head">
             <div><b>Anonymous Numbers</b><span>Choose the +888 number that protects your account</span></div>
@@ -4860,6 +5159,8 @@ function clearSession() {
   state.sessionToken = null;
   state.balance = null;
   _shopWallet = null;
+  _clearUndergroundTimers();
+  undergroundState.data = null;
   if (_presenceInterval) {
     clearInterval(_presenceInterval);
     _presenceInterval = null;
@@ -5070,6 +5371,11 @@ function goWallet(section = 'overview') {
   if (section !== _walletSection) setWalletSection(section);
 }
 
+function goUnderground() {
+  showPage('work', document.querySelector('[data-page="work"]'));
+  setEarnSection('underground');
+}
+
 // ── Nav ───────────────────────────────────────────────────────────────────────
 function showPage(id, btn) {
   if (id !== 'profile') {
@@ -5090,6 +5396,7 @@ function showPage(id, btn) {
   if (id === 'wallet') openWalletPage();
   if (id === 'profile') openProfilePage();
   if (id === 'games') _startGameTimers(); else _stopGameTimers();
+  if (id !== 'work') _clearUndergroundTimers();
   updateTelegramBackButton();
 }
 
@@ -5127,6 +5434,7 @@ function startPresencePing() {
 function setUser(id) {
   if (!state.sessionToken) return;
   state.userId = id;
+  undergroundState.data = null;
   localStorage.setItem('wrkUserId', id);
   document.getElementById('gamesLoginWall').style.display = 'none';
   prefillUserInputs();
@@ -6821,16 +7129,18 @@ async function submitHackGuess() {
       state.balance = data.new_balance;
       refreshHeaderBal();
       const resEl = document.getElementById('hackResult');
-      resEl.innerHTML = `✅ ACCESS GRANTED — "${data.word}" +${fmt(data.reward)} ${WRK}`;
+      resEl.innerHTML = `✅ ACCESS GRANTED — "${data.word}" +${fmt(data.reward)} ${WRK}<div style="margin-top:4px;font-size:10px">Heat ${data.heat}/100</div>`;
       resEl.className = 'result-box show win-box';
+      undergroundState.data = null;
       document.getElementById('hackGameWrap').style.display = 'none';
       document.getElementById('hackStartWrap').style.display = 'block';
       document.getElementById('hackStartBtn').disabled = true;
       document.getElementById('hackCooldown').textContent = '⏳ Cooldown: 60m';
     } else if (data.result === 'lose') {
       const resEl = document.getElementById('hackResult');
-      resEl.textContent = `❌ CONNECTION TERMINATED — the word was "${data.word}"`;
+      resEl.textContent = `❌ CONNECTION TERMINATED — the word was "${data.word}" · Heat ${data.heat}/100`;
       resEl.className = 'result-box show lose-box';
+      undergroundState.data = null;
       document.getElementById('hackGameWrap').style.display = 'none';
       document.getElementById('hackStartWrap').style.display = 'block';
       document.getElementById('hackStartBtn').disabled = true;
@@ -6913,8 +7223,9 @@ async function attemptRob() {
     state.balance = data.new_balance;
     refreshHeaderBal();
     const resEl = document.getElementById('robResult');
-    resEl.textContent = `${data.emoji} ${data.flavor}`;
+    resEl.textContent = `${data.emoji} ${data.flavor} · Heat ${data.heat}/100`;
     resEl.className = `result-box show ${data.outcome === 'success' ? 'win-box' : 'lose-box'}`;
+    undergroundState.data = null;
     document.getElementById('robConfirmWrap').style.display = 'none';
     document.getElementById('robTargetWrap').style.display = '';
     document.getElementById('robTargetList').innerHTML = `<div style="color:var(--muted);font-size:13px;text-align:center">Balance: ${fmt(data.new_balance)} ${WRK}</div>`;
@@ -7998,6 +8309,370 @@ async function claimDaily() {
   }
 }
 
+// ── Underground ───────────────────────────────────────────────────────────────
+const UG_SIGNAL_META = {
+  violet: { icon:'◆', label:'Violet' },
+  cyan:   { icon:'●', label:'Cyan' },
+  gold:   { icon:'▲', label:'Gold' },
+  rose:   { icon:'■', label:'Rose' },
+};
+let _earnSection = 'work';
+let undergroundState = {
+  data: null,
+  section: 'board',
+  composeOpen: false,
+  loading: false,
+  tracePhase: 'idle',
+  traceSequence: [],
+  traceAnswer: [],
+  previewTimers: [],
+  countdownTimer: null,
+  resolving: false,
+};
+
+function _clearUndergroundTimers() {
+  undergroundState.previewTimers.forEach(clearTimeout);
+  undergroundState.previewTimers = [];
+  clearInterval(undergroundState.countdownTimer);
+  undergroundState.countdownTimer = null;
+}
+
+function setEarnSection(section, force = false) {
+  if (!['work','underground'].includes(section)) section = 'work';
+  _earnSection = section;
+  document.querySelectorAll('#earnTabs .earn-tab').forEach(tab => {
+    const active = tab.dataset.earn === section;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('[data-earn-panel]').forEach(panel => {
+    panel.classList.toggle('active', panel.dataset.earnPanel === section);
+  });
+  document.getElementById('earnPageSub').textContent = section === 'work'
+    ? 'Work a shift or make a riskier move'
+    : 'Contracts, aliases, and the city’s most wanted';
+  if (state.userId) {
+    if (section === 'underground') {
+      if (force || !undergroundState.data) loadUnderground();
+    } else if (force) {
+      refreshWorkStatus();
+      loadDailyStatus();
+    }
+  }
+  if (section !== 'underground') _clearUndergroundTimers();
+  haptic();
+}
+
+async function loadUnderground(showLoading = true) {
+  if (!state.userId || undergroundState.loading) return;
+  undergroundState.loading = true;
+  const content = document.getElementById('undergroundContent');
+  if (showLoading) content.innerHTML = '<div class="loading">Opening a secure channel…</div>';
+  try {
+    undergroundState.data = await api(`/api/underground/status?user_id=${state.userId}`);
+    renderUnderground();
+  } catch (e) {
+    content.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+  } finally {
+    undergroundState.loading = false;
+  }
+}
+
+function _ugRemaining(timestamp) {
+  const seconds = Math.max(0, Number(timestamp || 0) - Math.floor(Date.now() / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return hours ? `${hours}h ${minutes}m` : `${minutes}m`;
+}
+
+function _ugIdentity(name, anonymous) {
+  return anonymous
+    ? `<span class="ug-anon">${esc(name)} · protected alias</span>`
+    : esc(name);
+}
+
+function _ugBountyCard(bounty, context = 'board') {
+  let action = '';
+  if (bounty.can_claim) {
+    action = `<button onclick="claimUndergroundBounty(${bounty.id},this)">Run Signal Trace</button>`;
+  } else if (bounty.can_cancel) {
+    action = `<button class="cancel" onclick="cancelUndergroundBounty(${bounty.id},this)">Cancel · fee stays burned</button>`;
+  } else if (bounty.attempted && bounty.status === 'open') {
+    action = '<button disabled>Attempt already used</button>';
+  } else if (bounty.is_target && bounty.status === 'open') {
+    action = '<button disabled>Contract targets you</button>';
+  }
+  const outcome = bounty.my_outcome
+    ? ` · Your run: ${esc(bounty.my_outcome)}`
+    : '';
+  const hunter = bounty.hunter
+    ? ` · Hunter ${_ugIdentity(bounty.hunter, bounty.hunter_anonymous)}`
+    : '';
+  return `<article class="ug-bounty">
+    <div class="ug-bounty-top">
+      <div class="ug-bounty-target"><span>${context === 'board' ? 'Target' : esc(bounty.status)}</span>${_ugIdentity(bounty.target, bounty.target_anonymous)}</div>
+      <div class="ug-bounty-amount">${fmtK(bounty.amount)} ${WRK}</div>
+    </div>
+    <div class="ug-bounty-meta">Posted by ${_ugIdentity(bounty.creator, bounty.creator_anonymous)} · ${bounty.status === 'open' ? `${_ugRemaining(bounty.expires_at)} left` : esc(bounty.status)}${hunter}${outcome}</div>
+    ${action ? `<div class="ug-bounty-actions">${action}</div>` : ''}
+  </article>`;
+}
+
+function _ugList(items, context = 'board', empty = 'No contracts here yet.') {
+  return items?.length
+    ? `<div class="ug-board-list">${items.map(item => _ugBountyCard(item, context)).join('')}</div>`
+    : `<div class="ug-empty">${esc(empty)}</div>`;
+}
+
+function _ugBoardHtml(data) {
+  const targets = data.targets || [];
+  const options = targets.map(target =>
+    `<option value="${target.user_id}">${esc(target.name)} · ${esc(target.heat_label)} (${target.heat})</option>`
+  ).join('');
+  const composer = `<div class="ug-compose ${undergroundState.composeOpen ? 'open' : ''}" id="ugComposer">
+    <select id="ugTarget" ${targets.length ? '' : 'disabled'}>
+      ${options || '<option>No eligible players yet</option>'}
+    </select>
+    <input id="ugAmount" class="bet-input" inputmode="numeric" placeholder="Bounty amount">
+    <div class="ug-compose-note">The bounty is held in escrow. A 5% posting fee is burned. The target never pays extra WRK$, and cancelling returns only the escrow.</div>
+    <button class="btn" id="ugPostBtn" onclick="postUndergroundBounty()" ${targets.length ? '' : 'disabled'}>Post to Shadow Board</button>
+  </div>`;
+  return `<div class="ug-action-row">
+      <button class="btn" onclick="toggleUndergroundComposer()">${undergroundState.composeOpen ? 'Close composer' : '＋ Post bounty'}</button>
+      <button class="btn outline" onclick="loadUnderground()">↻</button>
+    </div>
+    ${composer}
+    <div class="ug-section-label">${fmt(data.open_bounties.length)} open contracts</div>
+    ${_ugList(data.open_bounties, 'board', 'The Shadow Board is quiet. Post the first bounty.')}`;
+}
+
+function _ugActivityHtml(data) {
+  return `<div class="ug-section-label">Your posted bounties</div>
+    ${_ugList(data.my_posted, 'history', 'You have not posted a bounty.')}
+    <div class="ug-section-label">Your contract runs</div>
+    ${_ugList(data.my_hunts, 'history', 'You have not attempted a contract.')}
+    <div class="ug-section-label">Contracts against you</div>
+    ${_ugList(data.against_me, 'history', 'No one has put your name on the board.')}`;
+}
+
+function _ugWantedHtml(data) {
+  if (!data.most_wanted?.length) {
+    return '<div class="ug-empty">No one has built enough Heat yet. Successful hacks, robberies, and contracts will fill this list.</div>';
+  }
+  return `<div class="ug-board-list">${data.most_wanted.map((player, index) => `
+    <div class="ug-wanted-row">
+      <div class="ug-wanted-rank">#${index + 1}</div>
+      <div class="ug-wanted-name">${_ugIdentity(player.name, player.anonymous)}${player.is_you ? '<small>This is you</small>' : `<small>${esc(player.heat_label)}</small>`}</div>
+      <div class="ug-wanted-heat">${player.heat}</div>
+    </div>`).join('')}</div>
+    <div class="ug-compose-note" style="margin-top:8px">Heat drops by one point every 30 minutes. Anon Numbers conceal identity here; they do not conceal or reduce Heat.</div>`;
+}
+
+function renderUnderground() {
+  const data = undergroundState.data;
+  if (!data) return;
+  _clearUndergroundTimers();
+  const identity = data.identity;
+  const heat = data.heat;
+  const sectionHtml = undergroundState.section === 'activity'
+    ? _ugActivityHtml(data)
+    : undergroundState.section === 'wanted'
+    ? _ugWantedHtml(data)
+    : _ugBoardHtml(data);
+  const activeHtml = data.active_contract
+    ? '<div id="ugActiveContract"></div>'
+    : '';
+  const navigationHtml = data.active_contract ? '' : `
+    <div class="ug-tabs" role="tablist">
+      <button class="ug-tab ${undergroundState.section === 'board' ? 'active' : ''}" onclick="setUndergroundSection('board')">Shadow Board</button>
+      <button class="ug-tab ${undergroundState.section === 'activity' ? 'active' : ''}" onclick="setUndergroundSection('activity')">My Activity</button>
+      <button class="ug-tab ${undergroundState.section === 'wanted' ? 'active' : ''}" onclick="setUndergroundSection('wanted')">Most Wanted</button>
+    </div>
+    <div>${sectionHtml}</div>`;
+  document.getElementById('undergroundContent').innerHTML = `<div class="ug-shell">
+    <section class="ug-cover">
+      <div class="ug-cover-top">
+        <div><div class="ug-kicker">Operating identity</div><div class="ug-alias">${esc(identity.alias)}</div></div>
+        <div class="ug-cover-badge ${identity.anonymous ? '' : 'public'}">${identity.anonymous ? '+888 protected' : 'Public cover'}</div>
+      </div>
+      <div class="ug-cover-copy">${esc(identity.advantage)}</div>
+      <div class="ug-heat">
+        <div class="ug-heat-head"><span>Heat</span><b>${esc(heat.label)} · ${heat.value}/${heat.max}</b></div>
+        <div class="ug-heat-track"><div class="ug-heat-fill" style="width:${heat.value}%"></div></div>
+      </div>
+    </section>
+    <div class="ug-fairness"><span>✓</span><div><b>Cover, not power</b>Every hunter receives the same five-signal trace, 45-second timer, payout, limits, and Heat. A +888 number only replaces the public identity shown to other players.</div></div>
+    ${activeHtml}
+    ${navigationHtml}
+  </div>`;
+  if (data.active_contract) startUndergroundTrace(data.active_contract);
+}
+
+function setUndergroundSection(section) {
+  if (!['board','activity','wanted'].includes(section)) return;
+  undergroundState.section = section;
+  renderUnderground();
+  haptic();
+}
+
+function toggleUndergroundComposer() {
+  undergroundState.composeOpen = !undergroundState.composeOpen;
+  renderUnderground();
+}
+
+async function postUndergroundBounty() {
+  const targetId = Number(document.getElementById('ugTarget')?.value);
+  const amount = _parseAmountValue(document.getElementById('ugAmount')?.value || '');
+  const btn = document.getElementById('ugPostBtn');
+  if (!targetId || !Number.isSafeInteger(amount)) {
+    return _shopToast('Choose a target and enter a valid bounty', 'error');
+  }
+  btn.disabled = true;
+  try {
+    const result = await api('/api/underground/bounties', {
+      method:'POST',
+      json:{ creator_id:+state.userId, target_id:targetId, amount },
+    });
+    state.balance = result.new_balance;
+    refreshHeaderBal();
+    undergroundState.composeOpen = false;
+    _shopToast('Bounty posted to the Shadow Board');
+    await loadUnderground(false);
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+async function cancelUndergroundBounty(bountyId, btn) {
+  btn.disabled = true;
+  try {
+    const result = await api(`/api/underground/bounties/${bountyId}/cancel`, {
+      method:'POST', json:{ user_id:+state.userId },
+    });
+    state.balance = result.new_balance;
+    refreshHeaderBal();
+    _shopToast('Escrow returned; posting fee remained burned');
+    await loadUnderground(false);
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+async function claimUndergroundBounty(bountyId, btn) {
+  btn.disabled = true;
+  try {
+    const result = await api(`/api/underground/bounties/${bountyId}/claim`, {
+      method:'POST', json:{ user_id:+state.userId },
+    });
+    undergroundState.data.active_contract = result.contract;
+    undergroundState.data.open_bounties = undergroundState.data.open_bounties
+      .filter(bounty => bounty.id !== bountyId);
+    renderUnderground();
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+function startUndergroundTrace(contract) {
+  const host = document.getElementById('ugActiveContract');
+  const sequence = contract.challenge_sequence || [];
+  if (!host || !sequence.length) return;
+  undergroundState.traceSequence = sequence;
+  undergroundState.traceAnswer = [];
+  undergroundState.tracePhase = 'preview';
+  undergroundState.resolving = false;
+  host.innerHTML = `<section class="ug-contract">
+    <div class="ug-contract-head">
+      <div><b>Signal Trace · ${fmtK(contract.amount)} ${WRK}</b><span>Memorize the route, then repeat it exactly</span></div>
+      <span class="ug-contract-timer" id="ugTraceTimer">${_ugRemaining(contract.challenge_expires_at)}</span>
+    </div>
+    <div class="ug-trace">
+      <div class="ug-trace-status" id="ugTraceStatus">Watch the five-signal route…</div>
+      <div class="ug-trace-progress" id="ugTraceProgress">${sequence.map(() => '<span class="ug-trace-dot"></span>').join('')}</div>
+      <div class="ug-signal-grid">
+        ${Object.entries(UG_SIGNAL_META).map(([signal, meta]) => `<button class="ug-signal" type="button" data-signal="${signal}" aria-label="${meta.label}" onclick="tapUndergroundSignal('${signal}',this)" disabled>${meta.icon}</button>`).join('')}
+      </div>
+    </div>
+  </section>`;
+
+  undergroundState.countdownTimer = setInterval(() => {
+    const timer = document.getElementById('ugTraceTimer');
+    const remaining = Number(contract.challenge_expires_at) - Math.floor(Date.now() / 1000);
+    if (timer) timer.textContent = `${Math.max(0, remaining)}s`;
+    if (remaining <= 0 && !undergroundState.resolving) {
+      _resolveUndergroundContract([], true);
+    }
+  }, 500);
+
+  sequence.forEach((signal, index) => {
+    const onTimer = setTimeout(() => {
+      document.querySelector(`.ug-signal[data-signal="${signal}"]`)?.classList.add('flash');
+    }, 350 + index * 520);
+    const offTimer = setTimeout(() => {
+      document.querySelector(`.ug-signal[data-signal="${signal}"]`)?.classList.remove('flash');
+    }, 670 + index * 520);
+    undergroundState.previewTimers.push(onTimer, offTimer);
+  });
+  undergroundState.previewTimers.push(setTimeout(() => {
+    undergroundState.tracePhase = 'input';
+    document.querySelectorAll('.ug-signal').forEach(button => button.disabled = false);
+    const status = document.getElementById('ugTraceStatus');
+    if (status) status.textContent = 'Repeat the route';
+  }, 350 + sequence.length * 520));
+}
+
+function tapUndergroundSignal(signal, button) {
+  if (undergroundState.tracePhase !== 'input' || undergroundState.resolving) return;
+  button.classList.add('flash');
+  setTimeout(() => button.classList.remove('flash'), 170);
+  undergroundState.traceAnswer.push(signal);
+  document.querySelectorAll('#ugTraceProgress .ug-trace-dot').forEach((dot, index) => {
+    dot.classList.toggle('filled', index < undergroundState.traceAnswer.length);
+  });
+  if (undergroundState.traceAnswer.length >= undergroundState.traceSequence.length) {
+    _resolveUndergroundContract(undergroundState.traceAnswer);
+  }
+}
+
+async function _resolveUndergroundContract(sequence, timedOut = false) {
+  if (undergroundState.resolving) return;
+  const contract = undergroundState.data?.active_contract;
+  if (!contract) return;
+  undergroundState.resolving = true;
+  undergroundState.tracePhase = 'resolving';
+  _clearUndergroundTimers();
+  document.querySelectorAll('.ug-signal').forEach(button => button.disabled = true);
+  const status = document.getElementById('ugTraceStatus');
+  if (status) status.textContent = timedOut ? 'Trace expired…' : 'Verifying route…';
+  try {
+    const result = await api(`/api/underground/bounties/${contract.id}/resolve`, {
+      method:'POST',
+      json:{ user_id:+state.userId, sequence },
+    });
+    if (result.new_balance != null) {
+      state.balance = result.new_balance;
+      refreshHeaderBal();
+    }
+    if (result.result === 'success') {
+      haptic('success');
+      _shopToast(`Contract complete · +${fmt(result.payout)} WRK$`);
+    } else {
+      haptic('error');
+      _shopToast(result.result === 'timeout' ? 'Signal Trace expired' : 'Wrong route · bounty reopened', 'error');
+    }
+    undergroundState.data.active_contract = null;
+    await loadUnderground(false);
+  } catch (e) {
+    undergroundState.resolving = false;
+    _shopToast(e.message, 'error');
+    await loadUnderground(false);
+  }
+}
+
 // ── Work / Jobs ───────────────────────────────────────────────────────────────
 let workState = {
   status: null,
@@ -8015,21 +8690,12 @@ let workState = {
 async function openWorkPage() {
   if (!state.userId) {
     document.getElementById('workLoginWall').style.display = '';
-    document.getElementById('workContent').style.display = 'none';
-    const wc = document.getElementById('workCrimeWrap');
-    if (wc) wc.style.display = 'none';
-    const ds = document.getElementById('dailySection');
-    if (ds) ds.style.display = 'none';
+    document.getElementById('earnAuthenticated').style.display = 'none';
     return;
   }
   document.getElementById('workLoginWall').style.display = 'none';
-  document.getElementById('workContent').style.display = 'flex';
-  const wc = document.getElementById('workCrimeWrap');
-  if (wc) wc.style.display = 'flex';
-  const ds = document.getElementById('dailySection');
-  if (ds) ds.style.display = '';
-  await refreshWorkStatus();
-  loadDailyStatus();
+  document.getElementById('earnAuthenticated').style.display = 'flex';
+  setEarnSection(_earnSection || 'work', true);
 }
 
 function loginFromWork() {

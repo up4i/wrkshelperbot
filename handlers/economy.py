@@ -839,15 +839,18 @@ async def cmd_guess(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if guess == word:
         await db.delete_hack_session(config.DB_PATH, user.id)
-        await db.set_hack_cooldown(config.DB_PATH, user.id, int(time.time()))
+        now = int(time.time())
+        await db.set_hack_cooldown(config.DB_PATH, user.id, now)
         reward = game["reward"]
         new_bal = await db.update_balance(config.DB_PATH, user.id, reward)
+        heat = await db.add_heat(config.DB_PATH, user.id, 10, now=now)
         await msg.reply_text(
             f"✅ *ACCESS GRANTED*\n\n"
             f"The word was `{word}`.\n"
             f"You cracked the seed phrase and drained the wallet!\n\n"
             f"💰 +{reward:,} WRK$ earned\n"
-            f"Balance: {new_bal:,} WRK$",
+            f"Balance: {new_bal:,} WRK$\n"
+            f"🔥 Heat: {heat}/100",
             parse_mode="Markdown"
         )
         return
@@ -856,11 +859,14 @@ async def cmd_guess(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if attempts_left <= 0:
         await db.delete_hack_session(config.DB_PATH, user.id)
-        await db.set_hack_cooldown(config.DB_PATH, user.id, int(time.time()))
+        now = int(time.time())
+        await db.set_hack_cooldown(config.DB_PATH, user.id, now)
+        heat = await db.add_heat(config.DB_PATH, user.id, 6, now=now)
         await msg.reply_text(
             f"❌ *CONNECTION TERMINATED*\n\n"
             f"The word was `{word}`.\n"
-            f"You got traced. Better luck next time.",
+            f"You got traced. Better luck next time.\n"
+            f"🔥 Heat: {heat}/100",
             parse_mode="Markdown"
         )
         return
@@ -997,16 +1003,26 @@ async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     )
     if firewall["blocked"]:
         await db.set_rob_cooldown(config.DB_PATH, robber.id, int(now))
+        heat = await db.add_heat(
+            config.DB_PATH, robber.id, 4, now=int(now)
+        )
         protected_number = f"+888 {firewall['suffix']:03d}"
         await msg.reply_text(
             f"🛡️ {protected_number}'s firewall intercepted the robbery.\n"
-            f"No WRK$ moved. Your rob cooldown has been used."
+            f"No WRK$ moved. Your rob cooldown has been used.\n"
+            f"🔥 Heat: {heat}/100"
         )
         return
 
     await db.set_rob_cooldown(config.DB_PATH, robber.id, int(now))
     success = random.random() < 0.50
     result = _rob_outcome(success, robber_wallet["balance"], target_wallet["balance"])
+    heat = await db.add_heat(
+        config.DB_PATH,
+        robber.id,
+        12 if result["outcome"] == "success" else 6,
+        now=int(now),
+    )
 
     robber_name = display_name(robber)
 
@@ -1016,23 +1032,32 @@ async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         new_bal = await db.update_balance(config.DB_PATH, robber.id, amount)
         emoji, template = random.choice(_ROB_SUCCESS)
         line = template.format(robber=robber_name, target=target_name, amount=f"{amount:,}")
-        await msg.reply_text(f"{emoji} {line}\n💰 Your balance: {new_bal:,} WRK$")
+        await msg.reply_text(
+            f"{emoji} {line}\n💰 Your balance: {new_bal:,} WRK$\n🔥 Heat: {heat}/100"
+        )
     elif result["outcome"] == "fine":
         amount = result["amount"]
         new_bal = await db.update_balance(config.DB_PATH, robber.id, -amount)
         emoji, template = random.choice(_ROB_FINE)
         line = template.format(robber=robber_name, target=target_name, amount=f"{amount:,}")
-        await msg.reply_text(f"{emoji} {line}\n💰 Your balance: {new_bal:,} WRK$")
+        await msg.reply_text(
+            f"{emoji} {line}\n💰 Your balance: {new_bal:,} WRK$\n🔥 Heat: {heat}/100"
+        )
     elif result["outcome"] == "bail":
         amount = result["amount"]
         new_bal = await db.update_balance(config.DB_PATH, robber.id, -amount)
         emoji, template = random.choice(_ROB_BAIL)
         line = template.format(robber=robber_name, target=target_name, amount=f"{amount:,}")
-        await msg.reply_text(f"{emoji} {line}\n💰 Your balance: {new_bal:,} WRK$")
+        await msg.reply_text(
+            f"{emoji} {line}\n💰 Your balance: {new_bal:,} WRK$\n🔥 Heat: {heat}/100"
+        )
     else:  # getaway
         emoji, template = random.choice(_ROB_GETAWAY)
         line = template.format(robber=robber_name, target=target_name, amount="0")
-        await msg.reply_text(f"{emoji} {line}\n💰 Your balance: {robber_wallet['balance']:,} WRK$")
+        await msg.reply_text(
+            f"{emoji} {line}\n💰 Your balance: {robber_wallet['balance']:,} WRK$\n"
+            f"🔥 Heat: {heat}/100"
+        )
 
 
 # ── /slots ────────────────────────────────────────────────────────────────────

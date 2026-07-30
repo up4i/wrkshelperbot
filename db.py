@@ -72,7 +72,9 @@ CREATE TABLE IF NOT EXISTS economy (
     vault_pending_amount       INTEGER NOT NULL DEFAULT 0,
     vault_withdraw_available_at INTEGER NOT NULL DEFAULT 0,
     anon_mask_enabled          INTEGER NOT NULL DEFAULT 0,
-    anon_firewall_used_at      INTEGER NOT NULL DEFAULT 0
+    anon_firewall_used_at      INTEGER NOT NULL DEFAULT 0,
+    heat                       INTEGER NOT NULL DEFAULT 0,
+    heat_updated_at            INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS gift_models (
     id               INTEGER PRIMARY KEY,
@@ -146,6 +148,39 @@ CREATE TABLE IF NOT EXISTS anon_security_events (
 );
 CREATE INDEX IF NOT EXISTS idx_anon_security_events_user
 ON anon_security_events(user_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS underground_bounties (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    creator_id           INTEGER NOT NULL,
+    target_id            INTEGER NOT NULL,
+    amount               INTEGER NOT NULL,
+    fee                  INTEGER NOT NULL DEFAULT 0,
+    status               TEXT NOT NULL DEFAULT 'open',
+    creator_alias        TEXT NOT NULL,
+    creator_anon         INTEGER NOT NULL DEFAULT 0,
+    target_alias         TEXT NOT NULL,
+    target_anon          INTEGER NOT NULL DEFAULT 0,
+    hunter_id            INTEGER,
+    hunter_alias         TEXT,
+    hunter_anon          INTEGER NOT NULL DEFAULT 0,
+    challenge_sequence   TEXT,
+    challenge_started_at INTEGER,
+    challenge_expires_at INTEGER,
+    created_at           INTEGER NOT NULL,
+    expires_at           INTEGER NOT NULL,
+    resolved_at          INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_underground_bounties_status
+ON underground_bounties(status, expires_at, amount DESC);
+CREATE INDEX IF NOT EXISTS idx_underground_bounties_users
+ON underground_bounties(creator_id, target_id, hunter_id);
+CREATE TABLE IF NOT EXISTS underground_attempts (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    bounty_id  INTEGER NOT NULL,
+    hunter_id  INTEGER NOT NULL,
+    outcome    TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    UNIQUE(bounty_id, hunter_id)
+);
 CREATE TABLE IF NOT EXISTS work_sessions (
     user_id         INTEGER PRIMARY KEY,
     taps            INTEGER NOT NULL DEFAULT 0,
@@ -213,6 +248,8 @@ async def _migrate(db) -> None:
         "vault_withdraw_available_at": "INTEGER NOT NULL DEFAULT 0",
         "anon_mask_enabled":    "INTEGER NOT NULL DEFAULT 0",
         "anon_firewall_used_at": "INTEGER NOT NULL DEFAULT 0",
+        "heat":                  "INTEGER NOT NULL DEFAULT 0",
+        "heat_updated_at":       "INTEGER NOT NULL DEFAULT 0",
     }
     for col, typedef in econ_new.items():
         if col not in econ_cols:
@@ -353,6 +390,39 @@ async def _migrate(db) -> None:
     )""")
     await db.execute("""CREATE INDEX IF NOT EXISTS idx_anon_security_events_user
         ON anon_security_events(user_id, created_at DESC)""")
+    await db.execute("""CREATE TABLE IF NOT EXISTS underground_bounties (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        creator_id           INTEGER NOT NULL,
+        target_id            INTEGER NOT NULL,
+        amount               INTEGER NOT NULL,
+        fee                  INTEGER NOT NULL DEFAULT 0,
+        status               TEXT NOT NULL DEFAULT 'open',
+        creator_alias        TEXT NOT NULL,
+        creator_anon         INTEGER NOT NULL DEFAULT 0,
+        target_alias         TEXT NOT NULL,
+        target_anon          INTEGER NOT NULL DEFAULT 0,
+        hunter_id            INTEGER,
+        hunter_alias         TEXT,
+        hunter_anon          INTEGER NOT NULL DEFAULT 0,
+        challenge_sequence   TEXT,
+        challenge_started_at INTEGER,
+        challenge_expires_at INTEGER,
+        created_at           INTEGER NOT NULL,
+        expires_at           INTEGER NOT NULL,
+        resolved_at          INTEGER
+    )""")
+    await db.execute("""CREATE INDEX IF NOT EXISTS idx_underground_bounties_status
+        ON underground_bounties(status, expires_at, amount DESC)""")
+    await db.execute("""CREATE INDEX IF NOT EXISTS idx_underground_bounties_users
+        ON underground_bounties(creator_id, target_id, hunter_id)""")
+    await db.execute("""CREATE TABLE IF NOT EXISTS underground_attempts (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        bounty_id  INTEGER NOT NULL,
+        hunter_id  INTEGER NOT NULL,
+        outcome    TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        UNIQUE(bounty_id, hunter_id)
+    )""")
     await db.executemany(
         "INSERT OR IGNORE INTO anon_numbers (id, suffix, price) VALUES (?, ?, ?)",
         [
@@ -1495,6 +1565,41 @@ async def set_rob_cooldown(db_path: str, user_id: int, timestamp: int) -> None:
             "UPDATE economy SET last_rob = ? WHERE user_id = ?", (timestamp, user_id)
         )
         await db.commit()
+
+
+async def add_heat(
+    db_path: str,
+    user_id: int,
+    amount: int,
+    *,
+    now: int | None = None,
+) -> int:
+    """Add decaying Underground Heat and return the capped current value."""
+    current_time = int(time.time()) if now is None else now
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute("BEGIN IMMEDIATE")
+        async with db.execute(
+            "SELECT heat, heat_updated_at FROM economy WHERE user_id = ?",
+            (user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            await db.rollback()
+            return 0
+        heat = max(0, min(100, int(row[0] or 0)))
+        updated_at = int(row[1] or 0)
+        if heat and updated_at:
+            heat = max(
+                0,
+                heat - max(0, current_time - updated_at) // (30 * 60),
+            )
+        heat = min(100, heat + max(0, amount))
+        await db.execute(
+            "UPDATE economy SET heat = ?, heat_updated_at = ? WHERE user_id = ?",
+            (heat, current_time, user_id),
+        )
+        await db.commit()
+        return heat
 
 
 async def consume_anon_firewall(

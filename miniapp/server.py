@@ -178,6 +178,64 @@ def _public_identity(db, user_id: int, fallback: str | None = None) -> str:
     return row["full_name"] or fallback or f"User {user_id}"
 
 
+_HEAT_DECAY_SECONDS = 30 * 60
+
+
+def _underground_identity(db, user_id: int) -> dict:
+    """Active numbers conceal identity here without changing game mechanics."""
+    active_number = _active_security_number(db, user_id)
+    if active_number:
+        return {
+            "alias": format_anon_number(active_number["suffix"]),
+            "anonymous": True,
+            "anon_id": active_number["id"],
+        }
+    return {
+        "alias": _public_identity(db, user_id),
+        "anonymous": False,
+        "anon_id": None,
+    }
+
+
+def _normalize_heat(db, user_id: int, *, now: int | None = None) -> int:
+    current_time = int(time.time()) if now is None else now
+    row = db.execute(
+        "SELECT heat, heat_updated_at FROM economy WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "User not found")
+    heat = max(0, min(100, int(row["heat"] or 0)))
+    updated_at = int(row["heat_updated_at"] or 0)
+    if heat and updated_at:
+        heat = max(
+            0,
+            heat - max(0, current_time - updated_at) // _HEAT_DECAY_SECONDS,
+        )
+    if heat != int(row["heat"] or 0) or (heat and not updated_at):
+        db.execute(
+            "UPDATE economy SET heat = ?, heat_updated_at = ? WHERE user_id = ?",
+            (heat, current_time, user_id),
+        )
+    return heat
+
+
+def _add_underground_heat(
+    db,
+    user_id: int,
+    amount: int,
+    *,
+    now: int | None = None,
+) -> int:
+    current_time = int(time.time()) if now is None else now
+    heat = min(100, _normalize_heat(db, user_id, now=current_time) + max(0, amount))
+    db.execute(
+        "UPDATE economy SET heat = ?, heat_updated_at = ? WHERE user_id = ?",
+        (heat, current_time, user_id),
+    )
+    return heat
+
+
 def _record_security_event(
     db,
     user_id: int,
@@ -1935,22 +1993,37 @@ def hack_guess(req: HackGuessRequest, authenticated_user: AuthenticatedUser):
         revealed = set(int(x) for x in sess["revealed_indices"].split(",") if x)
 
         if guess == word:
+            now = int(time.time())
             db.execute("DELETE FROM hack_sessions WHERE user_id = ?", (req.user_id,))
-            db.execute("UPDATE economy SET last_hack = ? WHERE user_id = ?", (int(time.time()), req.user_id))
+            db.execute("UPDATE economy SET last_hack = ? WHERE user_id = ?", (now, req.user_id))
             row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
             if not row:
                 raise HTTPException(500, "Economy record missing")
             new_bal = row["balance"] + sess["reward"]
             db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+            heat = _add_underground_heat(db, req.user_id, 10, now=now)
             db.commit()
-            return {"result": "win", "word": word, "reward": sess["reward"], "new_balance": new_bal}
+            return {
+                "result": "win",
+                "word": word,
+                "reward": sess["reward"],
+                "new_balance": new_bal,
+                "heat": heat,
+            }
 
         attempts_left = sess["attempts"] - 1
         if attempts_left <= 0:
+            now = int(time.time())
             db.execute("DELETE FROM hack_sessions WHERE user_id = ?", (req.user_id,))
-            db.execute("UPDATE economy SET last_hack = ? WHERE user_id = ?", (int(time.time()), req.user_id))
+            db.execute("UPDATE economy SET last_hack = ? WHERE user_id = ?", (now, req.user_id))
+            heat = _add_underground_heat(db, req.user_id, 6, now=now)
             db.commit()
-            return {"result": "lose", "word": word, "attempts_left": 0}
+            return {
+                "result": "lose",
+                "word": word,
+                "attempts_left": 0,
+                "heat": heat,
+            }
 
         unrevealed = [i for i in range(len(word)) if i not in revealed]
         if unrevealed:
@@ -2131,6 +2204,7 @@ def rob_attempt(req: RobAttemptRequest, authenticated_user: AuthenticatedUser):
         robber_display = _public_identity(db, req.user_id)
         if firewall["blocked"]:
             new_bal = robber_row["balance"]
+            heat = _add_underground_heat(db, req.user_id, 4, now=now)
             db.commit()
             _send_telegram_dm(
                 req.target_id,
@@ -2147,6 +2221,7 @@ def rob_attempt(req: RobAttemptRequest, authenticated_user: AuthenticatedUser):
                 "amount": 0,
                 "new_balance": new_bal,
                 "firewall_remaining": firewall["remaining"],
+                "heat": heat,
             }
 
         success = random.random() < 0.50
@@ -2174,9 +2249,22 @@ def rob_attempt(req: RobAttemptRequest, authenticated_user: AuthenticatedUser):
             emoji, template = random.choice(_ROB_GETAWAY)
             flavor = template.format(robber="You", target=target_name, amount="0")
 
+        heat = _add_underground_heat(
+            db,
+            req.user_id,
+            12 if result["outcome"] == "success" else 6,
+            now=now,
+        )
         new_bal = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()["balance"]
         db.commit()
-        return {"outcome": result["outcome"], "emoji": emoji, "flavor": flavor, "amount": amount, "new_balance": new_bal}
+        return {
+            "outcome": result["outcome"],
+            "emoji": emoji,
+            "flavor": flavor,
+            "amount": amount,
+            "new_balance": new_bal,
+            "heat": heat,
+        }
 
 
 @app.get("/api/rob/cooldown/{user_id}")
@@ -2189,6 +2277,633 @@ def rob_cooldown_status(user_id: int, authenticated_user: AuthenticatedUser):
         now = int(time.time())
         remaining = max(0, _ROB_COOLDOWN - (now - (row["last_rob"] or 0)))
         return {"cooldown_remaining": remaining}
+
+
+# ── Underground: Heat, Shadow Board, and Signal Trace ────────────────────────
+
+_BOUNTY_MIN = 5_000
+_BOUNTY_MAX = 50_000_000
+_BOUNTY_FEE_PERCENT = 5
+_BOUNTY_LIFETIME = 24 * 60 * 60
+_BOUNTY_CHALLENGE_SECONDS = 45
+_BOUNTY_MAX_POSTED = 3
+_BOUNTY_MAX_PER_TARGET = 3
+_TRACE_SIGNALS = ("violet", "cyan", "gold", "rose")
+
+
+class UndergroundBountyCreateRequest(BaseModel):
+    creator_id: int
+    target_id: int
+    amount: int
+
+
+class UndergroundActorRequest(BaseModel):
+    user_id: int
+
+
+class UndergroundResolveRequest(BaseModel):
+    user_id: int
+    sequence: list[str]
+
+
+def _heat_label(heat: int) -> str:
+    if heat >= 80:
+        return "Most Wanted"
+    if heat >= 55:
+        return "Notorious"
+    if heat >= 30:
+        return "Hot"
+    if heat >= 10:
+        return "Watched"
+    return "Low Profile"
+
+
+def _reap_underground_bounties(db, now: int) -> None:
+    timed_out = db.execute(
+        """SELECT id, creator_id, hunter_id, amount, expires_at
+           FROM underground_bounties
+           WHERE status = 'claimed'
+             AND (challenge_expires_at <= ? OR expires_at <= ?)""",
+        (now, now),
+    ).fetchall()
+    for bounty in timed_out:
+        attempt = db.execute(
+            """INSERT OR IGNORE INTO underground_attempts
+               (bounty_id, hunter_id, outcome, created_at)
+               VALUES (?, ?, 'timeout', ?)""",
+            (bounty["id"], bounty["hunter_id"], now),
+        )
+        if attempt.rowcount:
+            _add_underground_heat(db, bounty["hunter_id"], 4, now=now)
+        expired = bounty["expires_at"] <= now
+        if expired:
+            db.execute(
+                "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                (bounty["amount"], bounty["creator_id"]),
+            )
+        db.execute(
+            """UPDATE underground_bounties
+               SET status = ?, hunter_id = NULL, hunter_alias = NULL,
+                   hunter_anon = 0, challenge_sequence = NULL,
+                   challenge_started_at = NULL, challenge_expires_at = NULL,
+                   resolved_at = ?
+               WHERE id = ?""",
+            ("expired" if expired else "open", now if expired else None, bounty["id"]),
+        )
+
+    expired_open = db.execute(
+        """SELECT id, creator_id, amount
+           FROM underground_bounties
+           WHERE status = 'open' AND expires_at <= ?""",
+        (now,),
+    ).fetchall()
+    for bounty in expired_open:
+        db.execute(
+            "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+            (bounty["amount"], bounty["creator_id"]),
+        )
+        db.execute(
+            """UPDATE underground_bounties
+               SET status = 'expired', resolved_at = ?
+               WHERE id = ? AND status = 'open'""",
+            (now, bounty["id"]),
+        )
+
+
+def _underground_bounty_payload(db, row, viewer_id: int) -> dict:
+    bounty = dict(row)
+    attempted = bool(db.execute(
+        """SELECT 1 FROM underground_attempts
+           WHERE bounty_id = ? AND hunter_id = ?""",
+        (bounty["id"], viewer_id),
+    ).fetchone())
+    is_hunter = bounty["hunter_id"] == viewer_id
+    payload = {
+        "id": bounty["id"],
+        "amount": bounty["amount"],
+        "fee": bounty["fee"],
+        "status": bounty["status"],
+        "creator": bounty["creator_alias"],
+        "creator_anonymous": bool(bounty["creator_anon"]),
+        "target": bounty["target_alias"],
+        "target_anonymous": bool(bounty["target_anon"]),
+        "hunter": bounty["hunter_alias"],
+        "hunter_anonymous": bool(bounty["hunter_anon"]),
+        "created_at": bounty["created_at"],
+        "expires_at": bounty["expires_at"],
+        "resolved_at": bounty["resolved_at"],
+        "challenge_expires_at": (
+            bounty["challenge_expires_at"] if is_hunter else None
+        ),
+        "is_creator": bounty["creator_id"] == viewer_id,
+        "is_target": bounty["target_id"] == viewer_id,
+        "is_hunter": is_hunter,
+        "attempted": attempted,
+        "can_cancel": (
+            bounty["creator_id"] == viewer_id and bounty["status"] == "open"
+        ),
+        "can_claim": (
+            bounty["status"] == "open"
+            and bounty["creator_id"] != viewer_id
+            and bounty["target_id"] != viewer_id
+            and not attempted
+        ),
+    }
+    if is_hunter and bounty["status"] == "claimed":
+        try:
+            payload["challenge_sequence"] = json.loads(
+                bounty["challenge_sequence"] or "[]"
+            )
+        except json.JSONDecodeError:
+            payload["challenge_sequence"] = []
+    return payload
+
+
+@app.get("/api/underground/status")
+def underground_status(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        _reap_underground_bounties(db, now)
+        heat = _normalize_heat(db, user_id, now=now)
+        identity = _underground_identity(db, user_id)
+
+        open_rows = db.execute(
+            """SELECT * FROM underground_bounties
+               WHERE status = 'open'
+               ORDER BY amount DESC, created_at ASC LIMIT 40"""
+        ).fetchall()
+        posted_rows = db.execute(
+            """SELECT * FROM underground_bounties
+               WHERE creator_id = ?
+               ORDER BY created_at DESC LIMIT 20""",
+            (user_id,),
+        ).fetchall()
+        against_rows = db.execute(
+            """SELECT * FROM underground_bounties
+               WHERE target_id = ?
+               ORDER BY created_at DESC LIMIT 12""",
+            (user_id,),
+        ).fetchall()
+        active_row = db.execute(
+            """SELECT * FROM underground_bounties
+               WHERE hunter_id = ? AND status = 'claimed'
+               ORDER BY challenge_started_at DESC LIMIT 1""",
+            (user_id,),
+        ).fetchone()
+        hunt_rows = db.execute(
+            """SELECT b.*, a.outcome AS my_outcome
+               FROM underground_attempts a
+               JOIN underground_bounties b ON b.id = a.bounty_id
+               WHERE a.hunter_id = ?
+               ORDER BY a.created_at DESC LIMIT 20""",
+            (user_id,),
+        ).fetchall()
+
+        target_rows = db.execute(
+            """SELECT user_id FROM economy
+               WHERE user_id != ? AND balance >= 1000
+               ORDER BY balance DESC LIMIT 50""",
+            (user_id,),
+        ).fetchall()
+        targets = []
+        for target in target_rows:
+            target_heat = _normalize_heat(db, target["user_id"], now=now)
+            target_identity = _underground_identity(db, target["user_id"])
+            targets.append({
+                "user_id": target["user_id"],
+                "name": target_identity["alias"],
+                "anonymous": target_identity["anonymous"],
+                "heat": target_heat,
+                "heat_label": _heat_label(target_heat),
+            })
+
+        wanted_rows = db.execute(
+            """SELECT user_id FROM economy
+               WHERE heat > 0 ORDER BY heat DESC LIMIT 20"""
+        ).fetchall()
+        most_wanted = []
+        for wanted in wanted_rows:
+            wanted_heat = _normalize_heat(db, wanted["user_id"], now=now)
+            if not wanted_heat:
+                continue
+            wanted_identity = _underground_identity(db, wanted["user_id"])
+            most_wanted.append({
+                "name": wanted_identity["alias"],
+                "anonymous": wanted_identity["anonymous"],
+                "heat": wanted_heat,
+                "heat_label": _heat_label(wanted_heat),
+                "is_you": wanted["user_id"] == user_id,
+            })
+        most_wanted.sort(key=lambda item: item["heat"], reverse=True)
+        most_wanted = most_wanted[:8]
+        db.commit()
+
+        hunts = []
+        for row in hunt_rows:
+            item = _underground_bounty_payload(db, row, user_id)
+            item["my_outcome"] = row["my_outcome"]
+            hunts.append(item)
+        return {
+            "identity": {
+                "alias": identity["alias"],
+                "anonymous": identity["anonymous"],
+                "advantage": (
+                    "Your +888 number conceals your public identity on posts "
+                    "and completed contracts. It does not change odds or payouts."
+                    if identity["anonymous"]
+                    else "Your public identity is visible. Activate a +888 "
+                    "number to operate under that alias."
+                ),
+            },
+            "heat": {
+                "value": heat,
+                "label": _heat_label(heat),
+                "max": 100,
+                "decay_seconds": _HEAT_DECAY_SECONDS,
+            },
+            "rules": {
+                "min_bounty": _BOUNTY_MIN,
+                "max_bounty": _BOUNTY_MAX,
+                "fee_percent": _BOUNTY_FEE_PERCENT,
+                "challenge_seconds": _BOUNTY_CHALLENGE_SECONDS,
+                "max_posted": _BOUNTY_MAX_POSTED,
+                "anon_changes_gameplay": False,
+            },
+            "open_bounties": [
+                _underground_bounty_payload(db, row, user_id)
+                for row in open_rows
+            ],
+            "my_posted": [
+                _underground_bounty_payload(db, row, user_id)
+                for row in posted_rows
+            ],
+            "against_me": [
+                _underground_bounty_payload(db, row, user_id)
+                for row in against_rows
+            ],
+            "my_hunts": hunts,
+            "active_contract": (
+                _underground_bounty_payload(db, active_row, user_id)
+                if active_row else None
+            ),
+            "targets": targets,
+            "most_wanted": most_wanted,
+        }
+
+
+@app.post("/api/underground/bounties")
+def create_underground_bounty(
+    req: UndergroundBountyCreateRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.creator_id)
+    if req.creator_id == req.target_id:
+        raise HTTPException(400, "You cannot place a contract on yourself")
+    if req.amount < _BOUNTY_MIN or req.amount > _BOUNTY_MAX:
+        raise HTTPException(
+            400,
+            f"Bounties must be {_BOUNTY_MIN:,}–{_BOUNTY_MAX:,} WRK$",
+        )
+    now = int(time.time())
+    fee = max(1, (req.amount * _BOUNTY_FEE_PERCENT + 99) // 100)
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        _reap_underground_bounties(db, now)
+        creator = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?",
+            (req.creator_id,),
+        ).fetchone()
+        target = db.execute(
+            "SELECT user_id FROM economy WHERE user_id = ? AND balance >= 1000",
+            (req.target_id,),
+        ).fetchone()
+        if not creator:
+            raise HTTPException(404, "Creator not found")
+        if not target:
+            raise HTTPException(400, "That player is not eligible for contracts")
+        max_for_balance = min(_BOUNTY_MAX, creator["balance"] // 4)
+        if req.amount > max_for_balance:
+            raise HTTPException(
+                400,
+                f"A bounty can use at most 25% of your available balance "
+                f"({max_for_balance:,} WRK$)",
+            )
+        if creator["balance"] < req.amount + fee:
+            raise HTTPException(400, "Insufficient balance for bounty and fee")
+        posted_count = db.execute(
+            """SELECT COUNT(*) AS n FROM underground_bounties
+               WHERE creator_id = ? AND status IN ('open','claimed')""",
+            (req.creator_id,),
+        ).fetchone()["n"]
+        if posted_count >= _BOUNTY_MAX_POSTED:
+            raise HTTPException(400, "You already have three active bounties")
+        target_count = db.execute(
+            """SELECT COUNT(*) AS n FROM underground_bounties
+               WHERE target_id = ? AND status IN ('open','claimed')""",
+            (req.target_id,),
+        ).fetchone()["n"]
+        if target_count >= _BOUNTY_MAX_PER_TARGET:
+            raise HTTPException(400, "That player already has enough attention")
+        duplicate = db.execute(
+            """SELECT 1 FROM underground_bounties
+               WHERE creator_id = ? AND target_id = ?
+                 AND status IN ('open','claimed')""",
+            (req.creator_id, req.target_id),
+        ).fetchone()
+        if duplicate:
+            raise HTTPException(400, "You already posted a bounty on this player")
+
+        creator_identity = _underground_identity(db, req.creator_id)
+        target_identity = _underground_identity(db, req.target_id)
+        db.execute(
+            "UPDATE economy SET balance = balance - ? WHERE user_id = ?",
+            (req.amount + fee, req.creator_id),
+        )
+        bounty_id = db.execute(
+            """INSERT INTO underground_bounties
+               (creator_id, target_id, amount, fee, status,
+                creator_alias, creator_anon, target_alias, target_anon,
+                created_at, expires_at)
+               VALUES (?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?)""",
+            (
+                req.creator_id,
+                req.target_id,
+                req.amount,
+                fee,
+                creator_identity["alias"],
+                int(creator_identity["anonymous"]),
+                target_identity["alias"],
+                int(target_identity["anonymous"]),
+                now,
+                now + _BOUNTY_LIFETIME,
+            ),
+        ).lastrowid
+        new_balance = creator["balance"] - req.amount - fee
+        row = db.execute(
+            "SELECT * FROM underground_bounties WHERE id = ?",
+            (bounty_id,),
+        ).fetchone()
+        db.commit()
+    _send_telegram_dm(
+        req.target_id,
+        f"🎯 {creator_identity['alias']} placed a {req.amount:,} WRK$ "
+        "Shadow Board contract on you. No funds were removed from your wallet.",
+    )
+    return {
+        "ok": True,
+        "new_balance": new_balance,
+        "bounty": _underground_bounty_payload_for_response(row, req.creator_id),
+    }
+
+
+def _underground_bounty_payload_for_response(row, viewer_id: int) -> dict:
+    """Serialize a just-mutated row without requiring an open connection."""
+    bounty = dict(row)
+    return {
+        "id": bounty["id"],
+        "amount": bounty["amount"],
+        "fee": bounty["fee"],
+        "status": bounty["status"],
+        "creator": bounty["creator_alias"],
+        "creator_anonymous": bool(bounty["creator_anon"]),
+        "target": bounty["target_alias"],
+        "target_anonymous": bool(bounty["target_anon"]),
+        "hunter": bounty["hunter_alias"],
+        "hunter_anonymous": bool(bounty["hunter_anon"]),
+        "created_at": bounty["created_at"],
+        "expires_at": bounty["expires_at"],
+        "is_creator": bounty["creator_id"] == viewer_id,
+        "is_target": bounty["target_id"] == viewer_id,
+    }
+
+
+@app.post("/api/underground/bounties/{bounty_id}/cancel")
+def cancel_underground_bounty(
+    bounty_id: int,
+    req: UndergroundActorRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        _reap_underground_bounties(db, now)
+        bounty = db.execute(
+            "SELECT * FROM underground_bounties WHERE id = ?",
+            (bounty_id,),
+        ).fetchone()
+        if not bounty or bounty["creator_id"] != req.user_id:
+            raise HTTPException(404, "Bounty not found")
+        if bounty["status"] != "open":
+            raise HTTPException(400, "Only an open bounty can be cancelled")
+        db.execute(
+            "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+            (bounty["amount"], req.user_id),
+        )
+        db.execute(
+            """UPDATE underground_bounties
+               SET status = 'cancelled', resolved_at = ? WHERE id = ?""",
+            (now, bounty_id),
+        )
+        new_balance = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?",
+            (req.user_id,),
+        ).fetchone()["balance"]
+        db.commit()
+    return {"ok": True, "new_balance": new_balance, "fee_refunded": False}
+
+
+@app.post("/api/underground/bounties/{bounty_id}/claim")
+def claim_underground_bounty(
+    bounty_id: int,
+    req: UndergroundActorRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        _reap_underground_bounties(db, now)
+        bounty = db.execute(
+            "SELECT * FROM underground_bounties WHERE id = ?",
+            (bounty_id,),
+        ).fetchone()
+        if not bounty or bounty["status"] != "open":
+            raise HTTPException(400, "That bounty is no longer open")
+        if req.user_id in (bounty["creator_id"], bounty["target_id"]):
+            raise HTTPException(400, "You cannot claim this bounty")
+        if db.execute(
+            """SELECT 1 FROM underground_attempts
+               WHERE bounty_id = ? AND hunter_id = ?""",
+            (bounty_id, req.user_id),
+        ).fetchone():
+            raise HTTPException(400, "You already attempted this bounty")
+        if db.execute(
+            """SELECT 1 FROM underground_bounties
+               WHERE hunter_id = ? AND status = 'claimed'""",
+            (req.user_id,),
+        ).fetchone():
+            raise HTTPException(400, "Finish your active contract first")
+
+        sequence = random.choices(_TRACE_SIGNALS, k=5)
+        hunter_identity = _underground_identity(db, req.user_id)
+        challenge_expires_at = min(
+            bounty["expires_at"],
+            now + _BOUNTY_CHALLENGE_SECONDS,
+        )
+        db.execute(
+            """UPDATE underground_bounties
+               SET status = 'claimed', hunter_id = ?, hunter_alias = ?,
+                   hunter_anon = ?, challenge_sequence = ?,
+                   challenge_started_at = ?, challenge_expires_at = ?
+               WHERE id = ? AND status = 'open'""",
+            (
+                req.user_id,
+                hunter_identity["alias"],
+                int(hunter_identity["anonymous"]),
+                json.dumps(sequence),
+                now,
+                challenge_expires_at,
+                bounty_id,
+            ),
+        )
+        row = db.execute(
+            "SELECT * FROM underground_bounties WHERE id = ?",
+            (bounty_id,),
+        ).fetchone()
+        contract = _underground_bounty_payload(db, row, req.user_id)
+        db.commit()
+    return {
+        "ok": True,
+        "contract": contract,
+        "signals": list(_TRACE_SIGNALS),
+        "preview_seconds": 3,
+        "challenge_seconds": _BOUNTY_CHALLENGE_SECONDS,
+        "anon_changes_gameplay": False,
+    }
+
+
+@app.post("/api/underground/bounties/{bounty_id}/resolve")
+def resolve_underground_bounty(
+    bounty_id: int,
+    req: UndergroundResolveRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        bounty = db.execute(
+            "SELECT * FROM underground_bounties WHERE id = ?",
+            (bounty_id,),
+        ).fetchone()
+        if (
+            not bounty
+            or bounty["status"] != "claimed"
+            or bounty["hunter_id"] != req.user_id
+        ):
+            raise HTTPException(400, "You do not hold this contract")
+        expired = (
+            now > bounty["challenge_expires_at"]
+            or now > bounty["expires_at"]
+        )
+        if expired:
+            db.execute(
+                """INSERT OR IGNORE INTO underground_attempts
+                   (bounty_id, hunter_id, outcome, created_at)
+                   VALUES (?, ?, 'timeout', ?)""",
+                (bounty_id, req.user_id, now),
+            )
+            heat = _add_underground_heat(db, req.user_id, 4, now=now)
+            bounty_expired = now > bounty["expires_at"]
+            if bounty_expired:
+                db.execute(
+                    "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                    (bounty["amount"], bounty["creator_id"]),
+                )
+            db.execute(
+                """UPDATE underground_bounties
+                   SET status = ?, hunter_id = NULL, hunter_alias = NULL,
+                       hunter_anon = 0, challenge_sequence = NULL,
+                       challenge_started_at = NULL,
+                       challenge_expires_at = NULL, resolved_at = ?
+                   WHERE id = ?""",
+                (
+                    "expired" if bounty_expired else "open",
+                    now if bounty_expired else None,
+                    bounty_id,
+                ),
+            )
+            db.commit()
+            return {"result": "timeout", "payout": 0, "heat": heat}
+
+        try:
+            expected = json.loads(bounty["challenge_sequence"] or "[]")
+        except json.JSONDecodeError:
+            expected = []
+        answer = [str(signal).lower() for signal in req.sequence]
+        success = answer == expected and len(answer) == 5
+        outcome = "success" if success else "failed"
+        db.execute(
+            """INSERT INTO underground_attempts
+               (bounty_id, hunter_id, outcome, created_at)
+               VALUES (?, ?, ?, ?)""",
+            (bounty_id, req.user_id, outcome, now),
+        )
+        if success:
+            db.execute(
+                "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                (bounty["amount"], req.user_id),
+            )
+            db.execute(
+                """UPDATE underground_bounties
+                   SET status = 'completed', challenge_sequence = NULL,
+                       challenge_started_at = NULL,
+                       challenge_expires_at = NULL, resolved_at = ?
+                   WHERE id = ?""",
+                (now, bounty_id),
+            )
+            heat = _add_underground_heat(db, req.user_id, 25, now=now)
+            new_balance = db.execute(
+                "SELECT balance FROM economy WHERE user_id = ?",
+                (req.user_id,),
+            ).fetchone()["balance"]
+        else:
+            db.execute(
+                """UPDATE underground_bounties
+                   SET status = 'open', hunter_id = NULL, hunter_alias = NULL,
+                       hunter_anon = 0, challenge_sequence = NULL,
+                       challenge_started_at = NULL,
+                       challenge_expires_at = NULL
+                   WHERE id = ?""",
+                (bounty_id,),
+            )
+            heat = _add_underground_heat(db, req.user_id, 8, now=now)
+            new_balance = db.execute(
+                "SELECT balance FROM economy WHERE user_id = ?",
+                (req.user_id,),
+            ).fetchone()["balance"]
+        db.commit()
+
+    if success:
+        _send_telegram_dm(
+            bounty["creator_id"],
+            f"✅ {bounty['hunter_alias']} completed your {bounty['amount']:,} "
+            f"WRK$ contract on {bounty['target_alias']}.",
+        )
+        _send_telegram_dm(
+            bounty["target_id"],
+            f"🎯 {bounty['hunter_alias']} completed a Shadow Board contract "
+            "against you. Your wallet was not charged.",
+        )
+    return {
+        "result": outcome,
+        "payout": bounty["amount"] if success else 0,
+        "new_balance": new_balance,
+        "heat": heat,
+    }
 
 
 # ── Work / Jobs endpoints ─────────────────────────────────────────────────────
@@ -4182,6 +4897,8 @@ async def _startup():
             "vault_withdraw_available_at INTEGER NOT NULL DEFAULT 0",
             "anon_mask_enabled INTEGER NOT NULL DEFAULT 0",
             "anon_firewall_used_at INTEGER NOT NULL DEFAULT 0",
+            "heat INTEGER NOT NULL DEFAULT 0",
+            "heat_updated_at INTEGER NOT NULL DEFAULT 0",
         ):
             try:
                 db.execute(f"ALTER TABLE economy ADD COLUMN {col}")
@@ -4306,6 +5023,39 @@ async def _startup():
 )""")
         db.execute("""CREATE INDEX IF NOT EXISTS idx_anon_security_events_user
     ON anon_security_events(user_id, created_at DESC)""")
+        db.execute("""CREATE TABLE IF NOT EXISTS underground_bounties (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    creator_id           INTEGER NOT NULL,
+    target_id            INTEGER NOT NULL,
+    amount               INTEGER NOT NULL,
+    fee                  INTEGER NOT NULL DEFAULT 0,
+    status               TEXT NOT NULL DEFAULT 'open',
+    creator_alias        TEXT NOT NULL,
+    creator_anon         INTEGER NOT NULL DEFAULT 0,
+    target_alias         TEXT NOT NULL,
+    target_anon          INTEGER NOT NULL DEFAULT 0,
+    hunter_id            INTEGER,
+    hunter_alias         TEXT,
+    hunter_anon          INTEGER NOT NULL DEFAULT 0,
+    challenge_sequence   TEXT,
+    challenge_started_at INTEGER,
+    challenge_expires_at INTEGER,
+    created_at           INTEGER NOT NULL,
+    expires_at           INTEGER NOT NULL,
+    resolved_at          INTEGER
+)""")
+        db.execute("""CREATE INDEX IF NOT EXISTS idx_underground_bounties_status
+    ON underground_bounties(status, expires_at, amount DESC)""")
+        db.execute("""CREATE INDEX IF NOT EXISTS idx_underground_bounties_users
+    ON underground_bounties(creator_id, target_id, hunter_id)""")
+        db.execute("""CREATE TABLE IF NOT EXISTS underground_attempts (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    bounty_id  INTEGER NOT NULL,
+    hunter_id  INTEGER NOT NULL,
+    outcome    TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    UNIQUE(bounty_id, hunter_id)
+)""")
         db.executemany(
             "INSERT OR IGNORE INTO anon_numbers (id, suffix, price) VALUES (?, ?, ?)",
             [
