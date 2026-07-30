@@ -181,6 +181,59 @@ CREATE TABLE IF NOT EXISTS underground_attempts (
     created_at INTEGER NOT NULL,
     UNIQUE(bounty_id, hunter_id)
 );
+CREATE TABLE IF NOT EXISTS underground_inventory (
+    user_id    INTEGER NOT NULL,
+    item_key   TEXT NOT NULL,
+    quantity   INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, item_key)
+);
+CREATE TABLE IF NOT EXISTS black_market_purchases (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    item_key   TEXT NOT NULL,
+    quantity   INTEGER NOT NULL,
+    total_paid INTEGER NOT NULL,
+    buyer_alias TEXT NOT NULL,
+    buyer_anon INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS heists (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    heist_key        TEXT NOT NULL,
+    leader_id        INTEGER NOT NULL,
+    leader_role      TEXT NOT NULL,
+    status           TEXT NOT NULL DEFAULT 'forming',
+    stake_per_member INTEGER NOT NULL,
+    base_payout      INTEGER NOT NULL DEFAULT 0,
+    payout_bonus     INTEGER NOT NULL DEFAULT 0,
+    created_at       INTEGER NOT NULL,
+    started_at       INTEGER,
+    expires_at       INTEGER NOT NULL,
+    resolved_at      INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_heists_status
+ON heists(status, expires_at);
+CREATE TABLE IF NOT EXISTS heist_members (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    heist_id          INTEGER NOT NULL,
+    user_id           INTEGER NOT NULL,
+    role              TEXT NOT NULL,
+    status            TEXT NOT NULL DEFAULT 'invited',
+    alias             TEXT NOT NULL,
+    anonymous         INTEGER NOT NULL DEFAULT 0,
+    stake_paid        INTEGER NOT NULL DEFAULT 0,
+    task_status       TEXT NOT NULL DEFAULT 'pending',
+    challenge_json    TEXT,
+    challenge_started_at INTEGER,
+    challenge_expires_at INTEGER,
+    task_result       TEXT,
+    joined_at         INTEGER,
+    UNIQUE(heist_id, user_id),
+    UNIQUE(heist_id, role)
+);
+CREATE INDEX IF NOT EXISTS idx_heist_members_user
+ON heist_members(user_id, status);
 CREATE TABLE IF NOT EXISTS work_sessions (
     user_id         INTEGER PRIMARY KEY,
     taps            INTEGER NOT NULL DEFAULT 0,
@@ -423,6 +476,59 @@ async def _migrate(db) -> None:
         created_at INTEGER NOT NULL,
         UNIQUE(bounty_id, hunter_id)
     )""")
+    await db.execute("""CREATE TABLE IF NOT EXISTS underground_inventory (
+        user_id    INTEGER NOT NULL,
+        item_key   TEXT NOT NULL,
+        quantity   INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, item_key)
+    )""")
+    await db.execute("""CREATE TABLE IF NOT EXISTS black_market_purchases (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id     INTEGER NOT NULL,
+        item_key    TEXT NOT NULL,
+        quantity    INTEGER NOT NULL,
+        total_paid  INTEGER NOT NULL,
+        buyer_alias TEXT NOT NULL,
+        buyer_anon  INTEGER NOT NULL DEFAULT 0,
+        created_at  INTEGER NOT NULL
+    )""")
+    await db.execute("""CREATE TABLE IF NOT EXISTS heists (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        heist_key        TEXT NOT NULL,
+        leader_id        INTEGER NOT NULL,
+        leader_role      TEXT NOT NULL,
+        status           TEXT NOT NULL DEFAULT 'forming',
+        stake_per_member INTEGER NOT NULL,
+        base_payout      INTEGER NOT NULL DEFAULT 0,
+        payout_bonus     INTEGER NOT NULL DEFAULT 0,
+        created_at       INTEGER NOT NULL,
+        started_at       INTEGER,
+        expires_at       INTEGER NOT NULL,
+        resolved_at      INTEGER
+    )""")
+    await db.execute("""CREATE INDEX IF NOT EXISTS idx_heists_status
+        ON heists(status, expires_at)""")
+    await db.execute("""CREATE TABLE IF NOT EXISTS heist_members (
+        id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+        heist_id             INTEGER NOT NULL,
+        user_id              INTEGER NOT NULL,
+        role                 TEXT NOT NULL,
+        status               TEXT NOT NULL DEFAULT 'invited',
+        alias                TEXT NOT NULL,
+        anonymous            INTEGER NOT NULL DEFAULT 0,
+        stake_paid           INTEGER NOT NULL DEFAULT 0,
+        task_status          TEXT NOT NULL DEFAULT 'pending',
+        challenge_json       TEXT,
+        challenge_started_at INTEGER,
+        challenge_expires_at INTEGER,
+        task_result          TEXT,
+        joined_at            INTEGER,
+        UNIQUE(heist_id, user_id),
+        UNIQUE(heist_id, role)
+    )""")
+    await db.execute("""CREATE INDEX IF NOT EXISTS idx_heist_members_user
+        ON heist_members(user_id, status)""")
     await db.executemany(
         "INSERT OR IGNORE INTO anon_numbers (id, suffix, price) VALUES (?, ?, ?)",
         [

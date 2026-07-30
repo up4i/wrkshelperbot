@@ -39,3 +39,25 @@ def test_underground_lives_under_earn_and_links_from_anon_wallet():
     assert 'onclick="goUnderground()"' in html
     assert "A +888 number only replaces the public identity" in html
     assert "/api/underground/status" in html
+
+
+def test_underground_has_focused_board_heist_and_market_tabs():
+    html = INDEX_HTML.read_text()
+
+    for label in ("Shadow Board", "Crew Heists", "Black Market"):
+        assert f">{label}</button>" in html
+    for board_filter in ("Open contracts", "My activity", "Most wanted"):
+        assert f">{board_filter}</button>" in html
+    assert "/api/heists/status" in html
+    assert "/api/black-market" in html
+    assert "Everyone gets the same prices, role timers, task patterns" in html
+
+
+def test_all_four_heist_minigames_are_rendered_in_the_miniapp():
+    html = INDEX_HTML.read_text()
+
+    for kind in ("casing", "chip_trace", "getaway", "crowd_control"):
+        assert kind in html
+    assert "Move the trace into each illuminated gate" in html
+    assert "Switch lanes before each obstacle reaches the car" in html
+    assert "Control guards. Hold position around civilians." in html

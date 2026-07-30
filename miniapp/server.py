@@ -2906,6 +2906,1333 @@ def resolve_underground_bounty(
     }
 
 
+# ── Black Market and crew heists ─────────────────────────────────────────────
+
+_BLACK_MARKET_ITEMS = {
+    "laptop": {
+        "name": "Unmarked Laptop",
+        "icon": "💻",
+        "price": 2_500_000,
+        "description": "Reusable hardware for Hacker assignments.",
+        "durable": True,
+        "max_quantity": 1,
+        "category": "tools",
+    },
+    "hacking_usb": {
+        "name": "Hacking USB",
+        "icon": "🔌",
+        "price": 350_000,
+        "description": "Single-use Hacker access when no laptop is available.",
+        "durable": False,
+        "max_quantity": 5,
+        "category": "tools",
+    },
+    "stolen_car_keys": {
+        "name": "Stolen Car Keys",
+        "icon": "🔑",
+        "price": 225_000,
+        "description": "Single-use getaway access required by Drivers.",
+        "durable": False,
+        "max_quantity": 5,
+        "category": "tools",
+    },
+    "stolen_pistol": {
+        "name": "Stolen Pistol",
+        "icon": "🔫",
+        "price": 900_000,
+        "description": "Reusable equipment for Muscle assignments.",
+        "durable": True,
+        "max_quantity": 1,
+        "category": "tools",
+    },
+    "stolen_rifle": {
+        "name": "Stolen Rifle",
+        "icon": "🗡️",
+        "price": 2_000_000,
+        "description": "Reusable Muscle equipment. No task advantage over a pistol.",
+        "durable": True,
+        "max_quantity": 1,
+        "category": "tools",
+    },
+    "insider_targ": {
+        "name": "Insider Info: Targ",
+        "icon": "☎️",
+        "price": 300_000,
+        "description": "One Insider charge for the Scam Call.",
+        "durable": False,
+        "max_quantity": 1,
+        "category": "intel",
+    },
+    "insider_gas": {
+        "name": "Insider Info: Gas Station",
+        "icon": "⛽",
+        "price": 450_000,
+        "description": "One Insider charge for the Gas Station Job.",
+        "durable": False,
+        "max_quantity": 1,
+        "category": "intel",
+    },
+    "insider_sim": {
+        "name": "Insider Info: Carrier",
+        "icon": "📱",
+        "price": 750_000,
+        "description": "One optional Inside Contact charge for SIM Swap Crew.",
+        "durable": False,
+        "max_quantity": 1,
+        "category": "intel",
+    },
+    "insider_convoy": {
+        "name": "Insider Info: Convoy",
+        "icon": "🚚",
+        "price": 1_500_000,
+        "description": "One optional Inside Contact charge for Cold Wallet Convoy.",
+        "durable": False,
+        "max_quantity": 1,
+        "category": "intel",
+    },
+}
+
+_HEIST_ROLE_META = {
+    "mastermind": {
+        "name": "Mastermind",
+        "icon": "🧠",
+        "task": "Case the target and memorize its weak points.",
+    },
+    "hacker": {
+        "name": "Hacker",
+        "icon": "💻",
+        "task": "Guide a live trace through the chip gates.",
+    },
+    "driver": {
+        "name": "Driver",
+        "icon": "🏎️",
+        "task": "Dodge a three-lane pursuit until the crew is clear.",
+    },
+    "muscle": {
+        "name": "Muscle",
+        "icon": "💪",
+        "task": "Control threats without hitting civilians.",
+    },
+    "insider": {
+        "name": "Inside Contact",
+        "icon": "🕵️",
+        "task": "Case the target and recover payout intelligence.",
+    },
+}
+
+_HEIST_TYPES = {
+    "scam_call": {
+        "name": "Scam Call",
+        "icon": "☎️",
+        "theme": "Social engineering",
+        "description": "Spoof a high-value support call and redirect the recovery wallet.",
+        "stake": 25_000,
+        "payout_low": 180_000,
+        "payout_high": 260_000,
+        "required_groups": [
+            ["mastermind", "insider"],
+            ["hacker"],
+        ],
+        "optional_roles": [],
+        "leader_roles": ["mastermind", "insider"],
+        "insider_item": "insider_targ",
+    },
+    "gas_station": {
+        "name": "Gas Station Job",
+        "icon": "⛽",
+        "theme": "Quick score",
+        "description": "Hit a cash-heavy stop, control the room, and lose the pursuit.",
+        "stake": 75_000,
+        "payout_low": 700_000,
+        "payout_high": 1_000_000,
+        "required_groups": [
+            ["mastermind", "insider"],
+            ["muscle"],
+            ["driver"],
+        ],
+        "optional_roles": [],
+        "leader_roles": ["mastermind", "insider"],
+        "insider_item": "insider_gas",
+    },
+    "sim_swap": {
+        "name": "SIM Swap Crew",
+        "icon": "📱",
+        "theme": "Crypto theft",
+        "description": "Hijack a carrier route, reset a whale account, and move the tokens.",
+        "stake": 150_000,
+        "payout_low": 1_800_000,
+        "payout_high": 2_600_000,
+        "required_groups": [
+            ["mastermind"],
+            ["hacker"],
+            ["driver"],
+        ],
+        "optional_roles": ["insider"],
+        "leader_roles": ["mastermind"],
+        "insider_item": "insider_sim",
+    },
+    "cold_wallet_convoy": {
+        "name": "Cold Wallet Convoy",
+        "icon": "🚚",
+        "theme": "Armored crypto heist",
+        "description": "Intercept a hardware-wallet shipment and crack its secure element.",
+        "stake": 350_000,
+        "payout_low": 5_000_000,
+        "payout_high": 7_500_000,
+        "required_groups": [
+            ["mastermind"],
+            ["hacker"],
+            ["muscle"],
+            ["driver"],
+        ],
+        "optional_roles": ["insider"],
+        "leader_roles": ["mastermind"],
+        "insider_item": "insider_convoy",
+    },
+}
+
+_HEIST_FORMING_SECONDS = 6 * 60 * 60
+_HEIST_ACTIVE_SECONDS = 30 * 60
+_HEIST_TASK_SECONDS = {
+    "mastermind": 45,
+    "insider": 45,
+    "hacker": 35,
+    "driver": 35,
+    "muscle": 30,
+}
+_HEIST_INSIDER_BONUS_PERCENT = 15
+
+
+class BlackMarketBuyRequest(BaseModel):
+    user_id: int
+    item_key: str
+    quantity: int = 1
+
+
+class HeistCreateRequest(BaseModel):
+    leader_id: int
+    heist_key: str
+    leader_role: str = "mastermind"
+
+
+class HeistInviteRequest(BaseModel):
+    leader_id: int
+    target_id: int
+    role: str
+
+
+class HeistInvitationResponse(BaseModel):
+    user_id: int
+    accept: bool
+
+
+class HeistActorRequest(BaseModel):
+    user_id: int
+
+
+class HeistTaskResolveRequest(BaseModel):
+    user_id: int
+    answers: list[str | int]
+
+
+def _inventory_quantity(db, user_id: int, item_key: str) -> int:
+    row = db.execute(
+        """SELECT quantity FROM underground_inventory
+           WHERE user_id = ? AND item_key = ?""",
+        (user_id, item_key),
+    ).fetchone()
+    return max(0, int(row["quantity"])) if row else 0
+
+
+def _set_inventory_quantity(
+    db,
+    user_id: int,
+    item_key: str,
+    quantity: int,
+    *,
+    now: int,
+) -> None:
+    db.execute(
+        """INSERT INTO underground_inventory
+           (user_id, item_key, quantity, updated_at)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(user_id, item_key) DO UPDATE SET
+             quantity = excluded.quantity,
+             updated_at = excluded.updated_at""",
+        (user_id, item_key, max(0, quantity), now),
+    )
+
+
+def _grant_inventory_item(
+    db,
+    user_id: int,
+    item_key: str,
+    amount: int,
+    *,
+    now: int,
+    cap: int | None = None,
+) -> int:
+    quantity = _inventory_quantity(db, user_id, item_key) + max(0, amount)
+    if cap is not None:
+        quantity = min(cap, quantity)
+    _set_inventory_quantity(db, user_id, item_key, quantity, now=now)
+    return quantity
+
+
+def _inventory_payload(db, user_id: int) -> list[dict]:
+    rows = {
+        row["item_key"]: row["quantity"]
+        for row in db.execute(
+            """SELECT item_key, quantity FROM underground_inventory
+               WHERE user_id = ? AND quantity > 0""",
+            (user_id,),
+        ).fetchall()
+    }
+    return [
+        {
+            "key": key,
+            **item,
+            "quantity": rows.get(key, 0),
+        }
+        for key, item in _BLACK_MARKET_ITEMS.items()
+    ]
+
+
+def _heist_allowed_roles(config: dict) -> list[str]:
+    roles: list[str] = []
+    for group in config["required_groups"]:
+        for role in group:
+            if role not in roles:
+                roles.append(role)
+    for role in config["optional_roles"]:
+        if role not in roles:
+            roles.append(role)
+    return roles
+
+
+def _heist_role_group(config: dict, role: str) -> list[str] | None:
+    return next(
+        (group for group in config["required_groups"] if role in group),
+        None,
+    )
+
+
+def _missing_role_item(db, user_id: int, role: str, config: dict) -> str | None:
+    if role == "hacker":
+        if (
+            _inventory_quantity(db, user_id, "laptop") < 1
+            and _inventory_quantity(db, user_id, "hacking_usb") < 1
+        ):
+            return "Unmarked Laptop or Hacking USB"
+    elif role == "driver":
+        if _inventory_quantity(db, user_id, "stolen_car_keys") < 1:
+            return "Stolen Car Keys"
+    elif role == "muscle":
+        if (
+            _inventory_quantity(db, user_id, "stolen_pistol") < 1
+            and _inventory_quantity(db, user_id, "stolen_rifle") < 1
+        ):
+            return "Stolen Pistol or Stolen Rifle"
+    elif role == "insider":
+        intel_key = config["insider_item"]
+        if _inventory_quantity(db, user_id, intel_key) < 1:
+            return _BLACK_MARKET_ITEMS[intel_key]["name"]
+    return None
+
+
+def _consume_heist_role_item(
+    db,
+    user_id: int,
+    role: str,
+    config: dict,
+    *,
+    now: int,
+) -> str | None:
+    missing = _missing_role_item(db, user_id, role, config)
+    if missing:
+        raise HTTPException(400, f"{_HEIST_ROLE_META[role]['name']} needs {missing}")
+    consumed = None
+    if role == "hacker" and _inventory_quantity(db, user_id, "laptop") < 1:
+        consumed = "hacking_usb"
+    elif role == "driver":
+        consumed = "stolen_car_keys"
+    elif role == "insider":
+        consumed = config["insider_item"]
+    if consumed:
+        _set_inventory_quantity(
+            db,
+            user_id,
+            consumed,
+            _inventory_quantity(db, user_id, consumed) - 1,
+            now=now,
+        )
+    return consumed
+
+
+def _reap_heists(db, now: int) -> None:
+    expired_forming = db.execute(
+        """SELECT id FROM heists
+           WHERE status = 'forming' AND expires_at <= ?""",
+        (now,),
+    ).fetchall()
+    for heist in expired_forming:
+        members = db.execute(
+            """SELECT user_id, stake_paid FROM heist_members
+               WHERE heist_id = ? AND status = 'accepted'""",
+            (heist["id"],),
+        ).fetchall()
+        for member in members:
+            if member["stake_paid"]:
+                db.execute(
+                    "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                    (member["stake_paid"], member["user_id"]),
+                )
+        db.execute(
+            """UPDATE heists SET status = 'cancelled', resolved_at = ?
+               WHERE id = ?""",
+            (now, heist["id"]),
+        )
+
+    expired_active = db.execute(
+        """SELECT DISTINCT h.id
+           FROM heists h
+           LEFT JOIN heist_members hm ON hm.heist_id = h.id
+           WHERE h.status = 'active'
+             AND (
+               h.expires_at <= ?
+               OR (
+                 hm.task_status = 'active'
+                 AND hm.challenge_expires_at <= ?
+               )
+             )""",
+        (now, now),
+    ).fetchall()
+    for heist in expired_active:
+        members = db.execute(
+            """SELECT user_id FROM heist_members
+               WHERE heist_id = ? AND status = 'accepted'""",
+            (heist["id"],),
+        ).fetchall()
+        for member in members:
+            _add_underground_heat(db, member["user_id"], 10, now=now)
+        db.execute(
+            """UPDATE heist_members
+               SET task_status = CASE
+                 WHEN task_status = 'success' THEN task_status ELSE 'failed' END,
+                   task_result = CASE
+                 WHEN task_status = 'success' THEN task_result ELSE 'timeout' END
+               WHERE heist_id = ? AND status = 'accepted'""",
+            (heist["id"],),
+        )
+        db.execute(
+            """UPDATE heists SET status = 'failed', resolved_at = ?
+               WHERE id = ?""",
+            (now, heist["id"]),
+        )
+
+
+def _heist_config_payload(key: str, config: dict) -> dict:
+    return {
+        "key": key,
+        "name": config["name"],
+        "icon": config["icon"],
+        "theme": config["theme"],
+        "description": config["description"],
+        "stake": config["stake"],
+        "payout_low": config["payout_low"],
+        "payout_high": config["payout_high"],
+        "required_groups": config["required_groups"],
+        "optional_roles": config["optional_roles"],
+        "leader_roles": config["leader_roles"],
+        "insider_item": config["insider_item"],
+        "roles": [
+            {"key": role, **_HEIST_ROLE_META[role]}
+            for role in _heist_allowed_roles(config)
+        ],
+    }
+
+
+def _heist_payload(db, heist_row, viewer_id: int) -> dict:
+    heist = dict(heist_row)
+    config = _HEIST_TYPES[heist["heist_key"]]
+    members = db.execute(
+        """SELECT * FROM heist_members
+           WHERE heist_id = ?
+           ORDER BY CASE role
+             WHEN 'mastermind' THEN 1 WHEN 'insider' THEN 2
+             WHEN 'hacker' THEN 3 WHEN 'muscle' THEN 4 ELSE 5 END""",
+        (heist["id"],),
+    ).fetchall()
+    member_payload = []
+    own_member = None
+    accepted_roles = {
+        member["role"]
+        for member in members
+        if member["status"] == "accepted"
+    }
+    for member in members:
+        concealed = bool(member["anonymous"]) and member["user_id"] != viewer_id
+        item = {
+            "member_id": member["id"],
+            "user_id": None if concealed else member["user_id"],
+            "role": member["role"],
+            "role_name": _HEIST_ROLE_META[member["role"]]["name"],
+            "role_icon": _HEIST_ROLE_META[member["role"]]["icon"],
+            "alias": member["alias"],
+            "anonymous": bool(member["anonymous"]),
+            "status": member["status"],
+            "stake_paid": member["stake_paid"],
+            "task_status": member["task_status"],
+            "task_result": member["task_result"],
+            "is_you": member["user_id"] == viewer_id,
+        }
+        if member["user_id"] == viewer_id:
+            own_member = dict(item)
+            own_member["challenge_expires_at"] = member["challenge_expires_at"]
+            if member["task_status"] == "active":
+                try:
+                    own_member["challenge"] = json.loads(
+                        member["challenge_json"] or "{}"
+                    )
+                except json.JSONDecodeError:
+                    own_member["challenge"] = {}
+        member_payload.append(item)
+    missing_groups = [
+        group
+        for group in config["required_groups"]
+        if not any(role in accepted_roles for role in group)
+    ]
+    return {
+        "id": heist["id"],
+        "heist_key": heist["heist_key"],
+        "name": config["name"],
+        "icon": config["icon"],
+        "theme": config["theme"],
+        "description": config["description"],
+        "status": heist["status"],
+        "leader_id": (
+            None
+            if any(
+                member["user_id"] == heist["leader_id"]
+                and member["anonymous"]
+                and member["user_id"] != viewer_id
+                for member in members
+            )
+            else heist["leader_id"]
+        ),
+        "leader_role": heist["leader_role"],
+        "is_leader": heist["leader_id"] == viewer_id,
+        "stake_per_member": heist["stake_per_member"],
+        "base_payout": heist["base_payout"],
+        "payout_bonus": heist["payout_bonus"],
+        "created_at": heist["created_at"],
+        "started_at": heist["started_at"],
+        "expires_at": heist["expires_at"],
+        "resolved_at": heist["resolved_at"],
+        "members": member_payload,
+        "own_member": own_member,
+        "missing_groups": missing_groups,
+        "can_start": (
+            heist["status"] == "forming"
+            and heist["leader_id"] == viewer_id
+            and not missing_groups
+        ),
+        "allowed_roles": _heist_allowed_roles(config),
+        "required_groups": config["required_groups"],
+        "optional_roles": config["optional_roles"],
+    }
+
+
+def _make_heist_challenge(role: str) -> tuple[dict, int]:
+    if role in ("mastermind", "insider"):
+        return {
+            "kind": "casing",
+            "zones": random.sample(range(9), 3),
+            "grid_size": 9,
+            "preview_seconds": 4,
+        }, _HEIST_TASK_SECONDS[role]
+    if role == "hacker":
+        return {
+            "kind": "chip_trace",
+            "gates": [random.randrange(3) for _ in range(12)],
+            "lanes": 3,
+            "step_ms": 650,
+        }, _HEIST_TASK_SECONDS[role]
+    if role == "driver":
+        return {
+            "kind": "getaway",
+            "obstacles": [random.randrange(3) for _ in range(15)],
+            "lanes": 3,
+            "step_ms": 600,
+        }, _HEIST_TASK_SECONDS[role]
+    prompts = [
+        random.choice(("guard", "guard", "civilian"))
+        for _ in range(12)
+    ]
+    return {
+        "kind": "crowd_control",
+        "prompts": prompts,
+        "step_ms": 850,
+    }, _HEIST_TASK_SECONDS["muscle"]
+
+
+def _heist_answer_is_correct(role: str, challenge: dict, answers: list) -> bool:
+    if role in ("mastermind", "insider"):
+        try:
+            selected = sorted(int(value) for value in answers)
+        except (TypeError, ValueError):
+            return False
+        return selected == sorted(challenge.get("zones", []))
+    if role == "hacker":
+        try:
+            path = [int(value) for value in answers]
+        except (TypeError, ValueError):
+            return False
+        return path == challenge.get("gates", [])
+    if role == "driver":
+        obstacles = challenge.get("obstacles", [])
+        try:
+            path = [int(value) for value in answers]
+        except (TypeError, ValueError):
+            return False
+        return (
+            len(path) == len(obstacles)
+            and all(0 <= lane <= 2 for lane in path)
+            and all(lane != obstacle for lane, obstacle in zip(path, obstacles))
+        )
+    expected = [
+        "control" if prompt == "guard" else "hold"
+        for prompt in challenge.get("prompts", [])
+    ]
+    return [str(value).lower() for value in answers] == expected
+
+
+def _settle_heist_if_ready(db, heist_id: int, *, now: int) -> dict | None:
+    heist = db.execute(
+        "SELECT * FROM heists WHERE id = ?",
+        (heist_id,),
+    ).fetchone()
+    if not heist or heist["status"] != "active":
+        return None
+    members = db.execute(
+        """SELECT * FROM heist_members
+           WHERE heist_id = ? AND status = 'accepted'""",
+        (heist_id,),
+    ).fetchall()
+    if any(member["task_status"] == "failed" for member in members):
+        for member in members:
+            _add_underground_heat(db, member["user_id"], 10, now=now)
+        db.execute(
+            """UPDATE heists SET status = 'failed', resolved_at = ?
+               WHERE id = ?""",
+            (now, heist_id),
+        )
+        return {"status": "failed", "payout_each": 0, "bonus": 0}
+    if not members or any(
+        member["task_status"] != "success" for member in members
+    ):
+        return None
+
+    config = _HEIST_TYPES[heist["heist_key"]]
+    insider_succeeded = any(
+        member["role"] == "insider" and member["task_status"] == "success"
+        for member in members
+    )
+    bonus = (
+        heist["base_payout"] * _HEIST_INSIDER_BONUS_PERCENT // 100
+        if insider_succeeded else 0
+    )
+    payout_each = (heist["base_payout"] + bonus) // len(members)
+    intel_key = config["insider_item"]
+    for member in members:
+        db.execute(
+            "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+            (member["stake_paid"] + payout_each, member["user_id"]),
+        )
+        _add_underground_heat(db, member["user_id"], 20, now=now)
+        # Completing a heist preserves one future Insider charge for it.
+        _grant_inventory_item(
+            db,
+            member["user_id"],
+            intel_key,
+            1,
+            now=now,
+            cap=1,
+        )
+    db.execute(
+        """UPDATE heists
+           SET status = 'completed', payout_bonus = ?, resolved_at = ?
+           WHERE id = ?""",
+        (bonus, now, heist_id),
+    )
+    return {
+        "status": "completed",
+        "payout_each": payout_each,
+        "bonus": bonus,
+        "intel_granted": intel_key,
+    }
+
+
+@app.get("/api/black-market")
+def black_market_status(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
+    with db_conn() as db:
+        identity = _underground_identity(db, user_id)
+        wallet = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        if not wallet:
+            raise HTTPException(404, "User not found")
+        return {
+            "balance": wallet["balance"],
+            "identity": identity,
+            "catalog": [
+                {"key": key, **item}
+                for key, item in _BLACK_MARKET_ITEMS.items()
+            ],
+            "inventory": _inventory_payload(db, user_id),
+            "anon_discount": 0,
+            "cover_note": (
+                "Your purchase log uses your +888 operating alias. "
+                "Prices and item limits are identical for everyone."
+                if identity["anonymous"]
+                else "Purchases use your public operating identity. "
+                "A +888 number changes the alias, not the price."
+            ),
+        }
+
+
+@app.post("/api/black-market/buy")
+def black_market_buy(
+    req: BlackMarketBuyRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    item = _BLACK_MARKET_ITEMS.get(req.item_key)
+    if not item:
+        raise HTTPException(404, "Black Market item not found")
+    if req.quantity < 1 or req.quantity > 5:
+        raise HTTPException(400, "Quantity must be 1–5")
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        wallet = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?",
+            (req.user_id,),
+        ).fetchone()
+        if not wallet:
+            raise HTTPException(404, "User not found")
+        current = _inventory_quantity(db, req.user_id, req.item_key)
+        if current + req.quantity > item["max_quantity"]:
+            raise HTTPException(
+                400,
+                f"You can hold at most {item['max_quantity']} of this item",
+            )
+        total = item["price"] * req.quantity
+        if wallet["balance"] < total:
+            raise HTTPException(400, "Insufficient balance")
+        identity = _underground_identity(db, req.user_id)
+        db.execute(
+            "UPDATE economy SET balance = balance - ? WHERE user_id = ?",
+            (total, req.user_id),
+        )
+        _set_inventory_quantity(
+            db,
+            req.user_id,
+            req.item_key,
+            current + req.quantity,
+            now=now,
+        )
+        db.execute(
+            """INSERT INTO black_market_purchases
+               (user_id, item_key, quantity, total_paid,
+                buyer_alias, buyer_anon, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                req.user_id,
+                req.item_key,
+                req.quantity,
+                total,
+                identity["alias"],
+                int(identity["anonymous"]),
+                now,
+            ),
+        )
+        new_balance = wallet["balance"] - total
+        inventory = _inventory_payload(db, req.user_id)
+        db.commit()
+    return {
+        "ok": True,
+        "new_balance": new_balance,
+        "item_key": req.item_key,
+        "quantity": current + req.quantity,
+        "inventory": inventory,
+        "anon_discount": 0,
+    }
+
+
+@app.get("/api/heists/status")
+def heist_status(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        _reap_heists(db, now)
+        current = db.execute(
+            """SELECT h.* FROM heists h
+               JOIN heist_members hm ON hm.heist_id = h.id
+               WHERE hm.user_id = ? AND hm.status = 'accepted'
+                 AND h.status IN ('forming','active')
+               ORDER BY h.created_at DESC LIMIT 1""",
+            (user_id,),
+        ).fetchone()
+        invitation_rows = db.execute(
+            """SELECT h.* FROM heists h
+               JOIN heist_members hm ON hm.heist_id = h.id
+               WHERE hm.user_id = ? AND hm.status = 'invited'
+                 AND h.status = 'forming'
+               ORDER BY h.created_at DESC""",
+            (user_id,),
+        ).fetchall()
+        history_rows = db.execute(
+            """SELECT h.* FROM heists h
+               JOIN heist_members hm ON hm.heist_id = h.id
+               WHERE hm.user_id = ? AND hm.status = 'accepted'
+                 AND h.status IN ('completed','failed','cancelled')
+               ORDER BY h.resolved_at DESC LIMIT 12""",
+            (user_id,),
+        ).fetchall()
+        players = []
+        for row in db.execute(
+            """SELECT user_id FROM economy
+               WHERE user_id != ? AND balance >= 1000
+               ORDER BY balance DESC LIMIT 60""",
+            (user_id,),
+        ).fetchall():
+            identity = _underground_identity(db, row["user_id"])
+            players.append({
+                "user_id": row["user_id"],
+                "name": identity["alias"],
+                "anonymous": identity["anonymous"],
+            })
+        wallet = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        response = {
+            "balance": wallet["balance"] if wallet else 0,
+            "types": [
+                _heist_config_payload(key, config)
+                for key, config in _HEIST_TYPES.items()
+            ],
+            "role_meta": _HEIST_ROLE_META,
+            "inventory": _inventory_payload(db, user_id),
+            "current_heist": (
+                _heist_payload(db, current, user_id) if current else None
+            ),
+            "invitations": [
+                _heist_payload(db, row, user_id)
+                for row in invitation_rows
+            ],
+            "history": [
+                _heist_payload(db, row, user_id)
+                for row in history_rows
+            ],
+            "players": players,
+            "anon_changes_gameplay": False,
+        }
+        db.commit()
+        return response
+
+
+@app.post("/api/heists")
+def create_heist(
+    req: HeistCreateRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.leader_id)
+    config = _HEIST_TYPES.get(req.heist_key)
+    if not config:
+        raise HTTPException(404, "Heist not found")
+    if req.leader_role not in config["leader_roles"]:
+        raise HTTPException(400, "That role cannot lead this heist")
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        _reap_heists(db, now)
+        active = db.execute(
+            """SELECT 1 FROM heists h
+               JOIN heist_members hm ON hm.heist_id = h.id
+               WHERE hm.user_id = ? AND hm.status = 'accepted'
+                 AND h.status IN ('forming','active')""",
+            (req.leader_id,),
+        ).fetchone()
+        if active:
+            raise HTTPException(400, "Finish your current heist first")
+        wallet = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?",
+            (req.leader_id,),
+        ).fetchone()
+        if not wallet:
+            raise HTTPException(404, "Leader not found")
+        if wallet["balance"] < config["stake"]:
+            raise HTTPException(400, "Insufficient balance for the setup stake")
+        missing = _missing_role_item(db, req.leader_id, req.leader_role, config)
+        if missing:
+            raise HTTPException(
+                400,
+                f"{_HEIST_ROLE_META[req.leader_role]['name']} needs {missing}",
+            )
+        identity = _underground_identity(db, req.leader_id)
+        db.execute(
+            "UPDATE economy SET balance = balance - ? WHERE user_id = ?",
+            (config["stake"], req.leader_id),
+        )
+        heist_id = db.execute(
+            """INSERT INTO heists
+               (heist_key, leader_id, leader_role, status,
+                stake_per_member, created_at, expires_at)
+               VALUES (?, ?, ?, 'forming', ?, ?, ?)""",
+            (
+                req.heist_key,
+                req.leader_id,
+                req.leader_role,
+                config["stake"],
+                now,
+                now + _HEIST_FORMING_SECONDS,
+            ),
+        ).lastrowid
+        db.execute(
+            """INSERT INTO heist_members
+               (heist_id, user_id, role, status, alias, anonymous,
+                stake_paid, task_status, joined_at)
+               VALUES (?, ?, ?, 'accepted', ?, ?, ?, 'pending', ?)""",
+            (
+                heist_id,
+                req.leader_id,
+                req.leader_role,
+                identity["alias"],
+                int(identity["anonymous"]),
+                config["stake"],
+                now,
+            ),
+        )
+        row = db.execute("SELECT * FROM heists WHERE id = ?", (heist_id,)).fetchone()
+        payload = _heist_payload(db, row, req.leader_id)
+        new_balance = wallet["balance"] - config["stake"]
+        db.commit()
+    return {"ok": True, "new_balance": new_balance, "heist": payload}
+
+
+@app.post("/api/heists/{heist_id}/invite")
+def invite_to_heist(
+    heist_id: int,
+    req: HeistInviteRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.leader_id)
+    if req.leader_id == req.target_id:
+        raise HTTPException(400, "You already occupy the leader slot")
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        _reap_heists(db, now)
+        heist = db.execute(
+            "SELECT * FROM heists WHERE id = ?",
+            (heist_id,),
+        ).fetchone()
+        if (
+            not heist
+            or heist["leader_id"] != req.leader_id
+            or heist["status"] != "forming"
+        ):
+            raise HTTPException(400, "This crew cannot be edited")
+        config = _HEIST_TYPES[heist["heist_key"]]
+        if req.role not in _heist_allowed_roles(config):
+            raise HTTPException(400, "Role is not available for this heist")
+        if db.execute(
+            "SELECT 1 FROM heist_members WHERE heist_id = ? AND role = ?",
+            (heist_id, req.role),
+        ).fetchone():
+            raise HTTPException(400, "That role already has an invitation")
+        role_group = _heist_role_group(config, req.role)
+        if role_group:
+            placeholders = ",".join("?" for _ in role_group)
+            occupied = db.execute(
+                f"""SELECT 1 FROM heist_members
+                    WHERE heist_id = ? AND role IN ({placeholders})""",
+                (heist_id, *role_group),
+            ).fetchone()
+            if occupied:
+                raise HTTPException(
+                    400,
+                    "That crew slot is already filled by its alternate role",
+                )
+        if db.execute(
+            "SELECT 1 FROM heist_members WHERE heist_id = ? AND user_id = ?",
+            (heist_id, req.target_id),
+        ).fetchone():
+            raise HTTPException(400, "That player is already in this crew")
+        if db.execute(
+            """SELECT 1 FROM heists h
+               JOIN heist_members hm ON hm.heist_id = h.id
+               WHERE hm.user_id = ? AND hm.status = 'accepted'
+                 AND h.status IN ('forming','active')""",
+            (req.target_id,),
+        ).fetchone():
+            raise HTTPException(400, "That player is already committed to a heist")
+        target = db.execute(
+            "SELECT user_id FROM economy WHERE user_id = ?",
+            (req.target_id,),
+        ).fetchone()
+        if not target:
+            raise HTTPException(404, "Player not found")
+        missing = _missing_role_item(db, req.target_id, req.role, config)
+        if missing:
+            raise HTTPException(
+                400,
+                f"That player needs {missing} before taking this role",
+            )
+        identity = _underground_identity(db, req.target_id)
+        db.execute(
+            """INSERT INTO heist_members
+               (heist_id, user_id, role, status, alias, anonymous,
+                task_status)
+               VALUES (?, ?, ?, 'invited', ?, ?, 'pending')""",
+            (
+                heist_id,
+                req.target_id,
+                req.role,
+                identity["alias"],
+                int(identity["anonymous"]),
+            ),
+        )
+        db.commit()
+    _send_telegram_dm(
+        req.target_id,
+        f"🕶️ {identity['alias']}, you were invited as "
+        f"{_HEIST_ROLE_META[req.role]['name']} for {config['name']}. "
+        "Open Earn → Underground → Heists to respond.",
+    )
+    return {"ok": True}
+
+
+@app.post("/api/heists/{heist_id}/respond")
+def respond_to_heist_invitation(
+    heist_id: int,
+    req: HeistInvitationResponse,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        _reap_heists(db, now)
+        heist = db.execute(
+            "SELECT * FROM heists WHERE id = ? AND status = 'forming'",
+            (heist_id,),
+        ).fetchone()
+        member = db.execute(
+            """SELECT * FROM heist_members
+               WHERE heist_id = ? AND user_id = ? AND status = 'invited'""",
+            (heist_id, req.user_id),
+        ).fetchone()
+        if not heist or not member:
+            raise HTTPException(404, "Invitation is no longer available")
+        if not req.accept:
+            db.execute("DELETE FROM heist_members WHERE id = ?", (member["id"],))
+            db.commit()
+            return {"ok": True, "accepted": False}
+        if db.execute(
+            """SELECT 1 FROM heists h
+               JOIN heist_members hm ON hm.heist_id = h.id
+               WHERE hm.user_id = ? AND hm.status = 'accepted'
+                 AND h.status IN ('forming','active')
+                 AND h.id != ?""",
+            (req.user_id, heist_id),
+        ).fetchone():
+            raise HTTPException(400, "You are already committed to another heist")
+        config = _HEIST_TYPES[heist["heist_key"]]
+        missing = _missing_role_item(db, req.user_id, member["role"], config)
+        if missing:
+            raise HTTPException(400, f"This role requires {missing}")
+        wallet = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?",
+            (req.user_id,),
+        ).fetchone()
+        if not wallet or wallet["balance"] < heist["stake_per_member"]:
+            raise HTTPException(400, "Insufficient balance for the crew stake")
+        db.execute(
+            "UPDATE economy SET balance = balance - ? WHERE user_id = ?",
+            (heist["stake_per_member"], req.user_id),
+        )
+        db.execute(
+            """UPDATE heist_members
+               SET status = 'accepted', stake_paid = ?, joined_at = ?
+               WHERE id = ?""",
+            (heist["stake_per_member"], now, member["id"]),
+        )
+        new_balance = wallet["balance"] - heist["stake_per_member"]
+        db.commit()
+    return {"ok": True, "accepted": True, "new_balance": new_balance}
+
+
+@app.post("/api/heists/{heist_id}/cancel")
+def cancel_heist(
+    heist_id: int,
+    req: HeistActorRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        heist = db.execute(
+            "SELECT * FROM heists WHERE id = ?",
+            (heist_id,),
+        ).fetchone()
+        if (
+            not heist
+            or heist["leader_id"] != req.user_id
+            or heist["status"] != "forming"
+        ):
+            raise HTTPException(400, "Only the leader can cancel a forming crew")
+        members = db.execute(
+            """SELECT user_id, stake_paid FROM heist_members
+               WHERE heist_id = ? AND status = 'accepted'""",
+            (heist_id,),
+        ).fetchall()
+        for member in members:
+            db.execute(
+                "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                (member["stake_paid"], member["user_id"]),
+            )
+        db.execute(
+            """UPDATE heists SET status = 'cancelled', resolved_at = ?
+               WHERE id = ?""",
+            (now, heist_id),
+        )
+        db.commit()
+    return {"ok": True, "stakes_refunded": True}
+
+
+@app.post("/api/heists/{heist_id}/members/{member_id}/remove")
+def remove_heist_member(
+    heist_id: int,
+    member_id: int,
+    req: HeistActorRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        _reap_heists(db, now)
+        heist = db.execute(
+            "SELECT * FROM heists WHERE id = ?",
+            (heist_id,),
+        ).fetchone()
+        member = db.execute(
+            "SELECT * FROM heist_members WHERE id = ? AND heist_id = ?",
+            (member_id, heist_id),
+        ).fetchone()
+        if (
+            not heist
+            or heist["leader_id"] != req.user_id
+            or heist["status"] != "forming"
+        ):
+            raise HTTPException(400, "Only the leader can edit this forming crew")
+        if not member or member["user_id"] == heist["leader_id"]:
+            raise HTTPException(400, "That crew member cannot be removed")
+        refund = int(member["stake_paid"] or 0)
+        if member["status"] == "accepted" and refund:
+            db.execute(
+                "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                (refund, member["user_id"]),
+            )
+        db.execute("DELETE FROM heist_members WHERE id = ?", (member_id,))
+        db.commit()
+    return {"ok": True, "stake_refunded": refund}
+
+
+@app.post("/api/heists/{heist_id}/start")
+def start_heist(
+    heist_id: int,
+    req: HeistActorRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        _reap_heists(db, now)
+        heist = db.execute(
+            "SELECT * FROM heists WHERE id = ?",
+            (heist_id,),
+        ).fetchone()
+        if (
+            not heist
+            or heist["leader_id"] != req.user_id
+            or heist["status"] != "forming"
+        ):
+            raise HTTPException(400, "This heist cannot be started")
+        config = _HEIST_TYPES[heist["heist_key"]]
+        members = db.execute(
+            """SELECT * FROM heist_members
+               WHERE heist_id = ? AND status = 'accepted'""",
+            (heist_id,),
+        ).fetchall()
+        accepted_roles = {member["role"] for member in members}
+        missing_groups = [
+            group
+            for group in config["required_groups"]
+            if not any(role in accepted_roles for role in group)
+        ]
+        if missing_groups:
+            raise HTTPException(400, "The crew is still missing required roles")
+        for member in members:
+            _consume_heist_role_item(
+                db,
+                member["user_id"],
+                member["role"],
+                config,
+                now=now,
+            )
+        db.execute(
+            "DELETE FROM heist_members WHERE heist_id = ? AND status = 'invited'",
+            (heist_id,),
+        )
+        base_payout = random.randint(
+            config["payout_low"],
+            config["payout_high"],
+        )
+        db.execute(
+            """UPDATE heists
+               SET status = 'active', base_payout = ?, started_at = ?,
+                   expires_at = ?
+               WHERE id = ?""",
+            (base_payout, now, now + _HEIST_ACTIVE_SECONDS, heist_id),
+        )
+        db.execute(
+            """UPDATE heist_members
+               SET task_status = 'pending', challenge_json = NULL,
+                   challenge_started_at = NULL, challenge_expires_at = NULL,
+                   task_result = NULL
+               WHERE heist_id = ? AND status = 'accepted'""",
+            (heist_id,),
+        )
+        db.commit()
+    return {"ok": True, "base_payout": base_payout}
+
+
+@app.post("/api/heists/{heist_id}/task/start")
+def start_heist_task(
+    heist_id: int,
+    req: HeistActorRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        _reap_heists(db, now)
+        heist = db.execute(
+            "SELECT * FROM heists WHERE id = ? AND status = 'active'",
+            (heist_id,),
+        ).fetchone()
+        member = db.execute(
+            """SELECT * FROM heist_members
+               WHERE heist_id = ? AND user_id = ? AND status = 'accepted'""",
+            (heist_id, req.user_id),
+        ).fetchone()
+        if not heist or not member:
+            raise HTTPException(404, "Active assignment not found")
+        if member["task_status"] == "active":
+            row = db.execute("SELECT * FROM heists WHERE id = ?", (heist_id,)).fetchone()
+            payload = _heist_payload(db, row, req.user_id)
+            db.commit()
+            return {"ok": True, "heist": payload, "resumed": True}
+        if member["task_status"] != "pending":
+            raise HTTPException(400, "Assignment has already been resolved")
+        challenge, duration = _make_heist_challenge(member["role"])
+        expires_at = min(now + duration, heist["expires_at"])
+        db.execute(
+            """UPDATE heist_members
+               SET task_status = 'active', challenge_json = ?,
+                   challenge_started_at = ?, challenge_expires_at = ?
+               WHERE id = ?""",
+            (json.dumps(challenge), now, expires_at, member["id"]),
+        )
+        row = db.execute("SELECT * FROM heists WHERE id = ?", (heist_id,)).fetchone()
+        payload = _heist_payload(db, row, req.user_id)
+        db.commit()
+    return {"ok": True, "heist": payload, "resumed": False}
+
+
+@app.post("/api/heists/{heist_id}/task/resolve")
+def resolve_heist_task(
+    heist_id: int,
+    req: HeistTaskResolveRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        heist = db.execute(
+            "SELECT * FROM heists WHERE id = ? AND status = 'active'",
+            (heist_id,),
+        ).fetchone()
+        member = db.execute(
+            """SELECT * FROM heist_members
+               WHERE heist_id = ? AND user_id = ? AND status = 'accepted'""",
+            (heist_id, req.user_id),
+        ).fetchone()
+        if (
+            not heist
+            or not member
+            or member["task_status"] != "active"
+        ):
+            raise HTTPException(400, "No active assignment to resolve")
+        if now >= member["challenge_expires_at"] or now >= heist["expires_at"]:
+            success = False
+            result_name = "timeout"
+        else:
+            try:
+                challenge = json.loads(member["challenge_json"] or "{}")
+            except json.JSONDecodeError:
+                challenge = {}
+            success = _heist_answer_is_correct(
+                member["role"],
+                challenge,
+                req.answers,
+            )
+            result_name = "success" if success else "failed"
+        db.execute(
+            """UPDATE heist_members
+               SET task_status = ?, task_result = ?,
+                   challenge_json = NULL, challenge_started_at = NULL,
+                   challenge_expires_at = NULL
+               WHERE id = ?""",
+            ("success" if success else "failed", result_name, member["id"]),
+        )
+        settlement = _settle_heist_if_ready(db, heist_id, now=now)
+        row = db.execute("SELECT * FROM heists WHERE id = ?", (heist_id,)).fetchone()
+        payload = _heist_payload(db, row, req.user_id)
+        balance = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?",
+            (req.user_id,),
+        ).fetchone()["balance"]
+        db.commit()
+    return {
+        "result": result_name,
+        "settlement": settlement,
+        "heist": payload,
+        "new_balance": balance,
+    }
+
+
 # ── Work / Jobs endpoints ─────────────────────────────────────────────────────
 
 @app.get("/api/work/status/{user_id}")
@@ -5056,6 +6383,59 @@ async def _startup():
     created_at INTEGER NOT NULL,
     UNIQUE(bounty_id, hunter_id)
 )""")
+        db.execute("""CREATE TABLE IF NOT EXISTS underground_inventory (
+    user_id    INTEGER NOT NULL,
+    item_key   TEXT NOT NULL,
+    quantity   INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, item_key)
+)""")
+        db.execute("""CREATE TABLE IF NOT EXISTS black_market_purchases (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    item_key    TEXT NOT NULL,
+    quantity    INTEGER NOT NULL,
+    total_paid  INTEGER NOT NULL,
+    buyer_alias TEXT NOT NULL,
+    buyer_anon  INTEGER NOT NULL DEFAULT 0,
+    created_at  INTEGER NOT NULL
+)""")
+        db.execute("""CREATE TABLE IF NOT EXISTS heists (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    heist_key        TEXT NOT NULL,
+    leader_id        INTEGER NOT NULL,
+    leader_role      TEXT NOT NULL,
+    status           TEXT NOT NULL DEFAULT 'forming',
+    stake_per_member INTEGER NOT NULL,
+    base_payout      INTEGER NOT NULL DEFAULT 0,
+    payout_bonus     INTEGER NOT NULL DEFAULT 0,
+    created_at       INTEGER NOT NULL,
+    started_at       INTEGER,
+    expires_at       INTEGER NOT NULL,
+    resolved_at      INTEGER
+)""")
+        db.execute("""CREATE INDEX IF NOT EXISTS idx_heists_status
+    ON heists(status, expires_at)""")
+        db.execute("""CREATE TABLE IF NOT EXISTS heist_members (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    heist_id             INTEGER NOT NULL,
+    user_id              INTEGER NOT NULL,
+    role                 TEXT NOT NULL,
+    status               TEXT NOT NULL DEFAULT 'invited',
+    alias                TEXT NOT NULL,
+    anonymous            INTEGER NOT NULL DEFAULT 0,
+    stake_paid           INTEGER NOT NULL DEFAULT 0,
+    task_status          TEXT NOT NULL DEFAULT 'pending',
+    challenge_json       TEXT,
+    challenge_started_at INTEGER,
+    challenge_expires_at INTEGER,
+    task_result          TEXT,
+    joined_at            INTEGER,
+    UNIQUE(heist_id, user_id),
+    UNIQUE(heist_id, role)
+)""")
+        db.execute("""CREATE INDEX IF NOT EXISTS idx_heist_members_user
+    ON heist_members(user_id, status)""")
         db.executemany(
             "INSERT OR IGNORE INTO anon_numbers (id, suffix, price) VALUES (?, ?, ?)",
             [

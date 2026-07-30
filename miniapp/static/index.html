@@ -1160,6 +1160,119 @@
     box-shadow: 0 0 18px color-mix(in srgb, var(--signal) 35%, transparent);
   }
   .ug-signal:disabled { cursor:default; opacity:.55; }
+  .ug-subtabs { display:flex; gap:5px; overflow-x:auto; padding-bottom:1px; }
+  .ug-subtab {
+    flex:none; min-height:31px; padding:0 11px; border:1px solid rgba(255,255,255,.07);
+    border-radius:999px; background:rgba(255,255,255,.025); color:#74808b;
+    font:800 8px system-ui; cursor:pointer;
+  }
+  .ug-subtab.active { border-color:rgba(103,232,249,.2); background:rgba(103,232,249,.07); color:#9beaf5; }
+  .ug-panel-stack { display:grid; gap:10px; }
+  .ug-info-card {
+    padding:12px; border:1px solid rgba(103,232,249,.12); border-radius:15px;
+    background:rgba(103,232,249,.035); color:#7f8b97; font-size:9px; line-height:1.5;
+  }
+  .ug-info-card b { display:block; margin-bottom:3px; color:#a5eef7; font-size:10px; }
+  .bm-balance {
+    display:flex; align-items:center; justify-content:space-between; gap:10px; padding:13px;
+    border:1px solid rgba(245,158,11,.14); border-radius:15px; background:rgba(245,158,11,.04);
+  }
+  .bm-balance span { color:#7e8993; font-size:8px; text-transform:uppercase; letter-spacing:.8px; }
+  .bm-balance b { display:block; margin-top:2px; color:#f6d98e; font-size:14px; }
+  .bm-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .bm-item {
+    display:flex; min-width:0; flex-direction:column; padding:12px; border:1px solid rgba(255,255,255,.075);
+    border-radius:16px; background:linear-gradient(145deg,rgba(255,255,255,.038),rgba(255,255,255,.014));
+  }
+  .bm-item-icon { font-size:24px; }
+  .bm-item h4 { margin:7px 0 3px; font-size:11px; line-height:1.2; }
+  .bm-item p { flex:1; margin:0; color:#74808b; font-size:8px; line-height:1.4; }
+  .bm-item-meta { display:flex; align-items:center; justify-content:space-between; gap:5px; margin:9px 0 7px; color:#8b96a0; font-size:8px; }
+  .bm-item-meta b { color:#f6d98e; font-size:9px; }
+  .bm-buy {
+    min-height:32px; border:1px solid rgba(245,158,11,.18); border-radius:9px;
+    background:rgba(245,158,11,.07); color:#f6d98e; font:850 8px system-ui; cursor:pointer;
+  }
+  .bm-buy:disabled { opacity:.4; cursor:default; }
+  .heist-list { display:grid; gap:9px; }
+  .heist-card {
+    overflow:hidden; padding:13px; border:1px solid rgba(255,255,255,.08); border-radius:17px;
+    background:radial-gradient(circle at 100% 0,rgba(236,72,153,.08),transparent 42%),rgba(255,255,255,.022);
+  }
+  .heist-card-top { display:grid; grid-template-columns:32px minmax(0,1fr) auto; align-items:start; gap:8px; }
+  .heist-icon { font-size:25px; line-height:1; }
+  .heist-title { min-width:0; font-size:12px; font-weight:900; }
+  .heist-title small { display:block; margin-top:2px; color:#7a8691; font-size:7px; font-weight:750; text-transform:uppercase; letter-spacing:.65px; }
+  .heist-stake { color:#f6d98e; font-size:9px; font-weight:900; text-align:right; }
+  .heist-desc { margin-top:8px; color:#78848e; font-size:8px; line-height:1.45; }
+  .heist-roles { display:flex; flex-wrap:wrap; gap:4px; margin-top:9px; }
+  .heist-role-pill { padding:4px 7px; border:1px solid rgba(255,255,255,.07); border-radius:999px; color:#9aa4ad; font-size:7px; }
+  .heist-payout { margin-top:7px; color:#75ddea; font-size:8px; font-weight:800; }
+  .heist-actions { display:flex; gap:6px; margin-top:10px; }
+  .heist-actions button {
+    flex:1; min-height:34px; padding:5px 7px; border:1px solid rgba(236,72,153,.18);
+    border-radius:10px; background:rgba(236,72,153,.07); color:#f9a8d4; font:850 8px system-ui; cursor:pointer;
+  }
+  .heist-actions button.alt { border-color:rgba(103,232,249,.17); background:rgba(103,232,249,.055); color:#9beaf5; }
+  .heist-actions button.danger { border-color:rgba(251,113,133,.16); background:rgba(251,113,133,.05); color:#fda4af; }
+  .heist-actions button:disabled { opacity:.4; cursor:default; }
+  .crew-header { display:flex; justify-content:space-between; gap:8px; margin:10px 0 7px; color:#7f8b97; font-size:8px; }
+  .crew-row {
+    display:grid; grid-template-columns:27px minmax(0,1fr) auto; align-items:center; gap:8px;
+    padding:9px; border-top:1px solid rgba(255,255,255,.055);
+  }
+  .crew-role-icon { font-size:18px; text-align:center; }
+  .crew-member { min-width:0; overflow:hidden; font-size:9px; font-weight:850; text-overflow:ellipsis; white-space:nowrap; }
+  .crew-member small { display:block; margin-top:2px; color:#707d87; font-size:7px; font-weight:700; }
+  .crew-status { color:#8a95a0; font-size:7px; font-weight:850; text-align:right; text-transform:uppercase; }
+  .crew-status.success { color:#86efac; }
+  .crew-status.failed { color:#fda4af; }
+  .crew-remove {
+    display:block; margin-top:4px; margin-left:auto; padding:3px 5px; border:1px solid rgba(251,113,133,.14);
+    border-radius:6px; background:rgba(251,113,133,.04); color:#fda4af; font:800 6px system-ui; text-transform:none;
+  }
+  .crew-invite { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px; padding:8px 0 0; }
+  .crew-invite select {
+    min-width:0; height:34px; padding:0 8px; border:1px solid rgba(255,255,255,.09);
+    border-radius:9px; background:#151620; color:#dce1e6; font-size:8px;
+  }
+  .crew-invite button { min-width:62px; border:1px solid rgba(103,232,249,.16); border-radius:9px; background:rgba(103,232,249,.055); color:#9beaf5; font:850 8px system-ui; }
+  .heist-task {
+    padding:13px; border:1px solid rgba(103,232,249,.19); border-radius:18px;
+    background:radial-gradient(circle at 50% 0,rgba(103,232,249,.09),transparent 45%),#10121a;
+  }
+  .heist-task-head { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:10px; }
+  .heist-task-head b { font-size:12px; }
+  .heist-task-head small { display:block; margin-top:3px; color:#77838f; font-size:8px; }
+  .heist-task-timer { color:#f6d98e; font-size:11px; font-weight:900; }
+  .casing-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .casing-zone {
+    aspect-ratio:1; border:1px solid rgba(255,255,255,.09); border-radius:11px;
+    background:rgba(255,255,255,.03); color:#67737d; font:900 9px system-ui; transition:.15s;
+  }
+  .casing-zone.marked { border-color:#67e8f9; background:rgba(103,232,249,.15); box-shadow:0 0 14px rgba(103,232,249,.18); color:#bdf4fa; }
+  .casing-zone.selected { border-color:#f9a8d4; background:rgba(236,72,153,.13); color:#f9a8d4; }
+  .lane-game { position:relative; height:230px; overflow:hidden; border:1px solid rgba(255,255,255,.08); border-radius:15px; background:#0b0d13; }
+  .lane-track { position:absolute; inset:0; display:grid; grid-template-columns:repeat(3,1fr); }
+  .lane-track > span { border-right:1px dashed rgba(255,255,255,.09); }
+  .lane-track > span:last-child { border:0; }
+  .lane-runner { position:absolute; bottom:18px; left:calc((var(--lane) * 33.333%) + 16.666%); transform:translateX(-50%); z-index:3; font-size:24px; transition:left .13s; }
+  .lane-threat { position:absolute; top:24px; left:calc((var(--lane) * 33.333%) + 16.666%); transform:translateX(-50%); font-size:24px; animation:laneApproach .62s linear; }
+  .lane-gate { width:44px; height:22px; border:2px solid #67e8f9; border-radius:4px; color:#67e8f9; }
+  @keyframes laneApproach { from { top:18px; opacity:.5 } to { top:180px; opacity:1 } }
+  .lane-controls { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:8px; }
+  .lane-controls button, .muscle-controls button {
+    min-height:38px; border:1px solid rgba(103,232,249,.14); border-radius:10px;
+    background:rgba(103,232,249,.045); color:#a5eef7; font:850 9px system-ui;
+  }
+  .lane-progress { margin:7px 0; color:#7d8994; font-size:8px; text-align:center; }
+  .muscle-scene { display:grid; place-items:center; min-height:150px; border:1px solid rgba(255,255,255,.07); border-radius:14px; background:rgba(255,255,255,.025); }
+  .muscle-target { font-size:50px; text-align:center; }
+  .muscle-target small { display:block; margin-top:7px; color:#b5bec6; font-size:10px; text-transform:uppercase; letter-spacing:1px; }
+  .muscle-controls { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:8px; }
+  .heist-history { display:flex; justify-content:space-between; gap:8px; padding:9px 2px; border-bottom:1px solid rgba(255,255,255,.055); font-size:8px; }
+  .heist-history b { color:#aeb6bd; }
+  .heist-history span { color:#78848e; text-transform:uppercase; }
 
   /* ── Market ── */
   .market-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -5161,6 +5274,8 @@ function clearSession() {
   _shopWallet = null;
   _clearUndergroundTimers();
   undergroundState.data = null;
+  undergroundState.heists = null;
+  undergroundState.market = null;
   if (_presenceInterval) {
     clearInterval(_presenceInterval);
     _presenceInterval = null;
@@ -5435,6 +5550,8 @@ function setUser(id) {
   if (!state.sessionToken) return;
   state.userId = id;
   undergroundState.data = null;
+  undergroundState.heists = null;
+  undergroundState.market = null;
   localStorage.setItem('wrkUserId', id);
   document.getElementById('gamesLoginWall').style.display = 'none';
   prefillUserInputs();
@@ -8320,13 +8437,21 @@ let _earnSection = 'work';
 let undergroundState = {
   data: null,
   section: 'board',
+  boardSection: 'open',
+  heists: null,
+  market: null,
   composeOpen: false,
   loading: false,
+  heistLoading: false,
+  marketLoading: false,
   tracePhase: 'idle',
   traceSequence: [],
   traceAnswer: [],
   previewTimers: [],
   countdownTimer: null,
+  heistTimers: [],
+  heistInterval: null,
+  heistGame: null,
   resolving: false,
 };
 
@@ -8335,6 +8460,11 @@ function _clearUndergroundTimers() {
   undergroundState.previewTimers = [];
   clearInterval(undergroundState.countdownTimer);
   undergroundState.countdownTimer = null;
+  undergroundState.heistTimers.forEach(clearTimeout);
+  undergroundState.heistTimers = [];
+  clearInterval(undergroundState.heistInterval);
+  undergroundState.heistInterval = null;
+  undergroundState.heistGame = null;
 }
 
 function setEarnSection(section, force = false) {
@@ -8375,6 +8505,44 @@ async function loadUnderground(showLoading = true) {
     content.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
   } finally {
     undergroundState.loading = false;
+  }
+}
+
+async function loadHeists(showLoading = true) {
+  if (!state.userId || undergroundState.heistLoading) return;
+  undergroundState.heistLoading = true;
+  const content = document.getElementById('undergroundContent');
+  if (showLoading && undergroundState.section === 'heists') {
+    content.innerHTML = '<div class="loading">Checking crew channels…</div>';
+  }
+  try {
+    undergroundState.heists = await api(`/api/heists/status?user_id=${state.userId}`);
+    if (undergroundState.section === 'heists') renderUnderground();
+  } catch (e) {
+    if (undergroundState.section === 'heists') {
+      content.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+    }
+  } finally {
+    undergroundState.heistLoading = false;
+  }
+}
+
+async function loadBlackMarket(showLoading = true) {
+  if (!state.userId || undergroundState.marketLoading) return;
+  undergroundState.marketLoading = true;
+  const content = document.getElementById('undergroundContent');
+  if (showLoading && undergroundState.section === 'market') {
+    content.innerHTML = '<div class="loading">Unsealing the inventory…</div>';
+  }
+  try {
+    undergroundState.market = await api(`/api/black-market?user_id=${state.userId}`);
+    if (undergroundState.section === 'market') renderUnderground();
+  } catch (e) {
+    if (undergroundState.section === 'market') {
+      content.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+    }
+  } finally {
+    undergroundState.marketLoading = false;
   }
 }
 
@@ -8438,13 +8606,24 @@ function _ugBoardHtml(data) {
     <div class="ug-compose-note">The bounty is held in escrow. A 5% posting fee is burned. The target never pays extra WRK$, and cancelling returns only the escrow.</div>
     <button class="btn" id="ugPostBtn" onclick="postUndergroundBounty()" ${targets.length ? '' : 'disabled'}>Post to Shadow Board</button>
   </div>`;
-  return `<div class="ug-action-row">
+  const open = `<div class="ug-action-row">
       <button class="btn" onclick="toggleUndergroundComposer()">${undergroundState.composeOpen ? 'Close composer' : '＋ Post bounty'}</button>
       <button class="btn outline" onclick="loadUnderground()">↻</button>
     </div>
     ${composer}
     <div class="ug-section-label">${fmt(data.open_bounties.length)} open contracts</div>
     ${_ugList(data.open_bounties, 'board', 'The Shadow Board is quiet. Post the first bounty.')}`;
+  const body = undergroundState.boardSection === 'activity'
+    ? _ugActivityHtml(data)
+    : undergroundState.boardSection === 'wanted'
+    ? _ugWantedHtml(data)
+    : open;
+  return `<div class="ug-subtabs" role="tablist">
+      <button class="ug-subtab ${undergroundState.boardSection === 'open' ? 'active' : ''}" onclick="setUndergroundBoardSection('open')">Open contracts</button>
+      <button class="ug-subtab ${undergroundState.boardSection === 'activity' ? 'active' : ''}" onclick="setUndergroundBoardSection('activity')">My activity</button>
+      <button class="ug-subtab ${undergroundState.boardSection === 'wanted' ? 'active' : ''}" onclick="setUndergroundBoardSection('wanted')">Most wanted</button>
+    </div>
+    <div class="ug-panel-stack">${body}</div>`;
 }
 
 function _ugActivityHtml(data) {
@@ -8469,25 +8648,175 @@ function _ugWantedHtml(data) {
     <div class="ug-compose-note" style="margin-top:8px">Heat drops by one point every 30 minutes. Anon Numbers conceal identity here; they do not conceal or reduce Heat.</div>`;
 }
 
+function _inventoryMap(items) {
+  return Object.fromEntries((items || []).map(item => [item.key, Number(item.quantity || 0)]));
+}
+
+function _blackMarketHtml(data) {
+  if (!data) return '<div class="loading">Unsealing the inventory…</div>';
+  const inventory = _inventoryMap(data.inventory);
+  const group = (category, label) => {
+    const items = (data.catalog || []).filter(item => item.category === category);
+    return `<div class="ug-section-label">${label}</div>
+      <div class="bm-grid">${items.map(item => {
+        const held = inventory[item.key] || 0;
+        const full = held >= Number(item.max_quantity);
+        return `<article class="bm-item">
+          <div class="bm-item-icon">${item.icon}</div>
+          <h4>${esc(item.name)}</h4>
+          <p>${esc(item.description)}</p>
+          <div class="bm-item-meta"><b>${fmtK(item.price)} ${WRK}</b><span>Owned ${held}/${item.max_quantity}</span></div>
+          <button class="bm-buy" onclick="buyBlackMarketItem('${item.key}',this)" ${full ? 'disabled' : ''}>${full ? 'Inventory full' : 'Buy item'}</button>
+        </article>`;
+      }).join('')}</div>`;
+  };
+  return `<div class="ug-panel-stack">
+    <div class="bm-balance"><div><span>Black Market wallet</span><b>${fmt(data.balance)} ${WRK}</b></div><button class="btn outline" onclick="loadBlackMarket(false)">↻</button></div>
+    <div class="ug-info-card"><b>${data.identity?.anonymous ? '+888 purchase cover active' : 'Public purchase cover'}</b>${esc(data.cover_note)}</div>
+    ${group('tools', 'Crew equipment')}
+    ${group('intel', 'Insider information')}
+  </div>`;
+}
+
+function _heistRolesText(type) {
+  return (type.required_groups || []).map(group =>
+    group.map(role => type.roles.find(item => item.key === role)?.name || role).join(' / ')
+  ).join(' · ');
+}
+
+function _heistTypeCard(type, inventory) {
+  const insiderKey = type.insider_item;
+  const hasIntel = (inventory[insiderKey] || 0) > 0;
+  return `<article class="heist-card">
+    <div class="heist-card-top">
+      <div class="heist-icon">${type.icon}</div>
+      <div class="heist-title">${esc(type.name)}<small>${esc(type.theme)}</small></div>
+      <div class="heist-stake">${fmtK(type.stake)} ${WRK}<br><small>each</small></div>
+    </div>
+    <div class="heist-desc">${esc(type.description)}</div>
+    <div class="heist-roles">${(type.roles || []).map(role => `<span class="heist-role-pill">${role.icon} ${esc(role.name)}</span>`).join('')}</div>
+    <div class="heist-payout">Crew score: ${fmtK(type.payout_low)}–${fmtK(type.payout_high)} ${WRK}</div>
+    <div class="heist-actions">
+      ${type.leader_roles.includes('mastermind') ? `<button onclick="createHeist('${type.key}','mastermind',this)">Lead as Mastermind</button>` : ''}
+      ${type.leader_roles.includes('insider') ? `<button class="alt" onclick="createHeist('${type.key}','insider',this)" ${hasIntel ? '' : 'disabled'}>${hasIntel ? 'Lead with Intel' : 'Intel required'}</button>` : ''}
+    </div>
+  </article>`;
+}
+
+function _crewMemberRows(heist) {
+  return (heist.members || []).map(member => `<div class="crew-row">
+    <div class="crew-role-icon">${member.role_icon}</div>
+    <div class="crew-member">${_ugIdentity(member.alias, member.anonymous)}${member.is_you ? ' · You' : ''}<small>${esc(member.role_name)} · ${fmtK(member.stake_paid || heist.stake_per_member)} stake</small></div>
+    <div class="crew-status ${member.task_status}">${heist.status === 'forming' ? member.status : member.task_status}${heist.is_leader && heist.status === 'forming' && !member.is_you ? `<button class="crew-remove" onclick="removeHeistMember(${heist.id},${member.member_id},this)">Remove</button>` : ''}</div>
+  </div>`).join('');
+}
+
+function _availableInviteRoles(heist) {
+  const occupied = new Set((heist.members || []).map(member => member.role));
+  const roles = [];
+  for (const group of heist.required_groups || []) {
+    if (!group.some(role => occupied.has(role))) roles.push(...group);
+  }
+  for (const role of heist.optional_roles || []) {
+    if (!occupied.has(role)) roles.push(role);
+  }
+  return [...new Set(roles)];
+}
+
+function _inviteControls(heist, data) {
+  if (!heist.is_leader || heist.status !== 'forming') return '';
+  const roles = _availableInviteRoles(heist);
+  if (!roles.length) return '';
+  const roleMeta = data.role_meta || {};
+  return roles.map(role => {
+    const eligible = (data.players || []).filter(player =>
+      !(heist.members || []).some(member => member.user_id === player.user_id)
+    );
+    return `<div class="crew-invite">
+      <select id="heistInvite-${role}">
+        <option value="">Choose ${esc(roleMeta[role]?.name || role)}</option>
+        ${eligible.map(player => `<option value="${player.user_id}">${esc(player.name)}${player.anonymous ? ' · +888' : ''}</option>`).join('')}
+      </select>
+      <button onclick="inviteHeistPlayer(${heist.id},'${role}',this)">Invite</button>
+    </div>`;
+  }).join('');
+}
+
+function _currentHeistHtml(heist, data) {
+  const own = heist.own_member;
+  const task = heist.status === 'active' && own
+    ? `<div class="heist-task" id="heistTaskHost">
+        <div class="heist-task-head"><div><b>${own.role_icon} ${esc(own.role_name)} assignment</b><small>${esc(data.role_meta?.[own.role]?.task || '')}</small></div><span class="heist-task-timer">${own.task_status}</span></div>
+        ${own.task_status === 'pending' ? `<button class="btn" style="width:100%" onclick="startHeistTask(${heist.id},this)">Start assignment</button>` : ''}
+        ${own.task_status === 'success' ? '<div class="ug-empty">Assignment clear. Stay on the channel while the rest of the crew finishes.</div>' : ''}
+        ${own.task_status === 'failed' ? '<div class="ug-empty">The assignment failed. The setup stakes were burned.</div>' : ''}
+      </div>`
+    : '';
+  return `<div class="ug-panel-stack">
+    <article class="heist-card">
+      <div class="heist-card-top">
+        <div class="heist-icon">${heist.icon}</div>
+        <div class="heist-title">${esc(heist.name)}<small>${esc(heist.status)} · ${_ugRemaining(heist.expires_at)} left</small></div>
+        <div class="heist-stake">${heist.base_payout ? `${fmtK(heist.base_payout)} ${WRK}` : `${fmtK(heist.stake_per_member)} ${WRK}`}<br><small>${heist.base_payout ? 'crew score' : 'each'}</small></div>
+      </div>
+      <div class="crew-header"><span>Crew channel</span><span>${(heist.members || []).filter(member => member.status === 'accepted').length} connected</span></div>
+      ${_crewMemberRows(heist)}
+      ${_inviteControls(heist, data)}
+      ${heist.missing_groups?.length ? `<div class="ug-compose-note" style="margin-top:9px">Still needed: ${heist.missing_groups.map(group => group.map(role => data.role_meta?.[role]?.name || role).join(' / ')).join(', ')}</div>` : ''}
+      ${heist.status === 'forming' && heist.is_leader ? `<div class="heist-actions"><button onclick="startHeist(${heist.id},this)" ${heist.can_start ? '' : 'disabled'}>Launch heist</button><button class="danger" onclick="cancelHeist(${heist.id},this)">Disband · refund stakes</button></div>` : ''}
+    </article>
+    ${task}
+  </div>`;
+}
+
+function _heistInvitationHtml(invite) {
+  const own = invite.own_member;
+  return `<article class="heist-card">
+    <div class="heist-card-top"><div class="heist-icon">${invite.icon}</div><div class="heist-title">${esc(invite.name)}<small>Invitation · ${esc(own?.role_name || '')}</small></div><div class="heist-stake">${fmtK(invite.stake_per_member)} ${WRK}</div></div>
+    <div class="heist-desc">Joining escrows your stake. Equipment is checked again when the heist launches.</div>
+    <div class="heist-actions"><button onclick="respondHeistInvite(${invite.id},true,this)">Accept</button><button class="danger" onclick="respondHeistInvite(${invite.id},false,this)">Decline</button></div>
+  </article>`;
+}
+
+function _heistsHtml(data) {
+  if (!data) return '<div class="loading">Checking crew channels…</div>';
+  const inventory = _inventoryMap(data.inventory);
+  const invitations = (data.invitations || []).length
+    ? `<div class="ug-section-label">Encrypted invitations</div><div class="heist-list">${data.invitations.map(_heistInvitationHtml).join('')}</div>`
+    : '';
+  const history = (data.history || []).length
+    ? `<div class="ug-section-label">Recent operations</div>${data.history.map(item => `<div class="heist-history"><b>${item.icon} ${esc(item.name)}</b><span>${esc(item.status)}</span></div>`).join('')}`
+    : '';
+  if (data.current_heist) {
+    return `${invitations}${_currentHeistHtml(data.current_heist, data)}${history}`;
+  }
+  return `<div class="ug-panel-stack">
+    ${invitations}
+    <div class="ug-info-card"><b>Crew rules</b>Every accepted member escrows the listed stake and completes a live role assignment. Tools unlock roles; expensive variants do not improve the odds. One failed assignment burns the crew’s setup stakes.</div>
+    <div class="heist-list">${(data.types || []).map(type => _heistTypeCard(type, inventory)).join('')}</div>
+    ${history}
+  </div>`;
+}
+
 function renderUnderground() {
   const data = undergroundState.data;
   if (!data) return;
   _clearUndergroundTimers();
   const identity = data.identity;
   const heat = data.heat;
-  const sectionHtml = undergroundState.section === 'activity'
-    ? _ugActivityHtml(data)
-    : undergroundState.section === 'wanted'
-    ? _ugWantedHtml(data)
+  const sectionHtml = undergroundState.section === 'heists'
+    ? _heistsHtml(undergroundState.heists)
+    : undergroundState.section === 'market'
+    ? _blackMarketHtml(undergroundState.market)
     : _ugBoardHtml(data);
-  const activeHtml = data.active_contract
+  const activeHtml = data.active_contract && undergroundState.section === 'board'
     ? '<div id="ugActiveContract"></div>'
     : '';
-  const navigationHtml = data.active_contract ? '' : `
+  const navigationHtml = data.active_contract && undergroundState.section === 'board' ? '' : `
     <div class="ug-tabs" role="tablist">
       <button class="ug-tab ${undergroundState.section === 'board' ? 'active' : ''}" onclick="setUndergroundSection('board')">Shadow Board</button>
-      <button class="ug-tab ${undergroundState.section === 'activity' ? 'active' : ''}" onclick="setUndergroundSection('activity')">My Activity</button>
-      <button class="ug-tab ${undergroundState.section === 'wanted' ? 'active' : ''}" onclick="setUndergroundSection('wanted')">Most Wanted</button>
+      <button class="ug-tab ${undergroundState.section === 'heists' ? 'active' : ''}" onclick="setUndergroundSection('heists')">Crew Heists</button>
+      <button class="ug-tab ${undergroundState.section === 'market' ? 'active' : ''}" onclick="setUndergroundSection('market')">Black Market</button>
     </div>
     <div>${sectionHtml}</div>`;
   document.getElementById('undergroundContent').innerHTML = `<div class="ug-shell">
@@ -8502,18 +8831,334 @@ function renderUnderground() {
         <div class="ug-heat-track"><div class="ug-heat-fill" style="width:${heat.value}%"></div></div>
       </div>
     </section>
-    <div class="ug-fairness"><span>✓</span><div><b>Cover, not power</b>Every hunter receives the same five-signal trace, 45-second timer, payout, limits, and Heat. A +888 number only replaces the public identity shown to other players.</div></div>
+    <div class="ug-fairness"><span>✓</span><div><b>Cover, not power</b>Everyone gets the same prices, role timers, task patterns, payout rules, limits, and Heat. A +888 number only replaces the public identity shown on contracts, crew channels, and purchase records.</div></div>
     ${activeHtml}
     ${navigationHtml}
   </div>`;
-  if (data.active_contract) startUndergroundTrace(data.active_contract);
+  if (data.active_contract && undergroundState.section === 'board') {
+    startUndergroundTrace(data.active_contract);
+  } else if (
+    undergroundState.section === 'heists'
+    && undergroundState.heists?.current_heist?.own_member?.task_status === 'active'
+  ) {
+    renderHeistTask(undergroundState.heists.current_heist);
+  }
 }
 
 function setUndergroundSection(section) {
-  if (!['board','activity','wanted'].includes(section)) return;
+  if (!['board','heists','market'].includes(section)) return;
   undergroundState.section = section;
   renderUnderground();
+  if (section === 'heists' && !undergroundState.heists) loadHeists();
+  if (section === 'market' && !undergroundState.market) loadBlackMarket();
   haptic();
+}
+
+function setUndergroundBoardSection(section) {
+  if (!['open','activity','wanted'].includes(section)) return;
+  undergroundState.boardSection = section;
+  renderUnderground();
+  haptic();
+}
+
+async function buyBlackMarketItem(itemKey, btn) {
+  btn.disabled = true;
+  try {
+    const result = await api('/api/black-market/buy', {
+      method:'POST',
+      json:{ user_id:+state.userId, item_key:itemKey, quantity:1 },
+    });
+    state.balance = result.new_balance;
+    refreshHeaderBal();
+    undergroundState.market = null;
+    undergroundState.heists = null;
+    _shopToast('Item moved to your underground inventory');
+    await loadBlackMarket(false);
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+async function createHeist(heistKey, leaderRole, btn) {
+  btn.disabled = true;
+  try {
+    const result = await api('/api/heists', {
+      method:'POST',
+      json:{ leader_id:+state.userId, heist_key:heistKey, leader_role:leaderRole },
+    });
+    state.balance = result.new_balance;
+    refreshHeaderBal();
+    _shopToast('Crew channel opened · setup stake escrowed');
+    await loadHeists(false);
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+async function inviteHeistPlayer(heistId, role, btn) {
+  const select = document.getElementById(`heistInvite-${role}`);
+  const targetId = Number(select?.value);
+  if (!targetId) return _shopToast('Choose a player first', 'error');
+  btn.disabled = true;
+  try {
+    await api(`/api/heists/${heistId}/invite`, {
+      method:'POST',
+      json:{ leader_id:+state.userId, target_id:targetId, role },
+    });
+    _shopToast('Encrypted invitation sent');
+    await loadHeists(false);
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+async function respondHeistInvite(heistId, accept, btn) {
+  btn.disabled = true;
+  try {
+    const result = await api(`/api/heists/${heistId}/respond`, {
+      method:'POST', json:{ user_id:+state.userId, accept },
+    });
+    if (result.new_balance != null) {
+      state.balance = result.new_balance;
+      refreshHeaderBal();
+    }
+    _shopToast(accept ? 'Crew joined · stake escrowed' : 'Invitation declined');
+    await loadHeists(false);
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+async function removeHeistMember(heistId, memberId, btn) {
+  btn.disabled = true;
+  try {
+    const result = await api(`/api/heists/${heistId}/members/${memberId}/remove`, {
+      method:'POST', json:{ user_id:+state.userId },
+    });
+    _shopToast(result.stake_refunded ? 'Crew member removed · their stake was refunded' : 'Invitation withdrawn');
+    await loadHeists(false);
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+async function cancelHeist(heistId, btn) {
+  btn.disabled = true;
+  try {
+    await api(`/api/heists/${heistId}/cancel`, {
+      method:'POST', json:{ user_id:+state.userId },
+    });
+    _shopToast('Crew disbanded · accepted stakes refunded');
+    await Promise.all([loadHeists(false), loadUnderground(false)]);
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+async function startHeist(heistId, btn) {
+  btn.disabled = true;
+  try {
+    await api(`/api/heists/${heistId}/start`, {
+      method:'POST', json:{ user_id:+state.userId },
+    });
+    undergroundState.market = null;
+    _shopToast('Operation live · every crew member has an assignment');
+    await loadHeists(false);
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+async function startHeistTask(heistId, btn) {
+  btn.disabled = true;
+  try {
+    const result = await api(`/api/heists/${heistId}/task/start`, {
+      method:'POST', json:{ user_id:+state.userId },
+    });
+    undergroundState.heists.current_heist = result.heist;
+    renderUnderground();
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+function _startHeistCountdown(heist, game) {
+  undergroundState.heistInterval = setInterval(() => {
+    const left = Math.max(0, Number(heist.own_member.challenge_expires_at) - Math.floor(Date.now() / 1000));
+    const timer = document.getElementById('heistTaskTimer');
+    if (timer) timer.textContent = `${left}s`;
+    if (left <= 0 && !game.resolving) resolveHeistTask([], true);
+  }, 400);
+}
+
+function renderHeistTask(heist) {
+  const host = document.getElementById('heistTaskHost');
+  const own = heist.own_member;
+  const challenge = own?.challenge;
+  if (!host || !challenge) return;
+  const game = {
+    heistId: heist.id,
+    kind: challenge.kind,
+    answers: [],
+    lane: 1,
+    step: 0,
+    resolving: false,
+    challenge,
+  };
+  undergroundState.heistGame = game;
+  const title = challenge.kind === 'casing' ? 'Case the joint'
+    : challenge.kind === 'chip_trace' ? 'Secure chip trace'
+    : challenge.kind === 'getaway' ? 'Getaway pursuit'
+    : 'Crowd control';
+  host.innerHTML = `<div class="heist-task-head"><div><b>${own.role_icon} ${title}</b><small id="heistTaskInstruction">Assignment is live</small></div><span class="heist-task-timer" id="heistTaskTimer">${_ugRemaining(own.challenge_expires_at)}</span></div><div id="heistGameBoard"></div>`;
+  _startHeistCountdown(heist, game);
+  if (challenge.kind === 'casing') _startCasingGame(game);
+  else if (challenge.kind === 'chip_trace') _startLaneGame(game, 'hacker');
+  else if (challenge.kind === 'getaway') _startLaneGame(game, 'driver');
+  else _startMuscleGame(game);
+}
+
+function _startCasingGame(game) {
+  const board = document.getElementById('heistGameBoard');
+  const instruction = document.getElementById('heistTaskInstruction');
+  board.innerHTML = `<div class="casing-grid">${Array.from({length:9}, (_, zone) => `<button class="casing-zone ${game.challenge.zones.includes(zone) ? 'marked' : ''}" data-zone="${zone}" disabled>${zone + 1}</button>`).join('')}</div>`;
+  instruction.textContent = 'Memorize the three exposed weak points';
+  undergroundState.heistTimers.push(setTimeout(() => {
+    document.querySelectorAll('.casing-zone').forEach(button => {
+      button.classList.remove('marked');
+      button.disabled = false;
+      button.onclick = () => selectCasingZone(Number(button.dataset.zone), button);
+    });
+    instruction.textContent = 'Mark the three weak points in any order';
+  }, Number(game.challenge.preview_seconds || 4) * 1000));
+}
+
+function selectCasingZone(zone, button) {
+  const game = undergroundState.heistGame;
+  if (!game || game.kind !== 'casing' || game.resolving) return;
+  if (game.answers.includes(zone)) {
+    game.answers = game.answers.filter(value => value !== zone);
+    button.classList.remove('selected');
+    return;
+  }
+  if (game.answers.length >= 3) return;
+  game.answers.push(zone);
+  button.classList.add('selected');
+  if (game.answers.length === 3) resolveHeistTask(game.answers);
+}
+
+function _laneThreatHtml(game, mode) {
+  const sequence = mode === 'hacker' ? game.challenge.gates : game.challenge.obstacles;
+  const lane = sequence[game.step];
+  if (lane == null) return '';
+  return mode === 'hacker'
+    ? `<div class="lane-threat lane-gate" style="--lane:${lane}">OPEN</div>`
+    : `<div class="lane-threat" style="--lane:${lane}">🚧</div>`;
+}
+
+function _startLaneGame(game, mode) {
+  game.mode = mode;
+  const board = document.getElementById('heistGameBoard');
+  const instruction = document.getElementById('heistTaskInstruction');
+  instruction.textContent = mode === 'hacker'
+    ? 'Move the trace into each illuminated gate'
+    : 'Switch lanes before each obstacle reaches the car';
+  board.innerHTML = `<div class="lane-game" id="laneGame">
+      <div class="lane-track"><span></span><span></span><span></span></div>
+      <div class="lane-runner" id="laneRunner" style="--lane:1">${mode === 'hacker' ? '⚡' : '🏎️'}</div>
+      <div id="laneThreat">${_laneThreatHtml(game, mode)}</div>
+    </div>
+    <div class="lane-progress" id="laneProgress">0 / ${(mode === 'hacker' ? game.challenge.gates : game.challenge.obstacles).length}</div>
+    <div class="lane-controls"><button onclick="setHeistLane(0)">Left</button><button onclick="setHeistLane(1)">Center</button><button onclick="setHeistLane(2)">Right</button></div>`;
+  const tick = () => {
+    if (game.resolving || undergroundState.heistGame !== game) return;
+    const sequence = mode === 'hacker' ? game.challenge.gates : game.challenge.obstacles;
+    game.answers.push(game.lane);
+    game.step += 1;
+    const progress = document.getElementById('laneProgress');
+    if (progress) progress.textContent = `${game.step} / ${sequence.length}`;
+    if (game.step >= sequence.length) return resolveHeistTask(game.answers);
+    const threat = document.getElementById('laneThreat');
+    if (threat) threat.innerHTML = _laneThreatHtml(game, mode);
+    undergroundState.heistTimers.push(setTimeout(tick, Number(game.challenge.step_ms || 600)));
+  };
+  undergroundState.heistTimers.push(setTimeout(tick, Number(game.challenge.step_ms || 600)));
+}
+
+function setHeistLane(lane) {
+  const game = undergroundState.heistGame;
+  if (!game || !['chip_trace','getaway'].includes(game.kind) || game.resolving) return;
+  game.lane = lane;
+  const runner = document.getElementById('laneRunner');
+  if (runner) runner.style.setProperty('--lane', lane);
+  haptic();
+}
+
+function _startMuscleGame(game) {
+  const board = document.getElementById('heistGameBoard');
+  document.getElementById('heistTaskInstruction').textContent = 'Control guards. Hold position around civilians.';
+  board.innerHTML = `<div class="muscle-scene" id="muscleScene"></div>
+    <div class="lane-progress" id="muscleProgress">0 / ${game.challenge.prompts.length}</div>
+    <div class="muscle-controls"><button onclick="answerMuscle('control')">Control threat</button><button onclick="answerMuscle('hold')">Hold position</button></div>`;
+  _showMusclePrompt(game);
+}
+
+function _showMusclePrompt(game) {
+  const prompt = game.challenge.prompts[game.step];
+  const scene = document.getElementById('muscleScene');
+  if (!scene || prompt == null) return;
+  scene.innerHTML = `<div class="muscle-target">${prompt === 'guard' ? '🛡️' : '🙋'}<small>${esc(prompt)}</small></div>`;
+}
+
+function answerMuscle(answer) {
+  const game = undergroundState.heistGame;
+  if (!game || game.kind !== 'crowd_control' || game.resolving) return;
+  game.answers.push(answer);
+  game.step += 1;
+  const progress = document.getElementById('muscleProgress');
+  if (progress) progress.textContent = `${game.step} / ${game.challenge.prompts.length}`;
+  if (game.step >= game.challenge.prompts.length) return resolveHeistTask(game.answers);
+  _showMusclePrompt(game);
+  haptic();
+}
+
+async function resolveHeistTask(answers, timedOut = false) {
+  const game = undergroundState.heistGame;
+  if (!game || game.resolving) return;
+  game.resolving = true;
+  _clearUndergroundTimers();
+  const instruction = document.getElementById('heistTaskInstruction');
+  if (instruction) instruction.textContent = timedOut ? 'Assignment timed out…' : 'Verifying crew feed…';
+  document.querySelectorAll('#heistTaskHost button').forEach(button => button.disabled = true);
+  try {
+    const result = await api(`/api/heists/${game.heistId}/task/resolve`, {
+      method:'POST', json:{ user_id:+state.userId, answers },
+    });
+    state.balance = result.new_balance;
+    refreshHeaderBal();
+    if (result.result === 'success') {
+      haptic('success');
+      _shopToast(result.settlement?.status === 'completed'
+        ? `Heist complete · +${fmt(result.settlement.payout_each)} WRK$`
+        : 'Assignment clear · waiting for the crew');
+    } else {
+      haptic('error');
+      _shopToast(result.result === 'timeout' ? 'Assignment expired · heist failed' : 'Assignment failed · setup stakes burned', 'error');
+    }
+    undergroundState.market = null;
+    await Promise.all([loadHeists(false), loadUnderground(false)]);
+  } catch (e) {
+    _shopToast(e.message, 'error');
+    await loadHeists(false);
+  }
 }
 
 function toggleUndergroundComposer() {

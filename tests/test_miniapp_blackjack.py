@@ -1,5 +1,6 @@
 import asyncio
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 
 import db as database
 from miniapp import server
@@ -164,6 +165,29 @@ def test_plinko_can_settle_multiple_balls_atomically(tmp_path, monkeypatch):
             "SELECT plinko_won, plinko_lost FROM game_stats WHERE user_id = 1"
         ).fetchone()
     assert stats == (120, 100)
+
+
+def test_rapid_individual_plinko_drops_do_not_overwrite_balance(tmp_path, monkeypatch):
+    path = tmp_path / "plinko-spam.db"
+    _seed_wallet(path)
+    monkeypatch.setattr(server, "DB_PATH", str(path))
+    monkeypatch.setattr(server.random, "choice", lambda _options: False)
+
+    def drop_one():
+        return server.play_plinko(
+            server.PlinkoRequest(user_id=1, bet=100, risk="low"),
+            authenticated_user=1,
+        )
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _index: drop_one(), range(20)))
+
+    assert all(result["delta"] == 120 for result in results)
+    with sqlite3.connect(path) as conn:
+        balance = conn.execute(
+            "SELECT balance FROM economy WHERE user_id = 1"
+        ).fetchone()[0]
+    assert balance == 12_400
 
 
 def test_roulette_straight_double_zero_pays_36_to_1(tmp_path, monkeypatch):
