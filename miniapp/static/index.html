@@ -3027,12 +3027,13 @@
   #gcatSolo .game-card:nth-child(1) { --game-card-accent: #f59e0b; }
   #gcatSolo .game-card:nth-child(2) { --game-card-accent: #fbbf24; }
   #gcatSolo .game-card:nth-child(3) { --game-card-accent: #22c55e; }
-  #gcatSolo .game-card:nth-child(4) { --game-card-accent: #ef4444; }
-  #gcatSolo .game-card:nth-child(5) { --game-card-accent: #fb7185; }
-  #gcatSolo .game-card:nth-child(6) { --game-card-accent: #60a5fa; }
-  #gcatSolo .game-card:nth-child(7) { --game-card-accent: #67e8f9; }
-  #gcatSolo .game-card:nth-child(8) { --game-card-accent: #a78bfa; }
-  #gcatSolo .game-card:nth-child(9) { --game-card-accent: #ec4899; }
+  #gcatSolo .game-card:nth-child(4) { --game-card-accent: #f97316; }
+  #gcatSolo .game-card:nth-child(5) { --game-card-accent: #ef4444; }
+  #gcatSolo .game-card:nth-child(6) { --game-card-accent: #fb7185; }
+  #gcatSolo .game-card:nth-child(7) { --game-card-accent: #60a5fa; }
+  #gcatSolo .game-card:nth-child(8) { --game-card-accent: #67e8f9; }
+  #gcatSolo .game-card:nth-child(9) { --game-card-accent: #a78bfa; }
+  #gcatSolo .game-card:nth-child(10) { --game-card-accent: #ec4899; }
 
   /* Crash flight deck */
   .crash-history {
@@ -3496,6 +3497,13 @@
     gap: 8px;
   }
   .bj-side-bets-grid .bj-side-bet-well { margin-top: 0; }
+  .bj-side-bet-well.war-focus {
+    animation: bj-war-focus 1.25s ease-out 2;
+  }
+  @keyframes bj-war-focus {
+    0%, 100% { border-color: rgba(167,139,250,.18); box-shadow: none; }
+    45% { border-color: rgba(249,115,22,.72); box-shadow: 0 0 24px rgba(249,115,22,.25); }
+  }
   .bj-war-copy {
     min-height: 30px;
     color: var(--muted);
@@ -4550,6 +4558,11 @@
             <div class="gicon">🃏</div>
             <div class="gname">Blackjack</div>
             <div class="gdesc">Hit, stand, or bust</div>
+          </div>
+          <div class="game-card" onclick="openWar()">
+            <div class="gicon">⚔️</div>
+            <div class="gname">Casino War</div>
+            <div class="gdesc">High-card side game at the Blackjack table</div>
           </div>
           <div class="game-card" onclick="openRoulette()">
             <div class="gicon">🎡</div>
@@ -11435,6 +11448,16 @@ async function openBlackjack() {
   } catch { renderBjBetting(); }
 }
 
+async function openWar() {
+  await openBlackjack();
+  const warWell = document.getElementById('bjWarWell');
+  if (!warWell) return;
+  warWell.classList.remove('war-focus');
+  void warWell.offsetWidth;
+  warWell.classList.add('war-focus');
+  warWell.scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
 function renderBjBetting() {
   bjBusy = false;
   bjCurrentBet = bjLastBet;
@@ -11469,7 +11492,7 @@ function renderBjBetting() {
           </div>
           <div id="bjPPDisplay" class="bj-side-bet-display${bjLastPPBet > 0 ? ' placed' : ''}">${bjLastPPBet > 0 ? '✓ Pair: ' + fmt(bjLastPPBet) + ' ' + WRK : 'No Perfect Pair bet'}</div>
         </div>
-        <div class="bj-side-bet-well">
+        <div class="bj-side-bet-well" id="bjWarWell">
           <div class="bj-section-label" style="text-align:center">⚔️ War</div>
           <div class="bj-war-copy">Your first card must outrank the dealer. Ace high; dealer wins ties. Pays 2×.</div>
           <div class="bj-chip-row">
