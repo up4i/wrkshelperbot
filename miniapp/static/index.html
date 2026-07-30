@@ -1071,99 +1071,104 @@
     backdrop-filter: blur(4px);
   }
 
-  /* ── Three-shop hub + wallet ── */
+  /* ── Shop + wallet ── */
   .shop-page-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .shop-menu {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 15px;
+    background: rgba(255,255,255,.028);
+  }
+  .shop-menu-card {
+    min-width: 0;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 5px;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    background: transparent;
+    color: #7f8b97;
+    cursor: pointer;
+    transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease;
+  }
+  .shop-menu-card:active { transform: scale(.97); }
+  .shop-menu-card.active {
+    border-color: color-mix(in srgb, var(--shop-accent) 28%, transparent);
+    background: color-mix(in srgb, var(--shop-accent) 11%, rgba(255,255,255,.025));
+    color: color-mix(in srgb, var(--shop-accent) 75%, white);
+  }
+  .shop-menu-card.rift { --shop-accent:#9b7bff; }
+  .shop-menu-card.mkrt { --shop-accent:#53b5f5; }
+  .shop-menu-card.fragsmint { --shop-accent:#f4bd60; }
+  .shop-menu-icon {
+    min-width: 25px;
+    height: 25px;
+    display: grid;
+    place-items: center;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--shop-accent) 10%, rgba(5,7,14,.5));
+    color: inherit;
+    font-size: 9px;
+    font-weight: 900;
+  }
+  .shop-menu-name { min-width: 0; font-size: 11px; font-weight: 850; letter-spacing: -.1px; }
+  .shop-panel { display: none; flex-direction: column; gap: 10px; }
+  .shop-panel.active { display: flex; }
+  .wallet-page-heading {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
   }
-  .shop-wallet-button {
+  .wallet-profile-link {
     flex: none;
-    min-height: 38px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 11px;
-    border: 1px solid rgba(82,174,235,.25);
-    border-radius: 12px;
-    background: rgba(82,174,235,.09);
-    color: #9bd8ff;
-    font: 750 11px system-ui;
+    min-height: 36px;
+    padding: 7px 10px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 11px;
+    background: rgba(255,255,255,.04);
+    color: #aeb9c2;
+    font: 750 10px system-ui;
     cursor: pointer;
   }
-  .shop-wallet-button span { font-size: 16px; }
-  .shop-menu {
+  .wallet-tabs {
     display: grid;
     grid-template-columns: repeat(3, minmax(0,1fr));
-    gap: 8px;
-  }
-  .shop-menu-card {
-    position: relative;
-    min-width: 0;
-    min-height: 82px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-end;
-    overflow: hidden;
-    padding: 11px;
+    gap: 4px;
+    padding: 4px;
     border: 1px solid rgba(255,255,255,.08);
-    border-radius: 17px;
-    background: #151621;
-    color: #fff;
-    text-align: left;
-    cursor: pointer;
-    transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+    border-radius: 15px;
+    background: rgba(255,255,255,.028);
   }
-  .shop-menu-card::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at 80% 8%, var(--shop-glow), transparent 54%);
-    opacity: .7;
-  }
-  .shop-menu-card:active { transform: scale(.97); }
-  .shop-menu-card.active {
-    border-color: var(--shop-accent);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--shop-accent) 30%, transparent), 0 9px 24px rgba(0,0,0,.2);
-  }
-  .shop-menu-card.rift { --shop-accent:#9b7bff; --shop-glow:rgba(155,123,255,.38); }
-  .shop-menu-card.mkrt { --shop-accent:#53b5f5; --shop-glow:rgba(83,181,245,.35); }
-  .shop-menu-card.fragsmint { --shop-accent:#f4bd60; --shop-glow:rgba(244,189,96,.3); }
-  .shop-menu-icon {
-    position: absolute;
-    z-index: 1;
-    top: 11px;
-    right: 10px;
-    min-width: 33px;
-    height: 33px;
-    display: grid;
-    place-items: center;
-    padding: 0 5px;
-    border: 1px solid color-mix(in srgb, var(--shop-accent) 35%, transparent);
+  .wallet-tab {
+    min-width: 0;
+    min-height: 40px;
+    padding: 7px 5px;
+    border: 1px solid transparent;
     border-radius: 11px;
-    background: color-mix(in srgb, var(--shop-accent) 13%, rgba(5,7,14,.72));
-    color: color-mix(in srgb, var(--shop-accent) 82%, white);
-    font-size: 11px;
-    font-weight: 900;
+    background: transparent;
+    color: #7f8b97;
+    font: 800 10px system-ui;
+    cursor: pointer;
   }
-  .shop-menu-name,
-  .shop-menu-sub { position: relative; z-index: 1; min-width: 0; }
-  .shop-menu-name { font-size: 14px; font-weight: 850; letter-spacing: -.2px; }
-  .shop-menu-sub {
-    width: 100%;
-    margin-top: 2px;
-    overflow: hidden;
-    color: #77838f;
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: .2px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .wallet-tab.active {
+    border-color: rgba(82,174,235,.24);
+    background: rgba(82,174,235,.11);
+    color: #a9ddff;
   }
-  .shop-panel { display: none; flex-direction: column; gap: 10px; }
-  .shop-panel.active { display: flex; }
+  .wallet-panel { display: none; flex-direction: column; gap: 10px; }
+  .wallet-panel.active { display: flex; }
   #marketTabs {
     display: grid;
     grid-template-columns: repeat(4, minmax(0,1fr));
@@ -1437,6 +1442,35 @@
     font-weight: 900;
     text-align: right;
     white-space: nowrap;
+  }
+  .wallet-balance small {
+    display: block;
+    margin-bottom: 3px;
+    color: #7d8994;
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: .75px;
+    text-transform: uppercase;
+  }
+  .wallet-quick-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0,1fr));
+    gap: 7px;
+  }
+  .wallet-quick-action {
+    min-height: 42px;
+    padding: 7px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    background: rgba(255,255,255,.03);
+    color: #b8c3cb;
+    font: 800 9px system-ui;
+    cursor: pointer;
+  }
+  .wallet-quick-action span {
+    margin-right: 4px;
+    color: #8ed0fa;
+    font-size: 13px;
   }
   .wallet-section {
     padding: 14px;
@@ -3874,7 +3908,7 @@
     </div>
     <div class="header-actions">
       <button class="header-action" id="headerSendBtn" type="button" aria-label="Send WRK" onclick="openSendWrkWithPicker()">↗</button>
-      <div class="balance-pill" id="headerBal" onclick="goProfile()"></div>
+      <div class="balance-pill" id="headerBal" onclick="goWallet()"></div>
       <img class="header-avatar" id="headerAvatar" src="" alt="" onclick="goProfile()" onerror="this.style.display='none'">
     </div>
   </header>
@@ -4137,37 +4171,82 @@
       </div>
     </div>
 
+    <!-- WALLET -->
+    <div class="page" id="page-wallet">
+      <div class="wallet-page-heading">
+        <div>
+          <div class="section-title">Wallet</div>
+          <div class="section-sub">Your balance, security, and collectibles</div>
+        </div>
+        <button class="wallet-profile-link" type="button" onclick="goProfile()">View profile</button>
+      </div>
+
+      <div class="wallet-tabs" id="walletTabs" role="tablist" aria-label="Wallet sections">
+        <button class="wallet-tab active" type="button" role="tab" aria-selected="true" data-wallet="overview" onclick="setWalletSection('overview')">Overview</button>
+        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet="gifts" onclick="setWalletSection('gifts')">Gifts <span id="walletGiftCount">0</span></button>
+        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet="numbers" onclick="setWalletSection('numbers')">Numbers <span id="walletAnonCount">0</span></button>
+      </div>
+
+      <section class="wallet-panel active" role="tabpanel" data-wallet-panel="overview">
+        <div class="wallet-hero">
+          <div>
+            <div class="shop-panel-kicker">WRK$ account</div>
+            <div class="shop-panel-title">My Wallet</div>
+          </div>
+          <div class="wallet-balance" id="shopWalletBalance"><small>Available</small>—</div>
+        </div>
+        <div class="wallet-quick-actions">
+          <button class="wallet-quick-action" type="button" onclick="openSendWrkWithPicker()"><span>↗</span>Send</button>
+          <button class="wallet-quick-action" type="button" onclick="showPage('work',document.querySelector('[data-page=work]'))"><span>⚡</span>Earn</button>
+          <button class="wallet-quick-action" type="button" onclick="showPage('market',document.querySelector('[data-page=market]'))"><span>＋</span>Shop</button>
+        </div>
+        <div id="walletSecurityCenter">
+          <div class="loading">Loading Secure Number…</div>
+        </div>
+      </section>
+
+      <section class="wallet-panel" role="tabpanel" data-wallet-panel="gifts">
+        <div class="wallet-section">
+          <div class="wallet-section-head">
+            <div><b>Your Gifts</b><span>Sell to Rift or list on MKRT · shown 40 at a time</span></div>
+          </div>
+          <div class="wallet-gift-grid" id="walletGiftGrid"><div class="loading">Loading…</div></div>
+        </div>
+      </section>
+
+      <section class="wallet-panel" role="tabpanel" data-wallet-panel="numbers">
+        <div class="wallet-section">
+          <div class="wallet-section-head">
+            <div><b>Anonymous Numbers</b><span>Choose the +888 number that protects your account</span></div>
+          </div>
+          <div class="anon-grid wallet-anon-grid" id="walletAnonGrid"></div>
+        </div>
+      </section>
+    </div>
+
     <!-- MARKET -->
     <div class="page" id="page-market">
       <div class="shop-page-heading">
-        <div>
-          <div class="section-title">Shops</div>
-          <div class="section-sub">Telegram-style collectibles, trading, and your wallet</div>
-        </div>
-        <button class="shop-wallet-button" onclick="setShopSection('wallet')">
-          <span>◫</span> My Wallet
-        </button>
+        <div class="section-title">Shop</div>
+        <div class="section-sub">Buy gifts, trade with collectors, or mint a +888 number</div>
       </div>
 
-      <div class="shop-menu" id="shopMenu">
-        <button class="shop-menu-card rift active" data-shop="rift" onclick="setShopSection('rift')">
+      <div class="shop-menu" id="shopMenu" role="tablist" aria-label="Storefronts">
+        <button class="shop-menu-card rift active" type="button" role="tab" aria-selected="true" data-shop="rift" onclick="setShopSection('rift')">
           <span class="shop-menu-icon">✦</span>
           <span class="shop-menu-name">Rift</span>
-          <span class="shop-menu-sub">Gift vault</span>
         </button>
-        <button class="shop-menu-card mkrt" data-shop="mkrt" onclick="setShopSection('mkrt')">
+        <button class="shop-menu-card mkrt" type="button" role="tab" aria-selected="false" data-shop="mkrt" onclick="setShopSection('mkrt')">
           <span class="shop-menu-icon">M</span>
           <span class="shop-menu-name">MKRT</span>
-          <span class="shop-menu-sub">User listings</span>
         </button>
-        <button class="shop-menu-card fragsmint" data-shop="fragsmint" onclick="setShopSection('fragsmint')">
+        <button class="shop-menu-card fragsmint" type="button" role="tab" aria-selected="false" data-shop="fragsmint" onclick="setShopSection('fragsmint')">
           <span class="shop-menu-icon">+888</span>
-          <span class="shop-menu-name">Fragsmint</span>
-          <span class="shop-menu-sub">Anon numbers</span>
+          <span class="shop-menu-name">Numbers</span>
         </button>
       </div>
 
-      <section class="shop-panel active" id="shopPanelRift" data-shop-panel="rift">
+      <section class="shop-panel active" id="shopPanelRift" role="tabpanel" data-shop-panel="rift">
         <div class="shop-panel-hero rift">
           <div class="shop-panel-mark">✦</div>
           <div>
@@ -4176,9 +4255,9 @@
             <div class="shop-panel-copy">Buy bank gifts or instantly sell yours back for 80% of Rift value.</div>
           </div>
         </div>
-        <button class="rift-buyback-link" onclick="setShopSection('wallet')">
+        <button class="rift-buyback-link" onclick="goWallet('gifts')">
           <span>↙</span>
-          <span><b>Auto Buyback</b><small>Open My Wallet to sell a gift to Rift</small></span>
+          <span><b>Sell a gift to Rift</b><small>Choose one from the Gifts section in Wallet</small></span>
           <span>›</span>
         </button>
         <div class="tab-row" id="marketTabs">
@@ -4203,7 +4282,7 @@
         <div class="market-grid" id="marketGrid"><div class="loading">Loading…</div></div>
       </section>
 
-      <section class="shop-panel" id="shopPanelMkrt" data-shop-panel="mkrt">
+      <section class="shop-panel" id="shopPanelMkrt" role="tabpanel" data-shop-panel="mkrt">
         <div class="shop-panel-hero mkrt">
           <div class="shop-panel-mark">M</div>
           <div>
@@ -4212,16 +4291,16 @@
             <div class="shop-panel-copy">Collectors set the price. Purchases transfer gifts and WRK$ instantly.</div>
           </div>
         </div>
-        <button class="rift-buyback-link mkrt-link" onclick="setShopSection('wallet')">
+        <button class="rift-buyback-link mkrt-link" onclick="goWallet('gifts')">
           <span>＋</span>
-          <span><b>List a gift</b><small>Choose a collectible from My Wallet</small></span>
+          <span><b>List a gift</b><small>Choose a collectible from Wallet</small></span>
           <span>›</span>
         </button>
         <input class="market-search" id="mkrtSearch" placeholder="Search MKRT gifts or #number…" oninput="onMkrtSearch(this.value)">
         <div class="market-grid mkrt-grid" id="mkrtGrid"><div class="loading">Loading…</div></div>
       </section>
 
-      <section class="shop-panel" id="shopPanelFragsmint" data-shop-panel="fragsmint">
+      <section class="shop-panel" id="shopPanelFragsmint" role="tabpanel" data-shop-panel="fragsmint">
         <div class="shop-panel-hero fragsmint">
           <div class="shop-panel-mark">+888</div>
           <div>
@@ -4239,32 +4318,6 @@
         <div class="anon-grid" id="anonGrid"><div class="loading">Loading…</div></div>
       </section>
 
-      <section class="shop-panel" id="shopPanelWallet" data-shop-panel="wallet">
-        <div class="wallet-hero">
-          <div>
-            <div class="shop-panel-kicker">Your collectibles</div>
-            <div class="shop-panel-title">My Wallet</div>
-          </div>
-          <div class="wallet-balance" id="shopWalletBalance">—</div>
-        </div>
-        <div id="walletSecurityCenter">
-          <div class="loading">Loading Secure Number…</div>
-        </div>
-        <div class="wallet-section">
-          <div class="wallet-section-head">
-            <div><b>Anonymous Numbers</b><span>Kept above large gift collections for quick access</span></div>
-            <span id="walletAnonCount">0</span>
-          </div>
-          <div class="anon-grid wallet-anon-grid" id="walletAnonGrid"></div>
-        </div>
-        <div class="wallet-section">
-          <div class="wallet-section-head">
-            <div><b>Gifts</b><span>Sell to Rift or list on MKRT · shown 40 at a time</span></div>
-            <span id="walletGiftCount">0</span>
-          </div>
-          <div class="wallet-gift-grid" id="walletGiftGrid"><div class="loading">Loading…</div></div>
-        </div>
-      </section>
     </div>
   </main>
 
@@ -4279,10 +4332,10 @@
       <span class="icon">⚡</span>Earn
     </button>
     <button class="nav-btn" onclick="showPage('market',this)" data-page="market">
-      <span class="icon">🏪</span>Market
+      <span class="icon">🏪</span>Shop
     </button>
-    <button class="nav-btn" onclick="showPage('profile',this)" data-page="profile">
-      <span class="icon">👤</span>Profile
+    <button class="nav-btn" onclick="showPage('wallet',this)" data-page="wallet">
+      <span class="icon">💰</span>Wallet
     </button>
   </nav>
 </div>
@@ -4806,6 +4859,7 @@ function clearSession() {
   state.userId = null;
   state.sessionToken = null;
   state.balance = null;
+  _shopWallet = null;
   if (_presenceInterval) {
     clearInterval(_presenceInterval);
     _presenceInterval = null;
@@ -5008,7 +5062,12 @@ function renderHomeAccount(data) {
 }
 
 function goProfile() {
-  showPage('profile', document.querySelector('[data-page="profile"]'));
+  showPage('profile', null);
+}
+
+function goWallet(section = 'overview') {
+  showPage('wallet', document.querySelector('[data-page="wallet"]'));
+  if (section !== _walletSection) setWalletSection(section);
 }
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
@@ -5028,6 +5087,7 @@ function showPage(id, btn) {
   if (id === 'lb') loadLeaderboard(state.lbTab);
   if (id === 'work') openWorkPage();
   if (id === 'market') openShopHub();
+  if (id === 'wallet') openWalletPage();
   if (id === 'profile') openProfilePage();
   if (id === 'games') _startGameTimers(); else _stopGameTimers();
   updateTelegramBackButton();
@@ -5158,7 +5218,7 @@ function setProfileTab(tab, btn) {
 }
 
 function viewUser(id) {
-  showPage('profile', document.querySelector('[data-page="profile"]'));
+  showPage('profile', null);
   // showPage starts the signed-in user's profile. A visited profile supersedes
   // that render so its slower response cannot steal the gift paginator.
   document.getElementById('ownProfileWrap').style.display = 'none';
@@ -8222,6 +8282,7 @@ function handleShiftComplete(result) {
 // ── Market ────────────────────────────────────────────────────────────────────
 let _marketItems = [];
 let _shopSection = 'rift';
+let _walletSection = 'overview';
 let _mkrtItems = [];
 let _mkrtOffset = 0;
 let _mkrtTotal = 0;
@@ -8240,11 +8301,32 @@ function openShopHub() {
   setShopSection(_shopSection || 'rift', true);
 }
 
+function openWalletPage() {
+  setWalletSection(_walletSection || 'overview', true);
+}
+
+function setWalletSection(section, force = false) {
+  if (!['overview','gifts','numbers'].includes(section)) section = 'overview';
+  _walletSection = section;
+  document.querySelectorAll('#walletTabs .wallet-tab').forEach(tab => {
+    const active = tab.dataset.wallet === section;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('[data-wallet-panel]').forEach(panel => {
+    panel.classList.toggle('active', panel.dataset.walletPanel === section);
+  });
+  if (force || !_shopWallet) loadShopWallet();
+  haptic();
+}
+
 function setShopSection(section, force = false) {
-  if (!['rift','mkrt','fragsmint','wallet'].includes(section)) section = 'rift';
+  if (!['rift','mkrt','fragsmint'].includes(section)) section = 'rift';
   _shopSection = section;
   document.querySelectorAll('#shopMenu .shop-menu-card').forEach(card => {
-    card.classList.toggle('active', card.dataset.shop === section);
+    const active = card.dataset.shop === section;
+    card.classList.toggle('active', active);
+    card.setAttribute('aria-selected', String(active));
   });
   document.querySelectorAll('[data-shop-panel]').forEach(panel => {
     panel.classList.toggle('active', panel.dataset.shopPanel === section);
@@ -8254,10 +8336,8 @@ function setShopSection(section, force = false) {
     if (force || !_marketItems.length) loadMarket(true);
   } else if (section === 'mkrt') {
     loadMkrt(true);
-  } else if (section === 'fragsmint') {
-    loadFragsmint(true);
   } else {
-    loadShopWallet();
+    loadFragsmint(true);
   }
   haptic();
 }
@@ -8446,7 +8526,7 @@ async function cancelMkrtListing(listingId) {
       json:{ user_id:+state.userId },
     });
     _shopToast('MKRT listing cancelled');
-    if (_shopSection === 'wallet') loadShopWallet();
+    if (document.getElementById('page-wallet')?.classList.contains('active')) loadShopWallet();
     else loadMkrt(true);
   } catch (e) {
     _shopToast(e.message, 'error');
@@ -8781,21 +8861,27 @@ function loadMoreWalletGifts() {
 async function loadShopWallet() {
   const giftGrid = document.getElementById('walletGiftGrid');
   const anonGrid = document.getElementById('walletAnonGrid');
+  const securityCenter = document.getElementById('walletSecurityCenter');
   if (!state.userId) {
+    _shopWallet = null;
+    document.getElementById('shopWalletBalance').innerHTML = '<small>Available</small>Sign in';
+    document.getElementById('walletGiftCount').textContent = '0';
+    document.getElementById('walletAnonCount').textContent = '0';
     giftGrid.innerHTML = '<div class="empty">Open the mini-app in Telegram to see your wallet.</div>';
-    anonGrid.innerHTML = '';
+    anonGrid.innerHTML = '<div class="empty">Open the mini-app in Telegram to see your numbers.</div>';
+    securityCenter.innerHTML = `<div class="card">${_TG_WALL_HTML}</div>`;
     return;
   }
   giftGrid.innerHTML = '<div class="loading">Loading gifts…</div>';
   anonGrid.innerHTML = '<div class="loading">Loading numbers…</div>';
-  document.getElementById('walletSecurityCenter').innerHTML = '<div class="loading">Loading Secure Number…</div>';
+  securityCenter.innerHTML = '<div class="loading">Loading Secure Number…</div>';
   try {
     const data = await api(`/api/wallet?user_id=${state.userId}`);
     _shopWallet = data;
     _walletGiftVisible = 40;
     state.balance = data.balance;
     refreshHeaderBal();
-    document.getElementById('shopWalletBalance').innerHTML = `${fmtK(data.balance)} ${WRK}`;
+    document.getElementById('shopWalletBalance').innerHTML = `<small>Available</small>${fmtK(data.balance)} ${WRK}`;
     document.getElementById('walletGiftCount').textContent = fmt(data.gifts.length);
     document.getElementById('walletAnonCount').textContent = fmt(data.anon_numbers.length);
     renderSecurityCenter(data.security);
@@ -8806,7 +8892,7 @@ async function loadShopWallet() {
   } catch (e) {
     giftGrid.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
     anonGrid.innerHTML = '';
-    document.getElementById('walletSecurityCenter').innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+    securityCenter.innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
   }
 }
 
