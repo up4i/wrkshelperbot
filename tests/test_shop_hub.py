@@ -200,7 +200,19 @@ def test_admin_gifts_are_locked_from_trade_and_shop(tmp_path, monkeypatch):
         conn.execute(
             "UPDATE gift_instances SET is_admin_gift=1 WHERE id=101"
         )
+        conn.execute(
+            "UPDATE economy SET pinned_gift_id=NULL WHERE user_id=1"
+        )
         conn.commit()
+
+    server.pin_gift(
+        server.PinGiftRequest(user_id=1, gift_id=101),
+        authenticated_user=1,
+    )
+    wallet = server.shop_wallet(user_id=1, authenticated_user=1)
+    admin_gift = next(gift for gift in wallet["gifts"] if gift["id"] == 101)
+    assert admin_gift["is_admin_gift"] == 1
+    assert admin_gift["is_pinned"] is True
 
     with pytest.raises(Exception, match="Admin gifts cannot be traded"):
         server.create_trade(

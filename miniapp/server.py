@@ -30,6 +30,7 @@ from collectibles import (
     anon_number_rarity,
     format_anon_number,
 )
+from gift_artwork import sync_gift_custom_emoji_ids_connection
 
 DB_PATH = config.DB_PATH
 STATIC_DIR = Path(__file__).parent / "static"
@@ -6663,6 +6664,7 @@ async def _startup():
             db.commit()
         except Exception:
             pass
+        sync_gift_custom_emoji_ids_connection(db)
 
     return [
         asyncio.create_task(_crash_loop()),

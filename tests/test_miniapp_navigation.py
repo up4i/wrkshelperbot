@@ -121,6 +121,23 @@ def test_profile_gifts_keep_a_fixed_size_and_use_the_requested_black():
     assert "black: '#0e0f0f'" in html
 
 
+def test_gift_artwork_stays_consistent_in_wallet_profile_and_reorder_mode():
+    html = INDEX_HTML.read_text(encoding="utf-8")
+    card_builder = html.split("function _buildGiftCardHtml", 1)[1].split(
+        "const _BADGE_EMOJI",
+        1,
+    )[0]
+
+    assert "function giftArtworkFallback" in html
+    assert "function _giftArtworkHtml" in html
+    assert "_giftArtworkHtml(g)" in card_builder
+    assert "if (compact)" not in card_builder
+    assert 'style="--gift-bg:${bgColor}"' in html
+    assert "background: var(--gift-bg);" in html
+    assert "function pinWalletGift(giftId)" in html
+    assert "The static artwork remains visible" in html
+
+
 def test_underground_explanatory_copy_has_a_readable_floor():
     html = INDEX_HTML.read_text(encoding="utf-8")
 

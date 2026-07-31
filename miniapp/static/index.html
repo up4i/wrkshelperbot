@@ -1399,8 +1399,21 @@
     display: block; margin: 0 auto 4px;
     border-radius: 6px;
   }
-  .gift-emoji-container { display: flex; justify-content: center; margin-bottom: 4px; }
+  .gift-emoji-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
   .gift-emoji-container svg { width: 50px; height: 50px; }
+  .gift-animation-layer {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    visibility: hidden;
+  }
+  .gift-artwork-fallback { display: grid; place-items: center; font-size: 28px; }
   .market-search {
     width: 100%;
     background: var(--card2);
@@ -1963,6 +1976,7 @@
   .wallet-gift-grid > .empty,
   .wallet-gift-grid > .error-msg { grid-column: 1/-1; }
   .wallet-gift-card {
+    --gift-bg: var(--card2);
     min-width: 0;
     overflow: hidden;
     padding: 11px;
@@ -1978,7 +1992,10 @@
     place-items: center;
     flex: none;
     border-radius: 11px;
-    background: rgba(255,255,255,.055);
+    background: var(--gift-bg);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.14),
+      0 5px 14px color-mix(in srgb, var(--gift-bg) 40%, transparent);
     font-size: 24px;
   }
   .wallet-gift-emoji img { width: 34px; height: 34px; object-fit: contain; }
@@ -2007,6 +2024,13 @@
   }
   .wallet-gift-actions .sell { border-color:rgba(167,139,250,.2); color:#cabaff; }
   .wallet-gift-actions .list { border-color:rgba(82,174,235,.2); color:#9bd8ff; }
+  .wallet-gift-actions .pin { border-color:rgba(82,174,235,.24); color:#9bd8ff; }
+  .wallet-gift-actions .pin.active {
+    border-color:rgba(52,211,153,.28);
+    background:rgba(52,211,153,.1);
+    color:#86efac;
+  }
+  .wallet-gift-actions .locked { color:#9aa5ae; cursor:not-allowed; }
   .wallet-gift-actions .cancel { grid-column:1/-1; border-color:rgba(251,113,133,.22); color:#fda4af; }
   .security-center {
     overflow: hidden;
@@ -4577,6 +4601,7 @@
     gap: 7px;
   }
   .profile-collection .gift-card {
+    position: relative;
     width: 104px;
     height: 134px;
     min-height: 134px;
@@ -4622,18 +4647,30 @@
     letter-spacing: .45px;
     text-transform: uppercase;
   }
+  .profile-gift-pin-mark {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 20px;
+    height: 20px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(82,174,235,.35);
+    border-radius: 7px;
+    background: rgba(8,12,18,.7);
+    box-shadow: 0 4px 12px rgba(0,0,0,.25);
+    font-size: 11px;
+  }
   .profile-collection .gift-card .gname { width: 100%; color: #f8fafc; font-size: 10px; }
   .profile-collection .gift-card .gtier { width: 100%; color: #d4d8de; font-size: 9px; text-transform: capitalize; }
   .profile-collection .gift-card.reorder-compact {
-    min-height: 72px;
-    display: grid;
-    align-content: center;
+    min-height: 134px;
     padding: 8px 5px;
     cursor: grab;
   }
-  .profile-collection .gift-card.reorder-compact .gem {
-    margin-bottom: 4px;
-    font-size: 18px;
+  .profile-collection .gift-card.reorder-compact .gift-emoji-container {
+    width: 52px;
+    height: 52px;
   }
   .profile-gift-loader {
     grid-column: 1/-1;
@@ -6957,36 +6994,44 @@ function openPinnedAnonInfo() {
   document.body.appendChild(backdrop);
 }
 
+function giftArtworkFallback(img) {
+  const fallback = img?.dataset?.fallback || '🎁';
+  const span = document.createElement('span');
+  span.className = img?.dataset?.fallbackClass || 'gift-artwork-fallback';
+  span.textContent = fallback;
+  img.replaceWith(span);
+}
+
+function _giftArtworkHtml(g, className = 'gift-emoji-img', fallbackClass = 'gem') {
+  const fallback = g.model_emoji || '🎁';
+  if (!g.custom_emoji_id) {
+    return `<span class="${esc(fallbackClass)}">${esc(fallback)}</span>`;
+  }
+  return `<img class="${esc(className)}" src="/emoji/${esc(g.custom_emoji_id)}"
+    alt="${esc(fallback)}" data-fallback="${esc(fallback)}"
+    data-fallback-class="${esc(fallbackClass)}" onerror="giftArtworkFallback(this)">`;
+}
+
 function _buildGiftCardHtml(g, isOwn, pinnedGiftId, compact = false) {
   if (!window._profileGiftContext) window._profileGiftContext = {};
   window._profileGiftContext[g.id] = { isOwn: !!isOwn, pinnedGiftId: pinnedGiftId || null };
-  if (compact) {
-    return `
-      <div class="gift-card reorder-compact" style="background:${(g.background && BG_HEX[g.background]) || 'var(--card2)'}" onclick="openProfileGiftModal(${g.id})">
-        <div class="gem">${esc(g.model_emoji || '🎁')}</div>
-        <div class="gname">${esc(g.model_name)}</div>
-        <div class="gtier">#${g.gift_number || g.id}</div>
-      </div>`;
-  }
   const tierColor = { common:'', uncommon:'', rare:'rare', epic:'epic', legendary:'legendary' };
-  const hasAnim = !!g.custom_emoji_id;
-  const innerEmoji = g.custom_emoji_id
-    ? `<img class="gift-emoji-img" src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<div class=\\'gem\\'>🎁</div>'">`
-    : `<div class="gem">${g.model_emoji || '🎁'}</div>`;
-  const gemHtml = `<div class="gift-emoji-container">${innerEmoji}</div>`;
+  const hasAnim = !!g.custom_emoji_id && !compact;
+  const gemHtml = `<div class="gift-emoji-container">${_giftArtworkHtml(g)}</div>`;
   const isPinned = pinnedGiftId === g.id;
   const ownCls = isOwn ? ' own-gift' : '';
   const pinnedCls = isPinned ? ' pinned-gift' : '';
   const adminCls = g.is_admin_gift ? ' admin-gift' : '';
+  const compactCls = compact ? ' reorder-compact' : '';
   const bgColor = (g.background && BG_HEX[g.background]) || 'var(--card2)';
   const animAttrs = hasAnim ? ` data-has-anim="true" data-emoji-id="${g.custom_emoji_id}"` : '';
   return `
-        <div class="gift-card${ownCls}${pinnedCls}${adminCls}"${animAttrs} style="cursor:pointer;background:${bgColor}" onclick="openProfileGiftModal(${g.id})">
+        <div class="gift-card${ownCls}${pinnedCls}${adminCls}${compactCls}"${animAttrs} style="cursor:pointer;background:${bgColor}" onclick="openProfileGiftModal(${g.id})">
           ${gemHtml}
           <div class="gname">${esc(g.model_name)}</div>
           <div class="gtier ${tierColor[g.tier]||''}">${g.tier} #${g.gift_number||g.id}</div>
-          ${g.is_admin_gift ? '<div class="profile-admin-gift-label">Admin gift · locked</div>' : ''}
-          ${isPinned ? '<div style="font-size:10px;color:var(--primary);margin-top:2px">📌 pinned</div>' : ''}
+          ${g.is_admin_gift ? '<div class="profile-admin-gift-label">Admin gift</div>' : ''}
+          ${isPinned ? '<div class="profile-gift-pin-mark" title="Pinned to profile">📌</div>' : ''}
         </div>`;
 }
 
@@ -7353,20 +7398,66 @@ function destroyGiftAnimations(root = null) {
 }
 
 function initAnimatedGift(cardEl, emojiId) {
-  if (!emojiId || !window.lottie) return;
+  if (!emojiId || !window.lottie || cardEl.dataset.animationLoading === 'true') return;
   const container = cardEl.querySelector('.gift-emoji-container');
   if (!container) return;
+  cardEl.dataset.animationLoading = 'true';
   fetch(`/emoji-anim/${emojiId}`)
     .then(r => r.ok ? r.json() : null)
     .then(animData => {
-      if (!animData || !cardEl.isConnected) return;
-      container.innerHTML = '';
-      const inst = lottie.loadAnimation({ container, renderer: 'svg', loop: false, autoplay: false, animationData: animData });
-      _lottieInstances.set(cardEl, inst);
-      cardEl.addEventListener('mouseenter', () => inst.goToAndPlay(0, true));
-      cardEl.addEventListener('mouseleave', () => { inst.stop(); inst.goToAndStop(0, true); });
+      if (!animData || !cardEl.isConnected) {
+        delete cardEl.dataset.animationLoading;
+        return;
+      }
+      const layer = document.createElement('div');
+      layer.className = 'gift-animation-layer';
+      container.appendChild(layer);
+      let inst;
+      try {
+        inst = lottie.loadAnimation({
+          container: layer,
+          renderer: 'svg',
+          loop: false,
+          autoplay: false,
+          animationData: animData,
+        });
+      } catch {
+        layer.remove();
+        delete cardEl.dataset.animationLoading;
+        return;
+      }
+      let animationDiscarded = false;
+      const keepStaticArtwork = () => {
+        if (animationDiscarded) return;
+        animationDiscarded = true;
+        try { inst.destroy(); } catch {}
+        layer.remove();
+        delete cardEl.dataset.animationLoading;
+      };
+      inst.addEventListener('data_failed', keepStaticArtwork);
+      inst.addEventListener('DOMLoaded', () => {
+        if (animationDiscarded) return;
+        if (!cardEl.isConnected) {
+          keepStaticArtwork();
+          return;
+        }
+        [...container.children].forEach(child => {
+          if (child !== layer) child.remove();
+        });
+        layer.style.visibility = 'visible';
+        inst.goToAndStop(0, true);
+        delete cardEl.dataset.animationLoading;
+        _lottieInstances.set(cardEl, inst);
+        cardEl.addEventListener('mouseenter', () => inst.goToAndPlay(0, true));
+        cardEl.addEventListener('mouseleave', () => {
+          inst.stop();
+          inst.goToAndStop(0, true);
+        });
+      });
     })
-    .catch(() => {});
+    .catch(() => {
+      delete cardEl.dataset.animationLoading;
+    });
 }
 
 function initAnimatedGiftsInGrid(gridEl) {
@@ -10466,10 +10557,7 @@ function setShopSection(section, force = false) {
 }
 
 function _shopGiftEmoji(g, className = '') {
-  if (g.custom_emoji_id) {
-    return `<img class="${className}" src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<span>${esc(g.model_emoji || '🎁')}</span>'">`;
-  }
-  return `<span>${esc(g.model_emoji || '🎁')}</span>`;
+  return _giftArtworkHtml(g, className, 'gift-artwork-fallback');
 }
 
 function _shopToast(message, kind = 'success') {
@@ -10589,14 +10677,10 @@ async function loadMkrt(reset = false) {
 function openMkrtListingDetail(listingId) {
   const item = _mkrtItems.find(g => g.listing_id === listingId);
   if (!item) return;
-  if (_gdLottie) { _gdLottie.destroy(); _gdLottie = null; }
 
   const hero = document.getElementById('giftDetailHero');
   hero.style.background = BG_HEX[item.background] || '#0e0f0f';
-  const emojiEl = document.getElementById('giftDetailEmoji');
-  emojiEl.innerHTML = item.custom_emoji_id
-    ? `<img src="/emoji/${esc(item.custom_emoji_id)}" alt="🎁" onerror="this.outerHTML='<span>🎁</span>'">`
-    : `<span>${esc(item.model_emoji || '🎁')}</span>`;
+  _renderGiftDetailArtwork(item);
   document.getElementById('giftDetailTitle').textContent =
     `${item.model_name} #${item.gift_number}`;
   document.getElementById('giftDetailRows').innerHTML = `
@@ -10931,8 +11015,9 @@ async function toggleSecurityMask(enabled) {
 
 function _walletGiftCardHtml(g) {
   const listed = !!g.listing_id;
+  const bgColor = BG_HEX[g.background] || '#0e0f0f';
   return `
-    <article class="wallet-gift-card">
+    <article class="wallet-gift-card" style="--gift-bg:${bgColor}">
       <div class="wallet-gift-top">
         <div class="wallet-gift-emoji">${_shopGiftEmoji(g)}</div>
         <div class="wallet-gift-copy">
@@ -10947,7 +11032,8 @@ function _walletGiftCardHtml(g) {
         : `Rift buyback <b>${fmtK(g.buyback_price)} ${WRK}</b>`}</div>
       <div class="wallet-gift-actions">
         ${g.is_admin_gift
-          ? '<button class="cancel" disabled>Not tradeable or sellable</button>'
+          ? `<button class="pin ${g.is_pinned ? 'active' : ''}" onclick="pinWalletGift(${g.is_pinned ? 'null' : g.id})">${g.is_pinned ? '📌 Unpin' : '📌 Pin to profile'}</button>
+             <button class="locked" disabled>Admin · not sellable</button>`
           : g.staked
           ? '<button class="cancel" disabled>Staked · unavailable</button>'
           : listed
@@ -10979,6 +11065,23 @@ function renderWalletGifts() {
 function loadMoreWalletGifts() {
   _walletGiftVisible += 40;
   renderWalletGifts();
+}
+
+async function pinWalletGift(giftId) {
+  if (!state.userId) return;
+  try {
+    await api('/api/profile/pin', {
+      method: 'POST',
+      json: { user_id: +state.userId, gift_id: giftId },
+    });
+    _shopToast(giftId === null ? 'Gift unpinned from profile' : 'Gift pinned to profile');
+    await loadShopWallet();
+    if (document.getElementById('page-profile')?.classList.contains('active')) {
+      loadOwnProfile();
+    }
+  } catch (e) {
+    _shopToast(e.message, 'error');
+  }
 }
 
 async function loadShopWallet() {
@@ -11273,43 +11376,78 @@ async function executeBuy(collection, modelNumber, background, btn) {
 // ── Gift Detail Modal ─────────────────────────────────────────────────────────
 let _gdCurrent = null;
 let _gdLottie = null;
+let _gdArtworkVersion = 0;
 
-function openGiftCard(idx) {
-  const g = _marketItems[idx];
-  if (!g) return;
-  _gdCurrent = g;
-
-  if (_gdLottie) { _gdLottie.destroy(); _gdLottie = null; }
-
-  const bg = BG_HEX[g.background] || '#0e0f0f';
-  const hero = document.getElementById('giftDetailHero');
-  hero.style.background = bg;
-
+function _renderGiftDetailArtwork(g) {
+  const version = ++_gdArtworkVersion;
+  if (_gdLottie) {
+    try { _gdLottie.destroy(); } catch {}
+    _gdLottie = null;
+  }
   const emojiEl = document.getElementById('giftDetailEmoji');
-  emojiEl.innerHTML = '';
+  emojiEl.innerHTML = _giftArtworkHtml(
+    g,
+    'gift-detail-static',
+    'gift-detail-fallback',
+  );
+  if (!g.custom_emoji_id || !window.lottie) return;
 
-  if (g.custom_emoji_id) {
-    const wrap = document.createElement('div');
-    wrap.className = 'gift-lottie-wrap';
-    emojiEl.appendChild(wrap);
-
-    fetch(`/emoji-anim/${g.custom_emoji_id}`)
-      .then(r => { if (!r.ok) throw new Error('static'); return r.json(); })
-      .then(animData => {
-        _gdLottie = lottie.loadAnimation({
+  fetch(`/emoji-anim/${g.custom_emoji_id}`)
+    .then(r => r.ok ? r.json() : null)
+    .then(animData => {
+      if (!animData || version !== _gdArtworkVersion) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'gift-lottie-wrap';
+      wrap.style.visibility = 'hidden';
+      emojiEl.appendChild(wrap);
+      let inst;
+      try {
+        inst = lottie.loadAnimation({
           container: wrap,
           renderer: 'svg',
           loop: true,
           autoplay: true,
           animationData: animData,
         });
-      })
-      .catch(() => {
-        emojiEl.innerHTML = `<img src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<span>🎁</span>'">`;
+      } catch {
+        wrap.remove();
+        return;
+      }
+      let animationDiscarded = false;
+      const discardAnimation = () => {
+        if (animationDiscarded) return;
+        animationDiscarded = true;
+        try { inst.destroy(); } catch {}
+        wrap.remove();
+      };
+      inst.addEventListener('data_failed', discardAnimation);
+      inst.addEventListener('DOMLoaded', () => {
+        if (animationDiscarded) return;
+        if (version !== _gdArtworkVersion || !emojiEl.isConnected) {
+          discardAnimation();
+          return;
+        }
+        [...emojiEl.children].forEach(child => {
+          if (child !== wrap) child.remove();
+        });
+        wrap.style.visibility = 'visible';
+        _gdLottie = inst;
       });
-  } else {
-    emojiEl.textContent = '🎁';
-  }
+    })
+    .catch(() => {
+      // The static artwork remains visible when an animated asset is unavailable.
+    });
+}
+
+function openGiftCard(idx) {
+  const g = _marketItems[idx];
+  if (!g) return;
+  _gdCurrent = g;
+
+  const bg = BG_HEX[g.background] || '#0e0f0f';
+  const hero = document.getElementById('giftDetailHero');
+  hero.style.background = bg;
+  _renderGiftDetailArtwork(g);
 
   document.getElementById('giftDetailTitle').textContent = `${g.model_name} #${g.min_gift_number}`;
 
@@ -11333,6 +11471,7 @@ function openGiftCard(idx) {
 }
 
 function closeGiftDetail() {
+  _gdArtworkVersion++;
   if (_gdLottie) { _gdLottie.destroy(); _gdLottie = null; }
   document.getElementById('giftDetailModal').classList.remove('open');
   _gdCurrent = null;
@@ -11342,30 +11481,12 @@ function openProfileGiftModal(giftId) {
   if (_sortableInstance) return; // block modal opens during reorder
   const g = (window._profileGifts || {})[giftId];
   if (!g) return;
-  if (_gdLottie) { _gdLottie.destroy(); _gdLottie = null; }
   _gdCurrent = null;
 
   const bg = BG_HEX[g.background] || '#0e0f0f';
   const hero = document.getElementById('giftDetailHero');
   hero.style.background = bg;
-
-  const emojiEl = document.getElementById('giftDetailEmoji');
-  emojiEl.innerHTML = '';
-  if (g.custom_emoji_id) {
-    const wrap = document.createElement('div');
-    wrap.className = 'gift-lottie-wrap';
-    emojiEl.appendChild(wrap);
-    fetch(`/emoji-anim/${g.custom_emoji_id}`)
-      .then(r => { if (!r.ok) throw new Error('static'); return r.json(); })
-      .then(animData => {
-        _gdLottie = lottie.loadAnimation({ container: wrap, renderer: 'svg', loop: true, autoplay: true, animationData: animData });
-      })
-      .catch(() => {
-        emojiEl.innerHTML = `<img src="/emoji/${g.custom_emoji_id}" alt="🎁" onerror="this.outerHTML='<span>🎁</span>'">`;
-      });
-  } else {
-    emojiEl.textContent = g.model_emoji || '🎁';
-  }
+  _renderGiftDetailArtwork(g);
 
   document.getElementById('giftDetailTitle').textContent = `${g.model_name} #${g.gift_number || g.id}`;
   const priceRow = g.current_price > 0
