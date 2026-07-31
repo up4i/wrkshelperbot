@@ -5221,7 +5221,7 @@
       <section class="wallet-panel" role="tabpanel" data-wallet-panel="gifts">
         <div class="wallet-section">
           <div class="wallet-section-head">
-            <div><b>Your Gifts</b><span>Sell to Rift or list on MKRT · shown 40 at a time</span></div>
+            <div><b>Your Gifts</b><span>All gifts loaded · sell or list without losing your place</span></div>
           </div>
           <div class="wallet-gift-grid" id="walletGiftGrid"><div class="loading">Loading…</div></div>
         </div>
@@ -10509,7 +10509,6 @@ let _anonSearch = '';
 let _anonSearchTimer = null;
 let _shopWallet = null;
 let _mkrtListingGiftId = null;
-let _walletGiftVisible = 40;
 
 function openShopHub() {
   setShopSection(_shopSection || 'rift', true);
@@ -11017,7 +11016,7 @@ function _walletGiftCardHtml(g) {
   const listed = !!g.listing_id;
   const bgColor = BG_HEX[g.background] || '#0e0f0f';
   return `
-    <article class="wallet-gift-card" style="--gift-bg:${bgColor}">
+    <article class="wallet-gift-card" data-wallet-gift-id="${g.id}" style="--gift-bg:${bgColor}">
       <div class="wallet-gift-top">
         <div class="wallet-gift-emoji">${_shopGiftEmoji(g)}</div>
         <div class="wallet-gift-copy">
@@ -11052,19 +11051,35 @@ function renderWalletGifts() {
     grid.innerHTML = '<div class="empty">No gifts in your wallet yet</div>';
     return;
   }
-  const visible = gifts.slice(0, _walletGiftVisible);
-  grid.innerHTML = visible.map(_walletGiftCardHtml).join('');
-  if (visible.length < gifts.length) {
-    grid.insertAdjacentHTML(
-      'beforeend',
-      `<button class="btn outline market-load-more" style="grid-column:1/-1" onclick="loadMoreWalletGifts()">Load 40 more · ${fmt(gifts.length - visible.length)} remaining</button>`,
-    );
+  grid.innerHTML = gifts.map(_walletGiftCardHtml).join('');
+}
+
+function _updateWalletGiftSummary() {
+  const gifts = _shopWallet?.gifts || [];
+  const giftCount = document.getElementById('walletGiftCount');
+  const walletBalance = document.getElementById('shopWalletBalance');
+  if (giftCount) giftCount.textContent = fmt(gifts.length);
+  if (walletBalance) {
+    walletBalance.innerHTML = `<small>Available</small>${fmtK(state.balance)} ${WRK}`;
   }
 }
 
-function loadMoreWalletGifts() {
-  _walletGiftVisible += 40;
-  renderWalletGifts();
+function _removeSoldWalletGift(giftId) {
+  if (!_shopWallet) return;
+  const walletScroller = document.querySelector('main');
+  const scrollTop = walletScroller?.scrollTop || 0;
+  _shopWallet.gifts = _shopWallet.gifts.filter(gift => gift.id !== giftId);
+
+  const card = document.querySelector(
+    `.wallet-gift-card[data-wallet-gift-id="${giftId}"]`,
+  );
+  if (card) card.remove();
+  if (!_shopWallet.gifts.length) renderWalletGifts();
+  _updateWalletGiftSummary();
+
+  requestAnimationFrame(() => {
+    if (walletScroller) walletScroller.scrollTop = scrollTop;
+  });
 }
 
 async function pinWalletGift(giftId) {
@@ -11104,11 +11119,9 @@ async function loadShopWallet() {
   try {
     const data = await api(`/api/wallet?user_id=${state.userId}`);
     _shopWallet = data;
-    _walletGiftVisible = 40;
     state.balance = data.balance;
     refreshHeaderBal();
-    document.getElementById('shopWalletBalance').innerHTML = `<small>Available</small>${fmtK(data.balance)} ${WRK}`;
-    document.getElementById('walletGiftCount').textContent = fmt(data.gifts.length);
+    _updateWalletGiftSummary();
     document.getElementById('walletAnonCount').textContent = fmt(data.anon_numbers.length);
     renderSecurityCenter(data.security);
     renderWalletGifts();
@@ -11135,9 +11148,13 @@ function confirmRiftSell(giftId) {
         json:{ user_id:+state.userId, gift_id:giftId },
       });
       state.balance = data.new_balance;
+      _shopWallet.balance = data.new_balance;
+      if (_shopWallet.security) _shopWallet.security.balance = data.new_balance;
       refreshHeaderBal();
-      _shopToast(`Sold gift #${data.gift_number} to Rift`);
-      loadShopWallet();
+      _removeSoldWalletGift(giftId);
+      _shopToast(
+        `Sold gift #${data.gift_number} · +${fmt(data.buyback_price)} WRK$`,
+      );
       _marketItems = [];
     },
     true,

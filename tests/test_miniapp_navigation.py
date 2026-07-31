@@ -138,6 +138,28 @@ def test_gift_artwork_stays_consistent_in_wallet_profile_and_reorder_mode():
     assert "The static artwork remains visible" in html
 
 
+def test_wallet_loads_every_gift_and_sales_do_not_refresh_the_page():
+    html = INDEX_HTML.read_text(encoding="utf-8")
+    wallet_renderer = html.split("function renderWalletGifts()", 1)[1].split(
+        "async function pinWalletGift",
+        1,
+    )[0]
+    sell_flow = html.split("function confirmRiftSell(giftId)", 1)[1].split(
+        "function openMkrtListModal",
+        1,
+    )[0]
+
+    assert "gifts.map(_walletGiftCardHtml)" in wallet_renderer
+    assert "_walletGiftVisible" not in html
+    assert "loadMoreWalletGifts" not in html
+    assert 'data-wallet-gift-id="${g.id}"' in html
+    assert "_removeSoldWalletGift(giftId)" in sell_flow
+    assert "loadShopWallet()" not in sell_flow
+    assert "walletScroller.scrollTop = scrollTop" in html
+    assert "data.buyback_price" in sell_flow
+    assert "data.buyback_price)} WRK$" in sell_flow
+
+
 def test_underground_explanatory_copy_has_a_readable_floor():
     html = INDEX_HTML.read_text(encoding="utf-8")
 
