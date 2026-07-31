@@ -200,7 +200,19 @@ def test_admin_gifts_are_locked_from_trade_and_shop(tmp_path, monkeypatch):
         conn.execute(
             "UPDATE gift_instances SET is_admin_gift=1 WHERE id=101"
         )
+        conn.execute(
+            "UPDATE economy SET pinned_gift_id=NULL WHERE user_id=1"
+        )
         conn.commit()
+
+    server.pin_gift(
+        server.PinGiftRequest(user_id=1, gift_id=101),
+        authenticated_user=1,
+    )
+    wallet = server.shop_wallet(user_id=1, authenticated_user=1)
+    admin_gift = next(gift for gift in wallet["gifts"] if gift["id"] == 101)
+    assert admin_gift["is_admin_gift"] == 1
+    assert admin_gift["is_pinned"] is True
 
     with pytest.raises(Exception, match="Admin gifts cannot be traded"):
         server.create_trade(
@@ -350,3 +362,32 @@ def test_large_profile_gift_pages_include_all_450_items(tmp_path, monkeypatch):
     admin_gift = next(gift for gift in all_gifts if gift["gift_number"] == 449)
     assert admin_gift["is_admin_gift"] == 1
     assert offset == 450
+
+
+def test_new_profile_gifts_are_appended_after_existing_gifts(tmp_path):
+    path = tmp_path / "profile-gift-order.db"
+    _seed_shop_db(path)
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "UPDATE gift_instances SET acquired_at = 10 WHERE id = 101"
+        )
+        conn.execute(
+            "UPDATE gift_instances SET acquired_at = 20 WHERE id = 102"
+        )
+        conn.execute(
+            "INSERT INTO gift_instances "
+            "(id, model_id, background, gift_number, owner_id, acquired_at) "
+            "VALUES (103, 1, 'grape', 9, 1, 30)"
+        )
+        conn.execute(
+            "INSERT INTO gift_prices "
+            "(collection, background, base_price, current_price, "
+            "demand_pressure, last_updated) "
+            "VALUES ('plush_pepe', 'grape', 10000000, 10000000, 0, 1)"
+        )
+        conn.commit()
+        conn.row_factory = sqlite3.Row
+
+        gifts = server._profile_gift_page(conn, 1, 0, 20)
+
+    assert [gift["id"] for gift in gifts] == [101, 102, 103]

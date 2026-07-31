@@ -13,20 +13,16 @@ import json
 import sys
 import os
 
-import re
-import unicodedata
-
 import aiosqlite
 from dotenv import load_dotenv
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from gift_artwork import clean_gift_model_name
 
 
 def clean_model_name(name: str) -> str:
     """Strip leading emoji / unicode remnants from parsed model names."""
-    # Remove zero-width joiners, variation selectors, black squares that leak from emoji
-    name = re.sub(r'^[‍‌️⃣⬛\s]+', '', name)
-    # Strip any remaining leading non-letter chars
-    name = re.sub(r'^[^\w\'"(]+', '', name)
-    return name.strip()
+    return clean_gift_model_name(name)
 
 load_dotenv()
 
