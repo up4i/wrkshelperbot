@@ -539,7 +539,7 @@ def _profile_gift_page(
         "FROM gift_instances gi JOIN gift_models gm ON gm.id = gi.model_id "
         "LEFT JOIN gift_prices gp ON gp.collection = gm.collection AND gp.background = gi.background "
         "WHERE gi.owner_id = ? "
-        "ORDER BY COALESCE(gi.sort_index, 999999) ASC, gi.acquired_at DESC "
+        "ORDER BY COALESCE(gi.sort_index, 999999) ASC, gi.acquired_at ASC "
         "LIMIT ? OFFSET ?",
         (user_id, gifts_limit, gifts_offset),
     ).fetchall()
