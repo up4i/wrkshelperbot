@@ -384,3 +384,97 @@ def test_crypto_heists_are_available_with_optional_insider(heist_db):
         ["driver"],
     ]
     assert status["anon_changes_gameplay"] is False
+
+
+def test_equipment_roles_are_limited_to_two_and_can_be_swapped_at_ten_percent(
+    heist_db,
+):
+    for item_key in ("laptop", "stolen_car_keys"):
+        server.black_market_buy(
+            server.BlackMarketBuyRequest(
+                user_id=1,
+                item_key=item_key,
+                quantity=1,
+            ),
+            authenticated_user=1,
+        )
+
+    with pytest.raises(Exception, match="specialization slots are full"):
+        server.black_market_buy(
+            server.BlackMarketBuyRequest(
+                user_id=1,
+                item_key="stolen_pistol",
+                quantity=1,
+            ),
+            authenticated_user=1,
+        )
+
+    sold = server.black_market_sell(
+        server.BlackMarketSellRequest(
+            user_id=1,
+            item_key="laptop",
+            quantity=1,
+        ),
+        authenticated_user=1,
+    )
+    assert sold["payout"] == 250_000
+    assert {role["key"] for role in sold["equipment_specializations"]} == {
+        "driver"
+    }
+
+    server.black_market_buy(
+        server.BlackMarketBuyRequest(
+            user_id=1,
+            item_key="stolen_pistol",
+            quantity=1,
+        ),
+        authenticated_user=1,
+    )
+    status = server.heist_status(user_id=1, authenticated_user=1)
+    assert {role["key"] for role in status["equipment_specializations"]} == {
+        "driver",
+        "muscle",
+    }
+    assert status["max_equipment_specializations"] == 2
+
+
+def test_hacker_trace_is_static_shorter_and_allows_two_reroutes():
+    challenge, duration = server._make_heist_challenge("hacker")
+
+    assert challenge["kind"] == "chip_trace"
+    assert len(challenge["gates"]) == 8
+    assert challenge["max_errors"] == 2
+    assert "step_ms" not in challenge
+    assert duration == 60
+
+    two_errors = list(challenge["gates"])
+    for index in (0, 1):
+        two_errors[index] = (two_errors[index] + 1) % 3
+    assert server._heist_answer_is_correct("hacker", challenge, two_errors)
+
+    three_errors = list(two_errors)
+    three_errors[2] = (three_errors[2] + 1) % 3
+    assert not server._heist_answer_is_correct("hacker", challenge, three_errors)
+
+
+def test_preexisting_extra_gear_does_not_unlock_more_than_two_roles(heist_db):
+    with sqlite3.connect(heist_db) as conn:
+        conn.executemany(
+            """INSERT INTO underground_inventory
+               (user_id,item_key,quantity,updated_at) VALUES (6,?,?,1)""",
+            [
+                ("laptop", 1),
+                ("stolen_car_keys", 1),
+                ("stolen_pistol", 1),
+            ],
+        )
+        conn.commit()
+
+    status = server.heist_status(user_id=6, authenticated_user=6)
+    assert [
+        role["key"] for role in status["equipment_specializations"]
+    ] == ["hacker", "driver"]
+
+    created = _create("gas_station")
+    with pytest.raises(Exception, match="open equipment specialization slot"):
+        _invite(created["heist"]["id"], 6, "muscle")

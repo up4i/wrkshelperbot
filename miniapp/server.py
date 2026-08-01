@@ -2990,6 +2990,7 @@ _BLACK_MARKET_ITEMS = {
         "durable": True,
         "max_quantity": 1,
         "category": "tools",
+        "role": "hacker",
     },
     "hacking_usb": {
         "name": "Hacking USB",
@@ -2999,6 +3000,7 @@ _BLACK_MARKET_ITEMS = {
         "durable": False,
         "max_quantity": 5,
         "category": "tools",
+        "role": "hacker",
     },
     "stolen_car_keys": {
         "name": "Stolen Car Keys",
@@ -3008,6 +3010,7 @@ _BLACK_MARKET_ITEMS = {
         "durable": False,
         "max_quantity": 5,
         "category": "tools",
+        "role": "driver",
     },
     "stolen_pistol": {
         "name": "Stolen Pistol",
@@ -3017,6 +3020,7 @@ _BLACK_MARKET_ITEMS = {
         "durable": True,
         "max_quantity": 1,
         "category": "tools",
+        "role": "muscle",
     },
     "stolen_rifle": {
         "name": "Stolen Rifle",
@@ -3026,6 +3030,7 @@ _BLACK_MARKET_ITEMS = {
         "durable": True,
         "max_quantity": 1,
         "category": "tools",
+        "role": "muscle",
     },
     "insider_targ": {
         "name": "Insider Info: Targ",
@@ -3035,6 +3040,7 @@ _BLACK_MARKET_ITEMS = {
         "durable": False,
         "max_quantity": 1,
         "category": "intel",
+        "role": "insider",
     },
     "insider_gas": {
         "name": "Insider Info: Gas Station",
@@ -3044,6 +3050,7 @@ _BLACK_MARKET_ITEMS = {
         "durable": False,
         "max_quantity": 1,
         "category": "intel",
+        "role": "insider",
     },
     "insider_sim": {
         "name": "Insider Info: Carrier",
@@ -3053,6 +3060,7 @@ _BLACK_MARKET_ITEMS = {
         "durable": False,
         "max_quantity": 1,
         "category": "intel",
+        "role": "insider",
     },
     "insider_convoy": {
         "name": "Insider Info: Convoy",
@@ -3062,6 +3070,7 @@ _BLACK_MARKET_ITEMS = {
         "durable": False,
         "max_quantity": 1,
         "category": "intel",
+        "role": "insider",
     },
 }
 
@@ -3169,14 +3178,22 @@ _HEIST_ACTIVE_SECONDS = 30 * 60
 _HEIST_TASK_SECONDS = {
     "mastermind": 45,
     "insider": 45,
-    "hacker": 35,
+    "hacker": 60,
     "driver": 35,
     "muscle": 30,
 }
 _HEIST_INSIDER_BONUS_PERCENT = 15
+_MAX_HEIST_SPECIALIZATIONS = 2
+_BLACK_MARKET_RESALE_PERCENT = 10
 
 
 class BlackMarketBuyRequest(BaseModel):
+    user_id: int
+    item_key: str
+    quantity: int = 1
+
+
+class BlackMarketSellRequest(BaseModel):
     user_id: int
     item_key: str
     quantity: int = 1
@@ -3261,13 +3278,48 @@ def _inventory_payload(db, user_id: int) -> list[dict]:
             (user_id,),
         ).fetchall()
     }
+    active_roles = set(_owned_heist_specializations(db, user_id))
     return [
         {
             "key": key,
             **item,
             "quantity": rows.get(key, 0),
+            "resale_price": item["price"] * _BLACK_MARKET_RESALE_PERCENT // 100,
+            "specialization_active": item["role"] in active_roles,
         }
         for key, item in _BLACK_MARKET_ITEMS.items()
+    ]
+
+
+def _inventory_heist_roles(db, user_id: int) -> list[str]:
+    owned_keys = {
+        row["item_key"]
+        for row in db.execute(
+            """SELECT item_key FROM underground_inventory
+               WHERE user_id = ? AND quantity > 0""",
+            (user_id,),
+        ).fetchall()
+    }
+    return [
+        role
+        for role in ("hacker", "driver", "muscle", "insider")
+        if any(
+            item["role"] == role and key in owned_keys
+            for key, item in _BLACK_MARKET_ITEMS.items()
+        )
+    ]
+
+
+def _owned_heist_specializations(db, user_id: int) -> list[str]:
+    # The slice also immediately constrains accounts that bought more role
+    # categories before specialization limits existed, without deleting gear.
+    return _inventory_heist_roles(db, user_id)[:_MAX_HEIST_SPECIALIZATIONS]
+
+
+def _specialization_payload(db, user_id: int) -> list[dict]:
+    return [
+        {"key": role, **_HEIST_ROLE_META[role]}
+        for role in _owned_heist_specializations(db, user_id)
     ]
 
 
@@ -3291,6 +3343,11 @@ def _heist_role_group(config: dict, role: str) -> list[str] | None:
 
 
 def _missing_role_item(db, user_id: int, role: str, config: dict) -> str | None:
+    if (
+        role in _inventory_heist_roles(db, user_id)
+        and role not in _owned_heist_specializations(db, user_id)
+    ):
+        return "an open equipment specialization slot"
     if role == "hacker":
         if (
             _inventory_quantity(db, user_id, "laptop") < 1
@@ -3527,9 +3584,9 @@ def _make_heist_challenge(role: str) -> tuple[dict, int]:
     if role == "hacker":
         return {
             "kind": "chip_trace",
-            "gates": [random.randrange(3) for _ in range(12)],
+            "gates": [random.randrange(3) for _ in range(8)],
             "lanes": 3,
-            "step_ms": 650,
+            "max_errors": 2,
         }, _HEIST_TASK_SECONDS[role]
     if role == "driver":
         return {
@@ -3561,7 +3618,11 @@ def _heist_answer_is_correct(role: str, challenge: dict, answers: list) -> bool:
             path = [int(value) for value in answers]
         except (TypeError, ValueError):
             return False
-        return path == challenge.get("gates", [])
+        gates = challenge.get("gates", [])
+        if len(path) != len(gates):
+            return False
+        errors = sum(lane != gate for lane, gate in zip(path, gates))
+        return errors <= int(challenge.get("max_errors", 0))
     if role == "driver":
         obstacles = challenge.get("obstacles", [])
         try:
@@ -3623,15 +3684,21 @@ def _settle_heist_if_ready(db, heist_id: int, *, now: int) -> dict | None:
             (member["stake_paid"] + payout_each, member["user_id"]),
         )
         _add_underground_heat(db, member["user_id"], 20, now=now)
-        # Completing a heist preserves one future Insider charge for it.
-        _grant_inventory_item(
-            db,
-            member["user_id"],
-            intel_key,
-            1,
-            now=now,
-            cap=1,
-        )
+        specializations = _owned_heist_specializations(db, member["user_id"])
+        # Completing a heist preserves one future Insider charge when doing so
+        # cannot bypass the two-specialization equipment limit.
+        if (
+            "insider" in specializations
+            or len(specializations) < _MAX_HEIST_SPECIALIZATIONS
+        ):
+            _grant_inventory_item(
+                db,
+                member["user_id"],
+                intel_key,
+                1,
+                now=now,
+                cap=1,
+            )
     db.execute(
         """UPDATE heists
            SET status = 'completed', payout_bonus = ?, resolved_at = ?
@@ -3661,10 +3728,19 @@ def black_market_status(user_id: int, authenticated_user: AuthenticatedUser):
             "balance": wallet["balance"],
             "identity": identity,
             "catalog": [
-                {"key": key, **item}
+                {
+                    "key": key,
+                    **item,
+                    "resale_price": (
+                        item["price"] * _BLACK_MARKET_RESALE_PERCENT // 100
+                    ),
+                }
                 for key, item in _BLACK_MARKET_ITEMS.items()
             ],
             "inventory": _inventory_payload(db, user_id),
+            "equipment_specializations": _specialization_payload(db, user_id),
+            "max_equipment_specializations": _MAX_HEIST_SPECIALIZATIONS,
+            "resale_percent": _BLACK_MARKET_RESALE_PERCENT,
             "anon_discount": 0,
             "cover_note": (
                 "Your purchase log uses your +888 operating alias. "
@@ -3697,6 +3773,16 @@ def black_market_buy(
         if not wallet:
             raise HTTPException(404, "User not found")
         current = _inventory_quantity(db, req.user_id, req.item_key)
+        specializations = _owned_heist_specializations(db, req.user_id)
+        if (
+            item["role"] not in specializations
+            and len(specializations) >= _MAX_HEIST_SPECIALIZATIONS
+        ):
+            raise HTTPException(
+                400,
+                "Both equipment specialization slots are full. "
+                "Sell all gear from one role before switching.",
+            )
         if current + req.quantity > item["max_quantity"]:
             raise HTTPException(
                 400,
@@ -3742,6 +3828,75 @@ def black_market_buy(
         "quantity": current + req.quantity,
         "inventory": inventory,
         "anon_discount": 0,
+    }
+
+
+@app.post("/api/black-market/sell")
+def black_market_sell(
+    req: BlackMarketSellRequest,
+    authenticated_user: AuthenticatedUser,
+):
+    _require_actor(authenticated_user, req.user_id)
+    item = _BLACK_MARKET_ITEMS.get(req.item_key)
+    if not item:
+        raise HTTPException(404, "Black Market item not found")
+    if req.quantity < 1 or req.quantity > item["max_quantity"]:
+        raise HTTPException(
+            400,
+            f"Quantity must be 1–{item['max_quantity']}",
+        )
+    now = int(time.time())
+    with db_conn() as db:
+        db.execute("BEGIN IMMEDIATE")
+        wallet = db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?",
+            (req.user_id,),
+        ).fetchone()
+        if not wallet:
+            raise HTTPException(404, "User not found")
+        current = _inventory_quantity(db, req.user_id, req.item_key)
+        if current < req.quantity:
+            raise HTTPException(400, "You do not own that many")
+        committed = db.execute(
+            """SELECT 1 FROM heists h
+               JOIN heist_members hm ON hm.heist_id = h.id
+               WHERE hm.user_id = ? AND hm.role = ?
+                 AND hm.status = 'accepted'
+                 AND h.status IN ('forming','active')""",
+            (req.user_id, item["role"]),
+        ).fetchone()
+        if committed:
+            raise HTTPException(
+                400,
+                "That gear is committed to your current heist role",
+            )
+        payout = (
+            item["price"] * _BLACK_MARKET_RESALE_PERCENT // 100
+        ) * req.quantity
+        _set_inventory_quantity(
+            db,
+            req.user_id,
+            req.item_key,
+            current - req.quantity,
+            now=now,
+        )
+        db.execute(
+            "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+            (payout, req.user_id),
+        )
+        inventory = _inventory_payload(db, req.user_id)
+        specializations = _specialization_payload(db, req.user_id)
+        new_balance = wallet["balance"] + payout
+        db.commit()
+    return {
+        "ok": True,
+        "new_balance": new_balance,
+        "item_key": req.item_key,
+        "quantity": current - req.quantity,
+        "sold_quantity": req.quantity,
+        "payout": payout,
+        "inventory": inventory,
+        "equipment_specializations": specializations,
     }
 
 
@@ -3801,6 +3956,8 @@ def heist_status(user_id: int, authenticated_user: AuthenticatedUser):
             ],
             "role_meta": _HEIST_ROLE_META,
             "inventory": _inventory_payload(db, user_id),
+            "equipment_specializations": _specialization_payload(db, user_id),
+            "max_equipment_specializations": _MAX_HEIST_SPECIALIZATIONS,
             "current_heist": (
                 _heist_payload(db, current, user_id) if current else None
             ),

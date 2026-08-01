@@ -1202,6 +1202,20 @@
     background:rgba(245,158,11,.07); color:#f6d98e; font:850 8px system-ui; cursor:pointer;
   }
   .bm-buy:disabled { opacity:.4; cursor:default; }
+  .bm-actions { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .bm-actions .bm-buy:only-child { grid-column:1/-1; }
+  .bm-sell {
+    min-height:32px; border:1px solid rgba(251,113,133,.17); border-radius:9px;
+    background:rgba(251,113,133,.05); color:#fda4af; font:850 8px system-ui; cursor:pointer;
+  }
+  .gear-panel { padding:12px; border:1px solid rgba(103,232,249,.13); border-radius:16px; background:rgba(103,232,249,.025); }
+  .gear-panel-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:9px; }
+  .gear-panel-head b { font-size:10px; }
+  .gear-panel-head span { color:#8bdfea; font-size:8px; font-weight:850; }
+  .gear-role-list, .gear-item-list { display:flex; flex-wrap:wrap; gap:5px; }
+  .gear-role, .gear-item { padding:5px 7px; border:1px solid rgba(255,255,255,.07); border-radius:9px; color:#aab4bd; font-size:8px; }
+  .gear-item-list { margin-top:7px; }
+  .gear-panel-note { margin-top:8px; color:#6f7b85; font-size:7px; line-height:1.45; }
   .heist-list { display:grid; gap:9px; }
   .heist-card {
     overflow:hidden; padding:13px; border:1px solid rgba(255,255,255,.08); border-radius:17px;
@@ -1274,6 +1288,15 @@
     background:rgba(103,232,249,.045); color:#a5eef7; font:850 9px system-ui;
   }
   .lane-progress { margin:7px 0; color:#7d8994; font-size:8px; text-align:center; }
+  .hack-route { padding:14px; border:1px solid rgba(103,232,249,.12); border-radius:15px; background:#0b0d13; }
+  .hack-gates { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; min-height:92px; }
+  .hack-gate {
+    display:grid; place-items:center; border:1px solid rgba(255,255,255,.07); border-radius:11px;
+    color:#53606a; font:900 8px system-ui; text-transform:uppercase;
+  }
+  .hack-gate.open { border-color:#67e8f9; background:rgba(103,232,249,.13); box-shadow:0 0 18px rgba(103,232,249,.14); color:#bdf4fa; }
+  .hack-status { margin:9px 0 2px; color:#91a0ab; font-size:8px; text-align:center; }
+  .hack-status.bad { color:#fda4af; }
   .muscle-scene { display:grid; place-items:center; min-height:150px; border:1px solid rgba(255,255,255,.07); border-radius:14px; background:rgba(255,255,255,.025); }
   .muscle-target { font-size:50px; text-align:center; }
   .muscle-target small { display:block; margin-top:7px; color:#b5bec6; font-size:10px; text-transform:uppercase; letter-spacing:1px; }
@@ -9558,6 +9581,7 @@ function _inventoryMap(items) {
 function _blackMarketHtml(data) {
   if (!data) return '<div class="loading">Unsealing the inventory…</div>';
   const inventory = _inventoryMap(data.inventory);
+  const specializationCount = (data.equipment_specializations || []).length;
   const group = (category, label) => {
     const items = (data.catalog || []).filter(item => item.category === category);
     return `<div class="ug-section-label">${label}</div>
@@ -9569,16 +9593,36 @@ function _blackMarketHtml(data) {
           <h4>${esc(item.name)}</h4>
           <p>${esc(item.description)}</p>
           <div class="bm-item-meta"><b>${fmtK(item.price)} ${WRK}</b><span>Owned ${held}/${item.max_quantity}</span></div>
-          <button class="bm-buy" onclick="buyBlackMarketItem('${item.key}',this)" ${full ? 'disabled' : ''}>${full ? 'Inventory full' : 'Buy item'}</button>
+          <div class="bm-actions">
+            <button class="bm-buy" onclick="buyBlackMarketItem('${item.key}',this)" ${full ? 'disabled' : ''}>${full ? 'Full' : 'Buy'}</button>
+            ${held ? `<button class="bm-sell" onclick="sellBlackMarketItem('${item.key}',${held},${Number(item.resale_price || 0) * held})">Sell ${held > 1 ? `all ${held}` : 'back'}</button>` : ''}
+          </div>
         </article>`;
       }).join('')}</div>`;
   };
   return `<div class="ug-panel-stack">
     <div class="bm-balance"><div><span>Black Market wallet</span><b>${fmt(data.balance)} ${WRK}</b></div><button class="btn outline" onclick="loadBlackMarket(false)">↻</button></div>
     <div class="ug-info-card"><b>${data.identity?.anonymous ? '+888 purchase cover active' : 'Public purchase cover'}</b>${esc(data.cover_note)}</div>
+    <div class="ug-info-card"><b>Equipment specializations · ${specializationCount}/${Number(data.max_equipment_specializations || 2)}</b>You can own gear for two crew roles. To switch, sell every item tied to one role back here for ${Number(data.resale_percent || 10)}% of its shop price.</div>
     ${group('tools', 'Crew equipment')}
     ${group('intel', 'Insider information')}
   </div>`;
+}
+
+function _ownedHeistGearHtml(data) {
+  const owned = (data.inventory || []).filter(item => Number(item.quantity || 0) > 0);
+  const roles = data.equipment_specializations || [];
+  const maxRoles = Number(data.max_equipment_specializations || 2);
+  return `<section class="gear-panel">
+    <div class="gear-panel-head"><b>My gear</b><span>${roles.length}/${maxRoles} equipment specializations</span></div>
+    <div class="gear-role-list">${roles.length
+      ? roles.map(role => `<span class="gear-role">${role.icon} ${esc(role.name)}</span>`).join('')
+      : '<span class="gear-role">No equipped roles yet</span>'}</div>
+    <div class="gear-item-list">${owned.length
+      ? owned.map(item => `<span class="gear-item">${item.icon} ${esc(item.name)} ×${Number(item.quantity)}${item.specialization_active === false ? ' · inactive' : ''}</span>`).join('')
+      : '<span class="gear-item">Your underground inventory is empty</span>'}</div>
+    <div class="gear-panel-note">Mastermind needs no equipment. Buy or sell role gear in the Black Market; selling every item for a role frees that specialization slot.</div>
+  </section>`;
 }
 
 function _heistRolesText(type) {
@@ -9684,6 +9728,7 @@ function _heistInvitationHtml(invite) {
 function _heistsHtml(data) {
   if (!data) return '<div class="loading">Checking crew channels…</div>';
   const inventory = _inventoryMap(data.inventory);
+  const gear = _ownedHeistGearHtml(data);
   const invitations = (data.invitations || []).length
     ? `<div class="ug-section-label">Encrypted invitations</div><div class="heist-list">${data.invitations.map(_heistInvitationHtml).join('')}</div>`
     : '';
@@ -9691,11 +9736,12 @@ function _heistsHtml(data) {
     ? `<div class="ug-section-label">Recent operations</div>${data.history.map(item => `<div class="heist-history"><b>${item.icon} ${esc(item.name)}</b><span>${esc(item.status)}</span></div>`).join('')}`
     : '';
   if (data.current_heist) {
-    return `${invitations}${_currentHeistHtml(data.current_heist, data)}${history}`;
+    return `<div class="ug-panel-stack">${gear}${invitations}${_currentHeistHtml(data.current_heist, data)}${history}</div>`;
   }
   return `<div class="ug-panel-stack">
+    ${gear}
     ${invitations}
-    <div class="ug-info-card"><b>Crew rules</b>Every accepted member escrows the listed stake and completes a live role assignment. Tools unlock roles; expensive variants do not improve the odds. One failed assignment burns the crew’s setup stakes.</div>
+    <div class="ug-info-card"><b>Crew rules</b>Every accepted member escrows the listed stake and completes a live role assignment. Gear unlocks up to two equipment roles; expensive variants do not improve the odds. One failed assignment burns the crew’s setup stakes.</div>
     <div class="heist-list">${(data.types || []).map(type => _heistTypeCard(type, inventory)).join('')}</div>
     ${history}
   </div>`;
@@ -9781,6 +9827,27 @@ async function buyBlackMarketItem(itemKey, btn) {
     _shopToast(e.message, 'error');
     btn.disabled = false;
   }
+}
+
+function sellBlackMarketItem(itemKey, quantity, payout) {
+  _shopConfirm(
+    'Sell gear to the Black Market?',
+    `This permanently removes ${quantity > 1 ? `all <b>${quantity}</b> units` : 'the item'} from your underground inventory. The fence pays only <b style="color:#fda4af">${fmt(payout)} ${WRK}</b>.`,
+    'Sell for 10%',
+    async () => {
+      const result = await api('/api/black-market/sell', {
+        method:'POST',
+        json:{ user_id:+state.userId, item_key:itemKey, quantity },
+      });
+      state.balance = result.new_balance;
+      refreshHeaderBal();
+      undergroundState.market = null;
+      undergroundState.heists = null;
+      _shopToast(`Gear fenced · +${fmt(result.payout)} ${WRK}`);
+      await loadBlackMarket(false);
+    },
+    true,
+  );
 }
 
 async function createHeist(heistKey, leaderRole, btn) {
@@ -9924,8 +9991,8 @@ function renderHeistTask(heist) {
   host.innerHTML = `<div class="heist-task-head"><div><b>${own.role_icon} ${title}</b><small id="heistTaskInstruction">Assignment is live</small></div><span class="heist-task-timer" id="heistTaskTimer">${_ugRemaining(own.challenge_expires_at)}</span></div><div id="heistGameBoard"></div>`;
   _startHeistCountdown(heist, game);
   if (challenge.kind === 'casing') _startCasingGame(game);
-  else if (challenge.kind === 'chip_trace') _startLaneGame(game, 'hacker');
-  else if (challenge.kind === 'getaway') _startLaneGame(game, 'driver');
+  else if (challenge.kind === 'chip_trace') _startHackerGame(game);
+  else if (challenge.kind === 'getaway') _startLaneGame(game);
   else _startMuscleGame(game);
 }
 
@@ -9958,47 +10025,83 @@ function selectCasingZone(zone, button) {
   if (game.answers.length === 3) resolveHeistTask(game.answers);
 }
 
-function _laneThreatHtml(game, mode) {
-  const sequence = mode === 'hacker' ? game.challenge.gates : game.challenge.obstacles;
+function _laneThreatHtml(game) {
+  const sequence = game.challenge.obstacles;
   const lane = sequence[game.step];
   if (lane == null) return '';
-  return mode === 'hacker'
-    ? `<div class="lane-threat lane-gate" style="--lane:${lane}">OPEN</div>`
-    : `<div class="lane-threat" style="--lane:${lane}">🚧</div>`;
+  return `<div class="lane-threat" style="--lane:${lane}">🚧</div>`;
 }
 
-function _startLaneGame(game, mode) {
-  game.mode = mode;
+function _startLaneGame(game) {
   const board = document.getElementById('heistGameBoard');
   const instruction = document.getElementById('heistTaskInstruction');
-  instruction.textContent = mode === 'hacker'
-    ? 'Move the trace into each illuminated gate'
-    : 'Switch lanes before each obstacle reaches the car';
+  instruction.textContent = 'Switch lanes before each obstacle reaches the car';
   board.innerHTML = `<div class="lane-game" id="laneGame">
       <div class="lane-track"><span></span><span></span><span></span></div>
-      <div class="lane-runner" id="laneRunner" style="--lane:1">${mode === 'hacker' ? '⚡' : '🏎️'}</div>
-      <div id="laneThreat">${_laneThreatHtml(game, mode)}</div>
+      <div class="lane-runner" id="laneRunner" style="--lane:1">🏎️</div>
+      <div id="laneThreat">${_laneThreatHtml(game)}</div>
     </div>
-    <div class="lane-progress" id="laneProgress">0 / ${(mode === 'hacker' ? game.challenge.gates : game.challenge.obstacles).length}</div>
+    <div class="lane-progress" id="laneProgress">0 / ${game.challenge.obstacles.length}</div>
     <div class="lane-controls"><button onclick="setHeistLane(0)">Left</button><button onclick="setHeistLane(1)">Center</button><button onclick="setHeistLane(2)">Right</button></div>`;
   const tick = () => {
     if (game.resolving || undergroundState.heistGame !== game) return;
-    const sequence = mode === 'hacker' ? game.challenge.gates : game.challenge.obstacles;
+    const sequence = game.challenge.obstacles;
     game.answers.push(game.lane);
     game.step += 1;
     const progress = document.getElementById('laneProgress');
     if (progress) progress.textContent = `${game.step} / ${sequence.length}`;
     if (game.step >= sequence.length) return resolveHeistTask(game.answers);
     const threat = document.getElementById('laneThreat');
-    if (threat) threat.innerHTML = _laneThreatHtml(game, mode);
+    if (threat) threat.innerHTML = _laneThreatHtml(game);
     undergroundState.heistTimers.push(setTimeout(tick, Number(game.challenge.step_ms || 600)));
   };
   undergroundState.heistTimers.push(setTimeout(tick, Number(game.challenge.step_ms || 600)));
 }
 
+function _startHackerGame(game) {
+  game.mistakes = 0;
+  game.locked = false;
+  document.getElementById('heistTaskInstruction').textContent = 'Move the trace into each illuminated gate. Tap the matching lane; nothing moves.';
+  _showHackerGate(game);
+}
+
+function _showHackerGate(game, feedback = '', bad = false) {
+  const board = document.getElementById('heistGameBoard');
+  const gate = game.challenge.gates[game.step];
+  const laneNames = ['Left', 'Center', 'Right'];
+  const maxErrors = Number(game.challenge.max_errors || 0);
+  if (!board || gate == null) return;
+  board.innerHTML = `<div class="hack-route">
+      <div class="hack-gates">${laneNames.map((name, lane) => `<div class="hack-gate ${lane === gate ? 'open' : ''}">${lane === gate ? 'OPEN' : esc(name)}</div>`).join('')}</div>
+      <div class="hack-status ${bad ? 'bad' : ''}">${feedback || `Gate ${game.step + 1} of ${game.challenge.gates.length} · tap the illuminated lane`} · ${Math.max(0, maxErrors - game.mistakes)} reroutes left</div>
+    </div>
+    <div class="lane-controls"><button onclick="answerHackerLane(0)">Left</button><button onclick="answerHackerLane(1)">Center</button><button onclick="answerHackerLane(2)">Right</button></div>`;
+}
+
+function answerHackerLane(lane) {
+  const game = undergroundState.heistGame;
+  if (!game || game.kind !== 'chip_trace' || game.resolving || game.locked) return;
+  game.locked = true;
+  const expected = Number(game.challenge.gates[game.step]);
+  game.answers.push(lane);
+  const missed = lane !== expected;
+  if (missed) game.mistakes += 1;
+  game.step += 1;
+  haptic(missed ? 'error' : 'success');
+  if (game.step >= game.challenge.gates.length) {
+    undergroundState.heistTimers.push(setTimeout(() => resolveHeistTask(game.answers), 250));
+    return;
+  }
+  undergroundState.heistTimers.push(setTimeout(() => {
+    if (undergroundState.heistGame !== game || game.resolving) return;
+    game.locked = false;
+    _showHackerGate(game, missed ? 'Wrong lane—the trace rerouted' : 'Gate cleared', missed);
+  }, 280));
+}
+
 function setHeistLane(lane) {
   const game = undergroundState.heistGame;
-  if (!game || !['chip_trace','getaway'].includes(game.kind) || game.resolving) return;
+  if (!game || game.kind !== 'getaway' || game.resolving) return;
   game.lane = lane;
   const runner = document.getElementById('laneRunner');
   if (runner) runner.style.setProperty('--lane', lane);
