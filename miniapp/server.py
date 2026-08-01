@@ -22,6 +22,9 @@ from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 import config
+from crafted_gifts import seed_crafted_gifts_connection
+from db import init_db
+from emojis import WRK_SYMBOL_ID
 from collectibles import (
     ANON_FIREWALL_COOLDOWN,
     ANON_MAX_SUFFIX,
@@ -964,6 +967,13 @@ _AVATAR_CACHE.mkdir(exist_ok=True)
 def get_emoji_image(emoji_id: str):
     if not emoji_id.isdigit():
         raise HTTPException(400, "Invalid emoji ID")
+
+    if emoji_id == WRK_SYMBOL_ID:
+        return FileResponse(
+            str(STATIC_DIR / "wrk-logo.svg"),
+            media_type="image/svg+xml",
+            headers={"Cache-Control": "public, max-age=31536000"},
+        )
 
     cached = _EMOJI_CACHE / f"{emoji_id}.webp"
     if cached.exists():
@@ -7123,6 +7133,7 @@ def game_timers():
 
 
 async def _startup():
+    await init_db(DB_PATH)
     with db_conn() as db:
         db.executescript(GAME_TOKEN_SCHEMA)
         db.executescript(SIMULATED_MARKET_SCHEMA)
@@ -7463,6 +7474,7 @@ async def _startup():
             db.commit()
         except Exception:
             pass
+        seed_crafted_gifts_connection(db)
         sync_gift_custom_emoji_ids_connection(db)
 
     return [

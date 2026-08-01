@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">WRK$</title>
+  <desc id="desc">WRK money round logo</desc>
+  <defs>
+    <radialGradient id="coin" cx="30%" cy="20%" r="90%">
+      <stop offset="0" stop-color="#38464a"/>
+      <stop offset="0.52" stop-color="#151b1d"/>
+      <stop offset="1" stop-color="#090b0c"/>
+    </radialGradient>
+    <linearGradient id="edge" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#eef8f5"/>
+      <stop offset="0.48" stop-color="#72807d"/>
+      <stop offset="1" stop-color="#25302e"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <circle cx="64" cy="64" r="57" fill="url(#coin)" stroke="url(#edge)" stroke-width="5" filter="url(#shadow)"/>
+  <path d="M24 46h80M20 79h88" fill="none" stroke="#34d399" stroke-width="3" stroke-linecap="round" opacity=".78"/>
+  <path d="M27 39 39 89 51 55 63 89 75 39" fill="none" stroke="#f7faf9" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M78 43h12c9 0 15 5 15 13 0 6-4 10-10 12l12 18H95L85 70h-1v16H74V43z" fill="#f7faf9"/>
+  <path d="M41 28h46M41 100h46" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".28"/>
+  <circle cx="101" cy="31" r="12" fill="#34d399" stroke="#09110e" stroke-width="3"/>
+  <text x="101" y="36" text-anchor="middle" fill="#07110d" font-family="Arial,sans-serif" font-size="15" font-weight="900">$</text>
+</svg>

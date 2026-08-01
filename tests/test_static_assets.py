@@ -22,13 +22,14 @@ def test_custom_badge_assets_referenced_by_ui_exist_and_are_not_empty():
         assert asset.stat().st_size > 1_000
 
 
-def test_wrk_brand_asset_is_cached_and_used_as_the_avatar_fallback():
+def test_wrk_brand_asset_is_tracked_and_used_as_the_avatar_fallback():
     html = INDEX_HTML.read_text(encoding="utf-8")
     wrk_id = "5093898072811898950"
-    cached = STATIC_DIR / "emoji_cache" / f"{wrk_id}.webp"
+    fallback = STATIC_DIR / "wrk-logo.svg"
 
-    assert cached.is_file()
-    assert cached.stat().st_size > 1_000
+    assert fallback.is_file()
+    assert fallback.stat().st_size > 500
+    assert 'href="/wrk-logo.svg"' in html
     assert f'src="/emoji/{wrk_id}"' in html
     assert f"this.src='/emoji/{wrk_id}'" in html
     assert not re.search(r"placeholder\.com|placehold\.co|dummyimage", html, re.I)
