@@ -1,5 +1,6 @@
 import time
 import pytest
+from crafted_gifts import CRAFTED_GIFT_MODELS, seed_crafted_gifts_connection
 from db import (
     init_db,
     seed_gifts, is_gifts_seeded,
@@ -44,6 +45,52 @@ async def test_seed_gifts_idempotent(db_path):
     await seed_gifts(db_path, MINI_CATALOG)
     gifts = await get_bank_gifts(db_path)
     assert len(gifts) == 12
+
+
+@pytest.mark.asyncio
+async def test_crafted_gifts_are_added_to_rift_idempotently(db_path):
+    await init_db(db_path)
+    catalog = {
+        "desk_calendar": {
+            "name": "Desk Calendar",
+            "emoji": "calendar",
+            "tier": "high",
+            "base_price": 1000,
+            "models": [
+                {"number": 1, "name": "Base Calendar", "rarity_pct": 1.0},
+            ],
+        },
+        "jingle_bells": {
+            "name": "Jingle Bells",
+            "emoji": "bells",
+            "tier": "high",
+            "base_price": 1000,
+            "models": [
+                {"number": 1, "name": "Base Bells", "rarity_pct": 1.0},
+            ],
+        },
+    }
+    await seed_gifts(db_path, catalog)
+
+    import sqlite3
+
+    with sqlite3.connect(db_path) as connection:
+        first_changes = seed_crafted_gifts_connection(connection)
+        second_changes = seed_crafted_gifts_connection(connection)
+        crafted_models = connection.execute(
+            "SELECT COUNT(*) FROM gift_models WHERE model_number >= 101"
+        ).fetchone()[0]
+        crafted_rift_stock = connection.execute(
+            "SELECT COUNT(*) FROM gift_instances gi "
+            "JOIN gift_models gm ON gm.id = gi.model_id "
+            "WHERE gm.model_number >= 101 AND gi.owner_id IS NULL"
+        ).fetchone()[0]
+
+    expected_models = sum(len(models) for models in CRAFTED_GIFT_MODELS.values())
+    assert first_changes == expected_models * 7
+    assert second_changes == 0
+    assert crafted_models == expected_models
+    assert crafted_rift_stock == expected_models * 6
 
 
 @pytest.mark.asyncio

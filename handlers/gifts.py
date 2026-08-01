@@ -9,6 +9,7 @@ from telegram.ext import ContextTypes
 
 import config
 import db
+from crafted_gifts import CRAFTED_GIFT_MODELS, seed_crafted_gifts
 from utils import display_name, parse_amount
 
 log = logging.getLogger(__name__)
@@ -93,7 +94,9 @@ async def cmd_seedgifts(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     from data.gift_catalog import CATALOG
     await msg.reply_text("⏳ Seeding gift catalog... this may take a moment.")
     await db.seed_gifts(config.DB_PATH, CATALOG)
-    total = sum(len(c["models"]) * 6 for c in CATALOG.values())
+    seed_crafted_gifts(config.DB_PATH)
+    crafted_total = sum(len(models) for models in CRAFTED_GIFT_MODELS.values())
+    total = (sum(len(c["models"]) for c in CATALOG.values()) + crafted_total) * 6
     await msg.reply_text(f"✅ Gift catalog seeded.\n{len(CATALOG)} collections · {total:,} unique instances")
 
 

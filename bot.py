@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import traceback
@@ -8,6 +9,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 
 import config
 from command_catalog import COMMANDS, PUBLIC_COMMANDS
+from crafted_gifts import seed_crafted_gifts
 from db import init_db
 import datetime
 from jobs import daily_price_update, simulated_market_tick, sweep_work_reminders
@@ -147,6 +149,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 async def post_init(app: Application) -> None:
     await init_db(config.DB_PATH)
+    await asyncio.to_thread(seed_crafted_gifts, config.DB_PATH)
     try:
         await app.bot.set_my_commands([
             BotCommand(command, description)

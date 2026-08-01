@@ -170,10 +170,11 @@ def test_roulette_results_and_craps_dice_have_clear_visual_feedback():
     assert "const bounce = Math.abs(Math.sin" in html
 
 
-def test_profile_gifts_keep_a_fixed_size_and_use_the_requested_black():
+def test_profile_gifts_keep_three_columns_and_use_the_requested_black():
     html = INDEX_HTML.read_text(encoding="utf-8")
 
-    assert "grid-template-columns: repeat(auto-fill, 104px)" in html
+    assert "grid-template-columns: repeat(3, minmax(0, 104px))" in html
+    assert "grid-template-columns: repeat(3, minmax(0,1fr))" in html
     assert "width: 104px;" in html
     assert "height: 134px;" in html
     assert "black: '#0e0f0f'" in html

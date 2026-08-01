@@ -67,6 +67,13 @@ def _is_model_line(text: str) -> tuple[str, str, float] | None:
     m = re.match(r"^(\S+)\s+(.+?)\s+[—–]\s*([\d.]+)%\s*$", text)
     if m:
         return m.group(1), m.group(2).strip(), float(m.group(3))
+    crafted = re.match(
+        r"^(\S+)\s+(.+?)\s+[—–]\s*(legendary|epic|rare|uncommon)\s*$",
+        text,
+        re.IGNORECASE,
+    )
+    if crafted:
+        return crafted.group(1), crafted.group(2).strip(), 0.0
     return None
 
 def _extract_collection_name(header_text: str) -> str | None:
@@ -110,10 +117,9 @@ def parse_gifts(path: str) -> dict:
             if m:
                 header_body = m.group(1).strip()
 
-                # Skip crafted collections
-                if "Crafted" in header_body:
-                    current = None
-                    continue
+                is_crafted = "Crafted Models" in header_body
+                if is_crafted:
+                    header_body = header_body.replace("Crafted Models", "Models")
 
                 col_name = _extract_collection_name(header_body)
                 if col_name is None:
@@ -133,6 +139,11 @@ def parse_gifts(path: str) -> dict:
                     continue
 
                 key = to_key(col_name)
+
+                if is_crafted and key in collections:
+                    current = key
+                    model_num = len(collections[key]["models"])
+                    continue
 
                 # If we've seen this key before (duplicate), overwrite it
                 # but keep track so we output in first-seen order

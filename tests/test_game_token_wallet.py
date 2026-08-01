@@ -127,6 +127,23 @@ def test_swap_quote_matches_execution_and_does_not_move_pool(wallet_db):
     assert execution["price_impact_pct"] == quote["price_impact_pct"]
 
 
+def test_swap_rejects_the_same_token_pair(wallet_db):
+    request = server.GameTokenSwapRequest(
+        user_id=1,
+        from_symbol="GRAM",
+        to_symbol="GRAM",
+        amount="1",
+    )
+
+    with pytest.raises(server.HTTPException) as quote_error:
+        server.game_wallet_swap_quote(request, authenticated_user=1)
+    with pytest.raises(server.HTTPException) as swap_error:
+        server.game_wallet_swap(request, authenticated_user=1)
+
+    assert quote_error.value.status_code == 400
+    assert swap_error.value.status_code == 400
+
+
 def test_custom_game_address_and_internal_token_send(wallet_db):
     server.game_wallet_topup(
         server.GameTokenAmountRequest(user_id=1, amount="6"),

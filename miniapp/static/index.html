@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#08080f">
 <meta name="color-scheme" content="dark light">
-<link rel="icon" type="image/webp" href="/emoji/5093898072811898950">
+<link rel="icon" type="image/svg+xml" href="/wrk-logo.svg">
 <title>wrk.money</title>
 <script>
   try {
@@ -2097,6 +2097,40 @@
   .game-wallet-send { display:grid; grid-template-columns:minmax(0,1fr) 92px; gap:7px; }
   .game-wallet-send .input:first-child { grid-column:1/-1; }
   .game-wallet-note { color:#7e8c91; font-size:9px; line-height:1.5; }
+  select.input { color-scheme:dark; }
+  select.input option,
+  .profile-stat-picker option,
+  .lb-more-select option {
+    background:#111821;
+    color:#eef5f3;
+  }
+  .stonk-title-row { display:flex; align-items:flex-end; justify-content:space-between; gap:10px; }
+  .stonk-gram-balance {
+    flex:none;
+    padding:6px 8px;
+    border:1px solid rgba(52,211,153,.22);
+    border-radius:10px;
+    background:rgba(52,211,153,.08);
+    color:#91edc8;
+    font-size:11px;
+    font-weight:900;
+    text-align:right;
+  }
+  .stonk-gram-balance small {
+    display:block;
+    margin-bottom:1px;
+    color:#77868b;
+    font-size:7px;
+    letter-spacing:.65px;
+    text-transform:uppercase;
+  }
+  .stonk-swap-form { display:flex; flex-direction:column; gap:8px; }
+  .stonk-swap-pair { display:grid; grid-template-columns:minmax(0,1fr) 38px minmax(0,1fr); gap:7px; align-items:end; }
+  .stonk-token-field { min-width:0; color:#7e8c91; font-size:8px; font-weight:850; letter-spacing:.7px; text-transform:uppercase; }
+  .stonk-token-field .input { width:100%; margin-top:4px; }
+  .stonk-flip-btn { min-height:44px; padding:0; font-size:17px; }
+  .stonk-swap-action { display:grid; grid-template-columns:minmax(0,1fr) 92px; gap:7px; }
+  .stonk-swap-action .input:first-child { grid-column:auto; }
   .token-market-grid { display:grid; gap:8px; }
   .token-market-card {
     display:grid;
@@ -4746,7 +4780,7 @@
     font-size: 10px !important;
   }
   .profile-collection .gifts-grid {
-    grid-template-columns: repeat(auto-fill, 104px);
+    grid-template-columns: repeat(3, minmax(0, 104px));
     grid-auto-rows: 134px;
     justify-content: center;
     gap: 7px;
@@ -4766,6 +4800,9 @@
     border-color: rgba(255,255,255,.08);
     border-radius: 16px;
     box-shadow: inset 0 1px rgba(255,255,255,.04);
+    contain: layout paint style;
+    content-visibility: auto;
+    contain-intrinsic-size: 104px 134px;
     transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
   }
   .profile-collection .gift-emoji-container {
@@ -4915,6 +4952,15 @@
     color: var(--text);
     border-color: var(--border-strong);
   }
+  html[data-theme="light"] select,
+  html[data-theme="light"] select.input,
+  html[data-theme="light"] select option,
+  html[data-theme="light"] .profile-stat-picker option,
+  html[data-theme="light"] .lb-more-select option {
+    color-scheme:light;
+    background:#fff;
+    color:#172033;
+  }
   html[data-theme="light"] .modal {
     background: #fff;
     box-shadow: 0 -20px 70px rgba(15,23,42,.22);
@@ -4962,8 +5008,100 @@
       radial-gradient(circle at 82% 14%, rgba(82,174,235,.18), transparent 34%),
       linear-gradient(135deg, #dcd7f8, #edf6fb);
   }
+  html[data-theme="light"] .profile-cover-label {
+    color:#38506b;
+    text-shadow:none;
+  }
+  html[data-theme="light"] .profile-cover-label::before { border-color:#466685; }
+  html[data-theme="light"] .profile-search-launch {
+    border-color:rgba(20,105,151,.3) !important;
+    background:#e5f2f9 !important;
+    color:#1e648b !important;
+  }
+  html[data-theme="light"] #profileTabRow {
+    border-color:rgba(15,23,42,.1);
+    background:rgba(255,255,255,.72);
+  }
+  html[data-theme="light"] #profileTabRow .tab-btn { color:#4a5667; }
+  html[data-theme="light"] #profileTabRow .tab-btn.active {
+    border-color:rgba(20,105,151,.25);
+    background:#dceef8;
+    color:#205f83;
+    box-shadow:0 3px 12px rgba(15,23,42,.08);
+  }
+  html[data-theme="light"] .shop-panel-hero .shop-panel-title { color:#f8fafc; }
   html[data-theme="light"] .profile-collection .gift-card {
     box-shadow: inset 0 1px rgba(255,255,255,.28), 0 5px 14px rgba(15,23,42,.08);
+  }
+  html[data-theme="light"] .home-community-details,
+  html[data-theme="light"] .game-wallet-card,
+  html[data-theme="light"] .token-market-card,
+  html[data-theme="light"] .market-model-note,
+  html[data-theme="light"] .profile-badges-panel,
+  html[data-theme="light"] .profile-stats,
+  html[data-theme="light"] .profile-feature {
+    border-color:rgba(15,23,42,.11);
+    background:rgba(255,255,255,.88);
+    box-shadow:0 8px 22px rgba(15,23,42,.055);
+  }
+  html[data-theme="light"] .home-community-details summary,
+  html[data-theme="light"] .game-wallet-head b,
+  html[data-theme="light"] .token-market-symbol,
+  html[data-theme="light"] .token-market-price,
+  html[data-theme="light"] .token-market-metrics b,
+  html[data-theme="light"] .profile-feature-value,
+  html[data-theme="light"] .profile-collection-title {
+    color:#1b2735;
+  }
+  html[data-theme="light"] .game-wallet-head span,
+  html[data-theme="light"] .game-wallet-note,
+  html[data-theme="light"] .token-market-name,
+  html[data-theme="light"] .token-market-source,
+  html[data-theme="light"] .token-market-metrics,
+  html[data-theme="light"] .market-model-note,
+  html[data-theme="light"] .profile-panel-title,
+  html[data-theme="light"] .profile-panel-title span:last-child,
+  html[data-theme="light"] .profile-stats .pstat .l,
+  html[data-theme="light"] .profile-feature-label,
+  html[data-theme="light"] .profile-pinned-label,
+  html[data-theme="light"] .profile-pinned-empty {
+    color:#526171;
+  }
+  html[data-theme="light"] .game-wallet-address {
+    border-color:rgba(15,23,42,.11);
+    background:#f3f6f7;
+    color:#344654;
+  }
+  html[data-theme="light"] .game-wallet-balance,
+  html[data-theme="light"] .token-market-price span,
+  html[data-theme="light"] .token-market-change.up,
+  html[data-theme="light"] .stonk-gram-balance { color:#087a54; }
+  html[data-theme="light"] .stonk-gram-balance {
+    border-color:rgba(8,122,84,.2);
+    background:#e7f7f0;
+  }
+  html[data-theme="light"] .stonk-gram-balance small,
+  html[data-theme="light"] .stonk-token-field { color:#526171; }
+  html[data-theme="light"] .profile-badge-slot,
+  html[data-theme="light"] .profile-ranks .rank-pill {
+    border-color:rgba(15,23,42,.1);
+    background:#f4f6f8;
+    color:#445161;
+  }
+  html[data-theme="light"] .profile-badge-slot.filled,
+  html[data-theme="light"] .profile-badge-slot.whale {
+    background:radial-gradient(circle, rgba(82,174,235,.12), #f5f9fb);
+  }
+  html[data-theme="light"] .token-whale-badge b { color:#087565; }
+  html[data-theme="light"] .profile-stat-picker {
+    border-color:rgba(15,23,42,.14);
+    background:#fff;
+    color:#172033;
+  }
+  html[data-theme="light"] .welcome-group-action {
+    border-color:rgba(98,68,204,.2);
+    background:rgba(114,82,220,.08);
+    color:#5436b2;
   }
   html[data-theme="light"] .ug-cover {
     background:
@@ -5016,6 +5154,9 @@
     .balance-pill { display: none !important; }
     .home-quick-grid { grid-template-columns: repeat(4, minmax(58px, 1fr)); gap: 6px; }
     .quick-action { padding-inline: 3px; font-size: 9px; }
+    .shop-menu-card { min-height:49px; flex-direction:column; gap:2px; padding:4px 2px; }
+    .shop-menu-icon { min-width:22px; height:22px; }
+    .shop-menu-name { max-width:100%; font-size:9px; line-height:1; }
     .game-modal { padding-inline: 12px; }
     .duck-lane { grid-template-columns: 20px minmax(0,1fr) 52px; }
     .lbj-table, .poker-table { border-width: 6px; padding-inline: 7px; }
@@ -5029,6 +5170,8 @@
     .profile-actions { grid-template-columns: repeat(2, minmax(0,1fr)); }
     .profile-actions .btn { font-size: 11px; }
     .profile-collection { padding-inline: 11px; }
+    .profile-collection .gifts-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .profile-collection .gift-card { width:100%; }
     .slots-auto-panel { grid-template-columns: minmax(0,1fr) 64px; }
     .slots-auto-panel .btn { grid-column: 1 / -1; }
   }
@@ -5534,16 +5677,24 @@
           <div class="shop-panel-mark">$</div>
           <div>
             <div class="shop-panel-kicker">Active simulated market · paid with GRAM</div>
-            <div class="shop-panel-title">STONK.fi</div>
+            <div class="stonk-title-row">
+              <div class="shop-panel-title">STONK.fi</div>
+              <div class="stonk-gram-balance" id="stonkGramBalance"><small>Your GRAM</small>—</div>
+            </div>
             <div class="shop-panel-copy">Every trade changes persistent pool reserves, prices, liquidity, volume, and market caps.</div>
           </div>
         </div>
         <div class="game-wallet-card">
-          <div class="game-wallet-send">
-            <select class="input" id="stonkFromToken" onchange="updateStonkQuote()"></select>
-            <select class="input" id="stonkToToken" onchange="updateStonkQuote()"></select>
-            <input class="input" id="stonkSwapAmount" inputmode="decimal" placeholder="Amount" oninput="updateStonkQuote()">
-            <button type="button" class="token-buy-btn" onclick="swapGameTokens()">Swap</button>
+          <div class="stonk-swap-form">
+            <div class="stonk-swap-pair">
+              <label class="stonk-token-field">From<select class="input" id="stonkFromToken" onchange="syncStonkTokenPair('from')"></select></label>
+              <button class="token-buy-btn stonk-flip-btn" type="button" aria-label="Reverse swap direction" onclick="flipStonkTokenPair()">⇄</button>
+              <label class="stonk-token-field">To<select class="input" id="stonkToToken" onchange="syncStonkTokenPair('to')"></select></label>
+            </div>
+            <div class="stonk-swap-action">
+              <input class="input" id="stonkSwapAmount" inputmode="decimal" placeholder="Amount" oninput="updateStonkQuote()">
+              <button type="button" class="token-buy-btn" id="stonkSwapBtn" onclick="swapGameTokens()" disabled>Swap</button>
+            </div>
           </div>
           <div class="game-wallet-note" id="stonkSwapQuote">Choose two game tokens to preview pool output and price impact.</div>
         </div>
@@ -7247,7 +7398,7 @@ function _giftArtworkHtml(g, className = 'gift-emoji-img', fallbackClass = 'gem'
   if (!g.custom_emoji_id) {
     return `<span class="${esc(fallbackClass)}">${esc(fallback)}</span>`;
   }
-  return `<img class="${esc(className)}" src="/emoji/${esc(g.custom_emoji_id)}"
+  return `<img class="${esc(className)}" src="/emoji/${esc(g.custom_emoji_id)}" loading="lazy" decoding="async"
     alt="${esc(fallback)}" data-fallback="${esc(fallback)}"
     data-fallback-class="${esc(fallbackClass)}" onerror="giftArtworkFallback(this)">`;
 }
@@ -7602,10 +7753,6 @@ async function _loadNextProfileGiftPage(trigger) {
         'beforeend',
         _buildGiftCardHtml(g, isOwn, pinnedId),
       );
-      const newCard = grid.lastElementChild;
-      if (newCard?.dataset.hasAnim) {
-        initAnimatedGift(newCard, newCard.dataset.emojiId);
-      }
     });
     const hasMore = !!d.has_more && d.gifts.length > 0;
     grid.dataset.giftsOffset = String(d.next_offset);
@@ -7715,10 +7862,15 @@ function initAnimatedGift(cardEl, emojiId) {
 }
 
 function initAnimatedGiftsInGrid(gridEl) {
-  if (!gridEl) return;
-  gridEl.querySelectorAll('.gift-card[data-has-anim="true"]').forEach(cardEl => {
-    if (!_lottieInstances.has(cardEl)) initAnimatedGift(cardEl, cardEl.dataset.emojiId);
-  });
+  if (!gridEl || gridEl.dataset.animationDelegated === 'true') return;
+  gridEl.dataset.animationDelegated = 'true';
+  const loadHoveredGift = event => {
+    const cardEl = event.target.closest?.('.gift-card[data-has-anim="true"]');
+    if (!cardEl || !gridEl.contains(cardEl) || _lottieInstances.has(cardEl)) return;
+    initAnimatedGift(cardEl, cardEl.dataset.emojiId);
+  };
+  gridEl.addEventListener('pointerover', loadHoveredGift, { passive:true });
+  gridEl.addEventListener('focusin', loadHoveredGift);
 }
 
 function showPinSheet(instanceId, isCurrentlyPinned) {
@@ -10919,6 +11071,7 @@ function setShopSection(section, force = false) {
     loadGameWallet();
   } else {
     loadTokenMarket();
+    loadGameWallet();
   }
   haptic();
 }
@@ -11005,6 +11158,38 @@ function _fillTokenSelect(select, selected) {
   if (_tokenMarket.tokens.some(token => token.symbol === current)) select.value = current;
 }
 
+function _syncStonkDisabledOptions() {
+  const from = document.getElementById('stonkFromToken');
+  const to = document.getElementById('stonkToToken');
+  if (!from || !to) return;
+  [...from.options].forEach(option => { option.disabled = option.value === to.value; });
+  [...to.options].forEach(option => { option.disabled = option.value === from.value; });
+}
+
+function syncStonkTokenPair(changedSide) {
+  const from = document.getElementById('stonkFromToken');
+  const to = document.getElementById('stonkToToken');
+  if (!from || !to || !_tokenMarket) return;
+  if (from.value === to.value) {
+    const selectToChange = changedSide === 'from' ? to : from;
+    const replacement = _tokenMarket.tokens.find(token => token.symbol !== (
+      changedSide === 'from' ? from.value : to.value
+    ));
+    if (replacement) selectToChange.value = replacement.symbol;
+  }
+  _syncStonkDisabledOptions();
+  updateStonkQuote();
+}
+
+function flipStonkTokenPair() {
+  const from = document.getElementById('stonkFromToken');
+  const to = document.getElementById('stonkToToken');
+  if (!from || !to) return;
+  [from.value, to.value] = [to.value, from.value];
+  _syncStonkDisabledOptions();
+  updateStonkQuote();
+}
+
 function prepareStonkSwap(symbol) {
   setShopSection('coins');
   const from = document.getElementById('stonkFromToken');
@@ -11016,7 +11201,7 @@ function prepareStonkSwap(symbol) {
     if (from) from.value = 'GRAM';
     if (to) to.value = symbol;
   }
-  updateStonkQuote();
+  syncStonkTokenPair('to');
   document.getElementById('stonkSwapAmount')?.focus();
 }
 
@@ -11026,9 +11211,13 @@ function updateStonkQuote() {
   const amountText = document.getElementById('stonkSwapAmount')?.value.trim() || '';
   const amount = Number(amountText);
   const el = document.getElementById('stonkSwapQuote');
+  const swapButton = document.getElementById('stonkSwapBtn');
   clearTimeout(_stonkQuoteTimer);
   const sequence = ++_stonkQuoteSeq;
-  if (!el || !from || !to || from.symbol === to.symbol || !Number.isFinite(amount) || amount <= 0) {
+  const validPair = !!from && !!to && from.symbol !== to.symbol;
+  const validAmount = Number.isFinite(amount) && amount > 0;
+  if (swapButton) swapButton.disabled = !state.userId || !validPair || !validAmount;
+  if (!el || !validPair || !validAmount) {
     if (el) el.textContent = 'Choose two different game tokens and enter an amount.';
     return;
   }
@@ -11057,6 +11246,11 @@ async function swapGameTokens() {
   const from = document.getElementById('stonkFromToken')?.value || '';
   const to = document.getElementById('stonkToToken')?.value || '';
   const amount = document.getElementById('stonkSwapAmount')?.value.trim() || '';
+  if (!from || !to || from === to) {
+    return _shopToast('Choose two different game tokens', 'error');
+  }
+  const swapButton = document.getElementById('stonkSwapBtn');
+  if (swapButton) swapButton.disabled = true;
   try {
     const result = await api('/api/game-wallet/swap', {
       method:'POST', json:{ user_id:+state.userId, from_symbol:from, to_symbol:to, amount },
@@ -11064,7 +11258,11 @@ async function swapGameTokens() {
     _shopToast(`Swapped ${result.amount_spent} ${result.from_symbol} for ${result.amount_received} ${result.to_symbol} · ${result.price_impact_pct}% impact`);
     _tokenMarket = null;
     await Promise.all([loadGameWallet(), loadTokenMarket()]);
-  } catch (error) { _shopToast(error.message, 'error'); }
+  } catch (error) {
+    _shopToast(error.message, 'error');
+  } finally {
+    updateStonkQuote();
+  }
 }
 
 async function topupGameGram() {
@@ -11154,6 +11352,10 @@ async function loadGameWallet() {
       ? `Active custom address: ${_gameWallet.custom_address}`
       : `A custom .wrk address costs ${_gameWallet.custom_address_price_gram} simulated GRAM.`;
     const gram = _gameWallet.holdings.find(item => item.symbol === 'GRAM');
+    const stonkGramBalance = document.getElementById('stonkGramBalance');
+    if (stonkGramBalance) {
+      stonkGramBalance.innerHTML = `<small>Your GRAM</small>${esc(gram?.display_amount || '0')}`;
+    }
     const quoteEl = document.getElementById('fragsGramQuote');
     if (quoteEl && gram) {
       const wrkRate = Math.ceil(Number(gram.price_usd) * _gameWallet.wrk_per_usd);
@@ -11179,9 +11381,11 @@ async function loadTokenMarket() {
     targets.forEach(([element, walletMode]) => {
       if (!walletMode) element.innerHTML = _tokenMarket.tokens.map(_tokenCardHtml).join('');
     });
-    _fillTokenSelect(document.getElementById('stonkFromToken'), 'GRAM');
-    _fillTokenSelect(document.getElementById('stonkToToken'), 'UTYA');
-    updateStonkQuote();
+    const fromSelect = document.getElementById('stonkFromToken');
+    const toSelect = document.getElementById('stonkToToken');
+    _fillTokenSelect(fromSelect, fromSelect?.value || 'GRAM');
+    _fillTokenSelect(toSelect, toSelect?.value || 'UTYA');
+    syncStonkTokenPair('to');
   } catch (error) {
     targets.forEach(([element]) => {
       element.innerHTML = `<div class="error-msg">${esc(error.message)}</div>`;
