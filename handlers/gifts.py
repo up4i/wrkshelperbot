@@ -9,7 +9,7 @@ from telegram.ext import ContextTypes
 
 import config
 import db
-from utils import display_name, is_admin, parse_amount
+from utils import display_name, parse_amount
 
 log = logging.getLogger(__name__)
 

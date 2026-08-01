@@ -3,10 +3,12 @@ import random
 import time
 import logging
 from html import escape
+from urllib.parse import quote
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions
 from telegram.error import TelegramError
 from telegram.ext import ContextTypes
+from telegram.helpers import escape_markdown
 
 import config
 import db
@@ -119,40 +121,53 @@ def _resolve_bet(arg: str, balance: int) -> int | None:
     return parse_amount(arg)
 
 
+def _social_hack_reward(target_balance: int) -> int:
+    """A rival hack risks a small, capped slice of the target's liquid wallet."""
+    return max(1, min(15_000, int(target_balance * random.uniform(0.01, 0.04))))
+
+
 async def _ensure_wallet(user: object, db_path: str) -> dict:
     await db.upsert_wallet(db_path, user.id, user.username, user.full_name)
     return await db.get_wallet(db_path, user.id)
 
 
-async def _check_topic(msg) -> bool:
-    """Returns True if the message is in the right place. Replies and returns False if not."""
-    if msg.chat.type not in ("group", "supergroup"):
-        return True
-    group = await db.get_group(config.DB_PATH, msg.chat.id)
-    if not group:
-        return True
-    bot_topic_id = group.get("bot_topic_id")
-    if not bot_topic_id:
-        return True
-    if msg.message_thread_id != bot_topic_id:
-        await msg.reply_text("⚠️ Economy commands only work in the bot topic.")
-        return False
-    return True
+async def _resolve_chat_target(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> dict | None:
+    """Resolve a game target from a reply first, then a chat-scoped @username."""
+    msg = update.effective_message
+    replied = msg.reply_to_message.from_user if msg.reply_to_message else None
+    if replied:
+        if replied.is_bot:
+            await msg.reply_text("❌ Bots can't join the WRK$ economy.")
+            return None
+        return {
+            "user_id": replied.id,
+            "full_name": display_name(replied),
+            "username": replied.username,
+        }
+    if not ctx.args:
+        return None
+    row = await db.get_user_by_username(config.DB_PATH, msg.chat.id, ctx.args[0])
+    if not row:
+        await msg.reply_text(
+            "❌ Can't find that player here. Reply to one of their messages or use their @username."
+        )
+        return None
+    return row
 
 
-def topic_gated(func):
-    """Decorator: blocks economy commands outside the configured bot topic."""
-    async def wrapper(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-        if not await _check_topic(update.effective_message):
-            return
-        return await func(update, ctx)
-    wrapper.__name__ = func.__name__
-    return wrapper
+async def _public_player_name(user_id: int, fallback: str) -> str:
+    profile = await db.get_profile(config.DB_PATH, user_id)
+    if profile and profile.get("identity_masked") and profile.get("pinned_anon"):
+        return profile["pinned_anon"]["number"]
+    if profile:
+        return profile.get("full_name") or (
+            f"@{profile['username']}" if profile.get("username") else fallback
+        )
+    return fallback
 
 
 # ── /balance ──────────────────────────────────────────────────────────────────
 
-@topic_gated
 async def cmd_balance(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     wallet = await _ensure_wallet(user, config.DB_PATH)
@@ -162,13 +177,14 @@ async def cmd_balance(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if mult > 1:
         streak_line += f" (daily bonus: {mult}x)"
     await update.effective_message.reply_text(
-        f"{_fmt(wallet)}\n{streak_line}", parse_mode="HTML"
+        f"🎮 <b>Fictional WRK$ game balance</b>\n{_fmt(wallet)}\n{streak_line}\n\n"
+        "Use /wallet for simulated GRAM and memecoins.",
+        parse_mode="HTML",
     )
 
 
 # ── /daily ────────────────────────────────────────────────────────────────────
 
-@topic_gated
 async def cmd_daily(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     wallet = await _ensure_wallet(user, config.DB_PATH)
@@ -502,7 +518,6 @@ async def _build_lb_text(tab: str) -> str:
         lines.append(f"{prefix} {display} — {val_str}")
     return "\n".join(lines)
 
-@topic_gated
 async def cmd_leaderboard(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     arg = (ctx.args[0].lower() if ctx.args else "balance")
     tab = _LB_ALIASES.get(arg, "balance")
@@ -543,7 +558,6 @@ async def _resolve_profile_target(update: Update, ctx: ContextTypes.DEFAULT_TYPE
         return row["user_id"]
     return update.effective_user.id
 
-@topic_gated
 async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     target_id = await _resolve_profile_target(update, ctx)
@@ -565,7 +579,7 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     # badges
     badge_list = await db.get_user_badges(config.DB_PATH, target_id, config.OWNER_ID)
-    badge_str = " ".join(emojis.BADGE_MAP[b] for b in badge_list if b in emojis.BADGE_MAP)
+    badge_str = emojis.badges_markup(badge_list)
     badge_line = f" {badge_str}" if badge_str else ""
 
     # pinned gift line
@@ -613,12 +627,73 @@ async def cmd_profile(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton(
             "View Profile in App",
-            url=f"https://t.me/wrkshelperbot/app?startapp=profile_{target_id}"
+            url=f"{config.MINI_APP_URL.split('?', 1)[0]}?startapp=profile_{target_id}"
         )
     ]])
     await msg.reply_text(text, parse_mode="HTML",
                          link_preview_options=LinkPreviewOptions(is_disabled=True),
                          reply_markup=keyboard)
+
+
+# ── /flex ─────────────────────────────────────────────────────────────────────
+
+async def cmd_flex(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Post a compact, shareable player card designed for group chats."""
+    msg = update.effective_message
+    target_id = await _resolve_profile_target(update, ctx)
+    if target_id is None:
+        return
+    profile = await db.get_profile(config.DB_PATH, target_id)
+    if not profile:
+        await msg.reply_text("❓ That player hasn't started a wallet yet.")
+        return
+
+    if profile.get("identity_masked") and profile.get("pinned_anon"):
+        name = profile["pinned_anon"]["number"]
+    else:
+        name = profile.get("full_name") or (
+            f"@{profile['username']}" if profile.get("username") else f"User {target_id}"
+        )
+    badges = await db.get_user_badges(config.DB_PATH, target_id, config.OWNER_ID)
+    badge_text = emojis.badges_markup(badges)
+    badge_line = f" {badge_text}" if badge_text else ""
+    job_title = _get_job(profile.get("work_count") or 0)[1]
+
+    collectible = ""
+    gift = profile.get("pinned_gift")
+    if gift:
+        if gift.get("custom_emoji_id"):
+            icon = (
+                f'<tg-emoji emoji-id="{gift["custom_emoji_id"]}">'
+                f'{escape(gift.get("model_emoji", "🎁"))}</tg-emoji>'
+            )
+        else:
+            icon = escape(gift.get("model_emoji", "🎁"))
+        collection = " ".join(word.capitalize() for word in gift["collection"].split("_"))
+        collectible = (
+            f"\n{icon} <b>{escape(collection)} #{gift['gift_number']}</b> · pinned flex"
+        )
+
+    app_url = f"{config.MINI_APP_URL.split('?', 1)[0]}?startapp=profile_{target_id}"
+    share_url = (
+        "https://t.me/share/url?url=" + quote(app_url, safe="")
+        + "&text=" + quote(f"Check out {name}'s WRK$ flex", safe="")
+    )
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("View full profile", url=app_url)],
+        [InlineKeyboardButton("Share this flex", url=share_url)],
+    ])
+    await msg.reply_text(
+        f"🏆 <b>{escape(name)} is flexing</b>{badge_line}\n"
+        f"{escape(job_title)}{collectible}\n\n"
+        f"💎 <b>{profile.get('net_worth', profile['balance']):,} {emojis.WRK}</b> net worth"
+        f" · rank #{profile.get('networth_rank', '?')}\n"
+        f"💰 {profile['balance']:,} liquid · 🔐 {profile.get('vault_value', 0):,} secured\n"
+        f"🎁 {profile['gift_count']} gifts · 🔥 {profile['streak']}d streak",
+        parse_mode="HTML",
+        link_preview_options=LinkPreviewOptions(is_disabled=True),
+        reply_markup=keyboard,
+    )
 
 
 # ── /workreminder ─────────────────────────────────────────────────────────────
@@ -693,7 +768,6 @@ async def cmd_setwrk(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /give ─────────────────────────────────────────────────────────────────────
 
-@topic_gated
 async def cmd_give(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -772,7 +846,6 @@ def _hack_display(word: str, revealed: set[int]) -> str:
     return " ".join(c if i in revealed else "_" for i, c in enumerate(word))
 
 
-@topic_gated
 async def cmd_hack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -794,32 +867,69 @@ async def cmd_hack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         else:
             revealed = set(int(x) for x in existing["revealed_indices"].split(",") if x)
             display = _hack_display(existing["word"], revealed)
+            target_note = (
+                f"\nTarget: *{escape_markdown(existing['target_name'])}*"
+                if existing.get("target_name") else ""
+            )
             await msg.reply_text(
                 f"🖥️ You already have an active hack session!\n\n"
-                f"`{display}`\n_{existing['clue']}_\n\n"
+                f"`{display}`\n_{existing['clue']}_{target_note}\n\n"
                 f"Attempts left: {existing['attempts']}\nUse `/guess <word>` to answer.",
                 parse_mode="Markdown"
             )
         return
 
+    target = None
+    if msg.reply_to_message or ctx.args:
+        target = await _resolve_chat_target(update, ctx)
+        if target is None:
+            return
+        if target["user_id"] == user.id:
+            await msg.reply_text("❌ You can't hack your own wallet.")
+            return
+        target_wallet = await db.get_wallet(config.DB_PATH, target["user_id"])
+        if not target_wallet or target_wallet["balance"] < 500:
+            await msg.reply_text("❌ That player needs at least 500 WRK$ in their liquid wallet.")
+            return
+        target["display_name"] = await _public_player_name(
+            target["user_id"], target.get("full_name") or "that player"
+        )
+
     word, clue = random.choice(_WORDLIST)
-    reward = random.randint(5000, 15000)
+    reward = (
+        _social_hack_reward(target_wallet["balance"])
+        if target else random.randint(5000, 15000)
+    )
     revealed_indices = "0"  # always reveal first letter
 
-    await db.save_hack_session(config.DB_PATH, user.id, word, clue, reward, revealed_indices)
+    await db.save_hack_session(
+        config.DB_PATH,
+        user.id,
+        word,
+        clue,
+        reward,
+        revealed_indices,
+        target_user_id=target["user_id"] if target else None,
+        target_name=target["display_name"] if target else None,
+        chat_id=msg.chat.id if target else None,
+    )
 
     display = _hack_display(word, {0})
+    intro = (
+        f"🎯 In-game target: *{escape_markdown(target['display_name'])}*\n"
+        if target else "🎯 Target: unclaimed simulation wallet\n"
+    )
     await msg.reply_text(
-        f"🖥️ *Hacking a wallet...*\n\n"
+        f"🖥️ *WRK$ wallet raid started*\n"
+        f"{intro}\n"
         f"Clue: _{clue}_\n\n"
         f"`{display}` ({len(word)} letters)\n\n"
         f"You have 5 attempts. Use `/guess <word>` to crack it.\n"
-        f"💰 Reward: {reward:,} WRK$",
+        f"💰 Max take: {reward:,} WRK$",
         parse_mode="Markdown"
     )
 
 
-@topic_gated
 async def cmd_guess(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -842,13 +952,79 @@ async def cmd_guess(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         now = int(time.time())
         await db.set_hack_cooldown(config.DB_PATH, user.id, now)
         reward = game["reward"]
-        new_bal = await db.update_balance(config.DB_PATH, user.id, reward)
         heat = await db.add_heat(config.DB_PATH, user.id, 10, now=now)
+        target_id = game.get("target_user_id")
+        if target_id:
+            firewall = await db.consume_anon_firewall(
+                config.DB_PATH, target_id, user.id, now=now
+            )
+            if firewall["blocked"]:
+                try:
+                    await ctx.bot.send_message(
+                        target_id,
+                        f"🛡️ +888 {firewall['suffix']:03d} blocked an in-game wallet raid. "
+                        "Your WRK$ is safe.",
+                    )
+                except TelegramError:
+                    pass
+                await msg.reply_text(
+                    f"🛡️ *ACCESS BLOCKED*\n\n"
+                    f"You cracked the word, but +888 {firewall['suffix']:03d}'s firewall "
+                    f"stopped the transfer. No WRK$ moved.\n"
+                    f"🔥 Heat: {heat}/100",
+                    parse_mode="Markdown",
+                )
+                return
+            transfer = await db.transfer_balance_up_to(
+                config.DB_PATH, target_id, user.id, reward
+            )
+            if not transfer:
+                await msg.reply_text(
+                    f"✅ *ACCESS GRANTED*\n\nThe word was `{word}`, but the target's "
+                    f"liquid wallet was empty before the transfer completed.\n"
+                    f"🔥 Heat: {heat}/100",
+                    parse_mode="Markdown",
+                )
+                return
+            reward = transfer["amount"]
+            new_bal = transfer["to_balance"]
+            token_loot = await db.raid_game_token(
+                config.DB_PATH,
+                target_id,
+                user.id,
+                random.randint(200, 500),
+                "hack",
+            )
+            token_notice = (
+                f" and {token_loot['display_amount']} ${token_loot['symbol']}"
+                if token_loot else ""
+            )
+            attacker_name = await _public_player_name(user.id, display_name(user))
+            try:
+                await ctx.bot.send_message(
+                    target_id,
+                    f"🖥️ {attacker_name} won an in-game wallet raid and took "
+                    f"{reward:,} WRK${token_notice} from your fictional wallet.",
+                )
+            except TelegramError:
+                pass
+            target_line = (
+                "\n🎯 Target: "
+                + escape_markdown(game.get("target_name") or "rival player")
+            )
+        else:
+            new_bal = await db.update_balance(config.DB_PATH, user.id, reward)
+            target_line = ""
+            token_loot = None
+        token_line = (
+            f"\n🪙 +{token_loot['display_amount']} ${token_loot['symbol']} taken"
+            if token_loot else ""
+        )
         await msg.reply_text(
             f"✅ *ACCESS GRANTED*\n\n"
             f"The word was `{word}`.\n"
-            f"You cracked the seed phrase and drained the wallet!\n\n"
-            f"💰 +{reward:,} WRK$ earned\n"
+            f"The in-game wallet raid succeeded!{target_line}\n\n"
+            f"💰 +{reward:,} WRK$ earned{token_line}\n"
             f"Balance: {new_bal:,} WRK$\n"
             f"🔥 Heat: {heat}/100",
             parse_mode="Markdown"
@@ -919,7 +1095,7 @@ def _highlow_result(current: int, next_card: int, direction: str) -> str:
 
 _ROB_SUCCESS = [
     ("🔫", "{robber} robbed {target} at gunpoint and walked away with {amount} WRK$!"),
-    ("🌱", "{robber} was randomly guessing seed phrases and cracked {target}'s wallet for {amount} WRK$!"),
+    ("🌱", "{robber} guessed {target}'s game-vault passcode and escaped with {amount} WRK$!"),
     ("📞", "{robber} was on a call and sneakily drained {target}'s wallet for {amount} WRK$!"),
     ("🎭", "{robber} pulled a classic social engineering play on {target} and got {amount} WRK$!"),
     ("🧢", "{robber} rug pulled {target} for {amount} WRK$. It was just a 'test token', bro."),
@@ -948,7 +1124,7 @@ _ROB_BAIL = [
     ("🚨", "{robber} got arrested trying to rob {target}! Had to post {amount} WRK$ bail."),
     ("⛓️", "{robber} got cuffed outside {target}'s wallet. Lawyer fees: {amount} WRK$."),
     ("🏛️", "{robber} went to trial for robbing {target} and lost. Court fined them {amount} WRK$!"),
-    ("📡", "{robber}'s heist on {target} was traced on-chain. Investigators froze {amount} WRK$."),
+    ("📡", "{robber}'s heist on {target} was traced in the game ledger. Investigators froze {amount} WRK$."),
     ("🕵️", "{robber} got doxxed attempting to rob {target}. Restitution order: {amount} WRK$."),
 ]
 
@@ -959,7 +1135,6 @@ _ROB_GETAWAY = [
     ("🧊", "{robber} fumbled the job on {target} but kept their cool and disappeared. No loss."),
 ]
 
-@topic_gated
 async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     robber = update.effective_user
@@ -973,18 +1148,21 @@ async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(f"⏳ Rob cooldown: {m}m {s}s remaining.")
         return
 
-    if not ctx.args:
-        await msg.reply_text("Usage: `/rob @username`", parse_mode="Markdown")
+    if not ctx.args and not msg.reply_to_message:
+        await msg.reply_text(
+            "Usage: reply to a player with `/rob`, or use `/rob @username`.",
+            parse_mode="Markdown",
+        )
         return
 
-    target_username = ctx.args[0]
-    target_row = await db.get_user_by_username(config.DB_PATH, msg.chat.id, target_username)
+    target_row = await _resolve_chat_target(update, ctx)
     if not target_row:
-        await msg.reply_text("❌ Can't find that user. They need to have sent a message first.")
         return
 
     target_id = target_row["user_id"]
-    target_name = target_row["full_name"] or target_username
+    target_name = await _public_player_name(
+        target_id, target_row.get("full_name") or "that player"
+    )
 
     if target_id == robber.id:
         await msg.reply_text("❌ You can't rob yourself.")
@@ -1028,12 +1206,44 @@ async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if result["outcome"] == "success":
         amount = result["amount"]
-        await db.update_balance(config.DB_PATH, target_id, -amount)
-        new_bal = await db.update_balance(config.DB_PATH, robber.id, amount)
+        transfer = await db.transfer_balance_up_to(
+            config.DB_PATH, target_id, robber.id, amount
+        )
+        if not transfer:
+            await msg.reply_text(
+                f"💨 {target_name} moved their liquid WRK$ before the transfer cleared.\n"
+                f"🔥 Heat: {heat}/100"
+            )
+            return
+        amount = transfer["amount"]
+        new_bal = transfer["to_balance"]
+        token_loot = await db.raid_game_token(
+            config.DB_PATH,
+            target_id,
+            robber.id,
+            random.randint(100, 300),
+            "rob",
+        )
+        token_line = (
+            f"\n🪙 +{token_loot['display_amount']} ${token_loot['symbol']} taken"
+            if token_loot else ""
+        )
         emoji, template = random.choice(_ROB_SUCCESS)
         line = template.format(robber=robber_name, target=target_name, amount=f"{amount:,}")
+        token_notice = (
+            f" and {token_loot['display_amount']} ${token_loot['symbol']}"
+            if token_loot else ""
+        )
+        try:
+            await ctx.bot.send_message(
+                target_id,
+                f"🥷 {robber_name} won an in-game robbery and took "
+                f"{amount:,} WRK${token_notice} from your fictional wallet.",
+            )
+        except TelegramError:
+            pass
         await msg.reply_text(
-            f"{emoji} {line}\n💰 Your balance: {new_bal:,} WRK$\n🔥 Heat: {heat}/100"
+            f"{emoji} {line}{token_line}\n💰 Your balance: {new_bal:,} WRK$\n🔥 Heat: {heat}/100"
         )
     elif result["outcome"] == "fine":
         amount = result["amount"]
@@ -1062,7 +1272,6 @@ async def cmd_rob(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /slots ────────────────────────────────────────────────────────────────────
 
-@topic_gated
 async def cmd_slots(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -1099,7 +1308,6 @@ async def cmd_slots(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /coinflip ─────────────────────────────────────────────────────────────────
 
-@topic_gated
 async def cmd_coinflip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -1145,7 +1353,6 @@ async def cmd_coinflip(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /dice ─────────────────────────────────────────────────────────────────────
 
-@topic_gated
 async def cmd_dice(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -1282,7 +1489,6 @@ async def _bj_resolve(query, game: dict, user_id: int, wallet: dict):
     )
 
 
-@topic_gated
 async def cmd_blackjack(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -1420,7 +1626,6 @@ async def blackjack_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ── /crash ────────────────────────────────────────────────────────────────────
 
-@topic_gated
 async def cmd_crash(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user
@@ -1575,7 +1780,6 @@ async def _crash_game_tick(ctx: ContextTypes.DEFAULT_TYPE):
         log.warning("crash tick edit failed chat=%s: %s", chat_id, e)
 
 
-@topic_gated
 async def cmd_cashout(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     user = update.effective_user

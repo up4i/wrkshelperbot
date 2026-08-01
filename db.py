@@ -1,3 +1,5 @@
+import asyncio
+import random
 import time
 import aiosqlite
 
@@ -8,36 +10,11 @@ from collectibles import (
     anon_number_price,
     format_anon_number,
 )
+from game_tokens import GAME_TOKEN_SCHEMA, default_wallet_address, format_token_amount
+from market_config import WHALE_SUPPLY_DIVISOR
+from simulated_market import SIMULATED_MARKET_SCHEMA, initialize_market
 
 _SCHEMA = """
-CREATE TABLE IF NOT EXISTS groups (
-    chat_id INTEGER PRIMARY KEY,
-    log_channel_id INTEGER,
-    warn_limit INTEGER DEFAULT 3,
-    warn_action TEXT DEFAULT 'mute',
-    warn_mute_duration INTEGER DEFAULT 3600,
-    default_mute_duration INTEGER
-);
-CREATE TABLE IF NOT EXISTS warnings (
-    chat_id INTEGER,
-    user_id INTEGER,
-    count INTEGER DEFAULT 0,
-    last_reason TEXT,
-    last_warned_at INTEGER,
-    PRIMARY KEY (chat_id, user_id)
-);
-CREATE TABLE IF NOT EXISTS punishments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    chat_id INTEGER,
-    user_id INTEGER,
-    action TEXT,
-    expires_at INTEGER
-);
-CREATE TABLE IF NOT EXISTS halo_users (
-    chat_id INTEGER,
-    user_id INTEGER,
-    PRIMARY KEY (chat_id, user_id)
-);
 CREATE TABLE IF NOT EXISTS user_activity (
     chat_id INTEGER,
     user_id INTEGER,
@@ -45,21 +22,6 @@ CREATE TABLE IF NOT EXISTS user_activity (
     full_name TEXT,
     last_seen INTEGER,
     PRIMARY KEY (chat_id, user_id)
-);
-CREATE TABLE IF NOT EXISTS autoreplies (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    chat_id INTEGER,
-    trigger TEXT COLLATE NOCASE,
-    response_type TEXT,
-    response_content TEXT,
-    response_caption TEXT,
-    UNIQUE(chat_id, trigger)
-);
-CREATE TABLE IF NOT EXISTS blocklist (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    chat_id INTEGER,
-    pattern TEXT COLLATE NOCASE,
-    UNIQUE(chat_id, pattern)
 );
 CREATE TABLE IF NOT EXISTS economy (
     user_id                    INTEGER PRIMARY KEY,
@@ -281,6 +243,8 @@ CREATE TABLE IF NOT EXISTS bot_roles (
     role    TEXT NOT NULL
 );
 """
+_SCHEMA += GAME_TOKEN_SCHEMA
+_SCHEMA += SIMULATED_MARKET_SCHEMA
 
 async def _migrate(db) -> None:
     # economy table migrations
@@ -411,8 +375,21 @@ async def _migrate(db) -> None:
         reward           INTEGER NOT NULL,
         attempts         INTEGER NOT NULL DEFAULT 5,
         revealed_indices TEXT    NOT NULL DEFAULT '0',
-        started_at       INTEGER NOT NULL
+        started_at       INTEGER NOT NULL,
+        target_user_id   INTEGER,
+        target_name      TEXT,
+        chat_id          INTEGER
     )""")
+    async with db.execute("PRAGMA table_info(hack_sessions)") as cur:
+        hack_cols = {row[1] async for row in cur}
+    for col, typedef in {
+        "target_user_id": "INTEGER",
+        "target_name": "TEXT",
+        "chat_id": "INTEGER",
+    }.items():
+        if col not in hack_cols:
+            await db.execute(f"ALTER TABLE hack_sessions ADD COLUMN {col} {typedef}")
+    await db.commit()
     await db.execute("""CREATE TABLE IF NOT EXISTS gift_market_listings (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
         gift_id    INTEGER NOT NULL REFERENCES gift_instances(id),
@@ -538,162 +515,11 @@ async def _migrate(db) -> None:
     )
     await db.commit()
 
-    # groups table migrations
-    async with db.execute("PRAGMA table_info(groups)") as cur:
-        cols = {row[1] async for row in cur}
-    new_cols = {
-        "rules": "TEXT",
-        "clean_service_msgs": "INTEGER DEFAULT 0",
-        "welcome_text": "TEXT",
-        "welcome_enabled": "INTEGER DEFAULT 1",
-        "goodbye_text": "TEXT",
-        "goodbye_enabled": "INTEGER DEFAULT 1",
-        "flood_limit": "INTEGER DEFAULT 0",
-        "flood_window": "INTEGER DEFAULT 30",
-        "flood_action": "TEXT DEFAULT 'mute'",
-        "flood_mute_duration": "INTEGER DEFAULT 600",
-        "blocklist_action": "TEXT DEFAULT 'delete'",
-        "locks": "TEXT",
-        "antiraid_enabled": "INTEGER DEFAULT 0",
-        "antiraid_limit": "INTEGER DEFAULT 5",
-        "antiraid_window": "INTEGER DEFAULT 30",
-        "antiraid_mute_duration": "INTEGER DEFAULT 600",
-        "bot_topic_id": "INTEGER",
-    }
-    for col, typedef in new_cols.items():
-        if col not in cols:
-            await db.execute(f"ALTER TABLE groups ADD COLUMN {col} {typedef}")
-            await db.commit()
-
 async def init_db(db_path: str) -> None:
     async with aiosqlite.connect(db_path) as db:
         await db.executescript(_SCHEMA)
         await _migrate(db)
-
-async def upsert_group(db_path: str, chat_id: int) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute("INSERT OR IGNORE INTO groups (chat_id) VALUES (?)", (chat_id,))
-        await db.commit()
-
-async def get_group(db_path: str, chat_id: int) -> dict | None:
-    async with aiosqlite.connect(db_path) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute("SELECT * FROM groups WHERE chat_id = ?", (chat_id,)) as cur:
-            row = await cur.fetchone()
-            return dict(row) if row else None
-
-async def update_group(db_path: str, chat_id: int, **kwargs) -> None:
-    if not kwargs:
-        return
-    cols = ", ".join(f"{k} = ?" for k in kwargs)
-    vals = list(kwargs.values()) + [chat_id]
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute(f"UPDATE groups SET {cols} WHERE chat_id = ?", vals)
-        await db.commit()
-
-async def add_warning(db_path: str, chat_id: int, user_id: int, reason: str) -> int:
-    now = int(time.time())
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute(
-            """INSERT INTO warnings (chat_id, user_id, count, last_reason, last_warned_at)
-               VALUES (?, ?, 1, ?, ?)
-               ON CONFLICT(chat_id, user_id) DO UPDATE SET
-                   count = count + 1,
-                   last_reason = excluded.last_reason,
-                   last_warned_at = excluded.last_warned_at""",
-            (chat_id, user_id, reason, now),
-        )
-        await db.commit()
-        async with db.execute(
-            "SELECT count FROM warnings WHERE chat_id = ? AND user_id = ?", (chat_id, user_id)
-        ) as cur:
-            row = await cur.fetchone()
-            return row[0]
-
-async def get_warnings(db_path: str, chat_id: int, user_id: int) -> dict | None:
-    async with aiosqlite.connect(db_path) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM warnings WHERE chat_id = ? AND user_id = ?", (chat_id, user_id)
-        ) as cur:
-            row = await cur.fetchone()
-            return dict(row) if row else None
-
-async def reset_warnings(db_path: str, chat_id: int, user_id: int) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute(
-            "DELETE FROM warnings WHERE chat_id = ? AND user_id = ?", (chat_id, user_id)
-        )
-        await db.commit()
-
-async def add_punishment(db_path: str, chat_id: int, user_id: int, action: str, expires_at: int | None) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute(
-            "INSERT INTO punishments (chat_id, user_id, action, expires_at) VALUES (?, ?, ?, ?)",
-            (chat_id, user_id, action, expires_at),
-        )
-        await db.commit()
-
-async def remove_punishment(db_path: str, chat_id: int, user_id: int, action: str) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute(
-            "DELETE FROM punishments WHERE chat_id = ? AND user_id = ? AND action = ?",
-            (chat_id, user_id, action),
-        )
-        await db.commit()
-
-async def get_expired_punishments(db_path: str) -> list[dict]:
-    now = int(time.time())
-    async with aiosqlite.connect(db_path) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM punishments WHERE expires_at IS NOT NULL AND expires_at <= ?", (now,)
-        ) as cur:
-            return [dict(r) async for r in cur]
-
-async def delete_punishment_by_id(db_path: str, punishment_id: int) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute("DELETE FROM punishments WHERE id = ?", (punishment_id,))
-        await db.commit()
-
-# --- halo ---
-
-async def give_halo(db_path: str, chat_id: int, user_id: int) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute(
-            "INSERT OR IGNORE INTO halo_users (chat_id, user_id) VALUES (?, ?)",
-            (chat_id, user_id),
-        )
-        await db.commit()
-
-async def remove_halo(db_path: str, chat_id: int, user_id: int) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute(
-            "DELETE FROM halo_users WHERE chat_id = ? AND user_id = ?",
-            (chat_id, user_id),
-        )
-        await db.commit()
-
-async def get_halos(db_path: str, chat_id: int) -> list[dict]:
-    async with aiosqlite.connect(db_path) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            """SELECT h.user_id, a.full_name, a.username
-               FROM halo_users h
-               LEFT JOIN user_activity a ON a.chat_id = h.chat_id AND a.user_id = h.user_id
-               WHERE h.chat_id = ?""",
-            (chat_id,),
-        ) as cur:
-            return [dict(r) async for r in cur]
-
-
-async def has_halo(db_path: str, chat_id: int, user_id: int) -> bool:
-    async with aiosqlite.connect(db_path) as db:
-        async with db.execute(
-            "SELECT 1 FROM halo_users WHERE chat_id = ? AND user_id = ?",
-            (chat_id, user_id),
-        ) as cur:
-            return await cur.fetchone() is not None
+    await asyncio.to_thread(initialize_market, db_path)
 
 # --- user activity ---
 
@@ -712,67 +538,6 @@ async def update_activity(
             (chat_id, user_id, username, full_name, now),
         )
         await db.commit()
-
-# --- blocklist ---
-
-async def add_blocked_pattern(db_path: str, chat_id: int, pattern: str) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute(
-            "INSERT OR IGNORE INTO blocklist (chat_id, pattern) VALUES (?, ?)",
-            (chat_id, pattern),
-        )
-        await db.commit()
-
-async def remove_blocked_pattern(db_path: str, chat_id: int, pattern: str) -> bool:
-    async with aiosqlite.connect(db_path) as db:
-        cur = await db.execute(
-            "DELETE FROM blocklist WHERE chat_id = ? AND pattern = ?",
-            (chat_id, pattern),
-        )
-        await db.commit()
-        return cur.rowcount > 0
-
-async def get_blocklist(db_path: str, chat_id: int) -> list[str]:
-    async with aiosqlite.connect(db_path) as db:
-        async with db.execute(
-            "SELECT pattern FROM blocklist WHERE chat_id = ? ORDER BY pattern", (chat_id,)
-        ) as cur:
-            return [row[0] async for row in cur]
-
-# --- autoreplies ---
-
-async def add_autoreply(
-    db_path: str, chat_id: int, trigger: str, response_type: str,
-    response_content: str, response_caption: str | None = None,
-) -> None:
-    async with aiosqlite.connect(db_path) as db:
-        await db.execute(
-            """INSERT INTO autoreplies (chat_id, trigger, response_type, response_content, response_caption)
-               VALUES (?, ?, ?, ?, ?)
-               ON CONFLICT(chat_id, trigger) DO UPDATE SET
-                   response_type = excluded.response_type,
-                   response_content = excluded.response_content,
-                   response_caption = excluded.response_caption""",
-            (chat_id, trigger, response_type, response_content, response_caption),
-        )
-        await db.commit()
-
-async def remove_autoreply(db_path: str, chat_id: int, trigger: str) -> bool:
-    async with aiosqlite.connect(db_path) as db:
-        cur = await db.execute(
-            "DELETE FROM autoreplies WHERE chat_id = ? AND trigger = ?",
-            (chat_id, trigger),
-        )
-        await db.commit()
-        return cur.rowcount > 0
-
-async def get_autoreplies(db_path: str, chat_id: int) -> list[dict]:
-    async with aiosqlite.connect(db_path) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            "SELECT * FROM autoreplies WHERE chat_id = ? ORDER BY trigger", (chat_id,)
-        ) as cur:
-            return [dict(r) async for r in cur]
 
 async def get_user_by_username(db_path: str, chat_id: int, username: str) -> dict | None:
     async with aiosqlite.connect(db_path) as db:
@@ -845,6 +610,16 @@ async def get_user_badges(db_path: str, user_id: int, owner_id: int) -> list[str
             row = await cur.fetchone()
             if row and row[0] == user_id:
                 badges.append("plush_pepe_1")
+        async with db.execute(
+            "SELECT b.symbol FROM game_token_balances b "
+            "JOIN simulated_market_pools p ON p.symbol = b.symbol "
+            "WHERE b.user_id = ? "
+            "AND b.amount > p.circulating_supply / ? "
+            "ORDER BY CAST(b.amount AS REAL) / p.circulating_supply DESC, b.symbol",
+            (user_id, WHALE_SUPPLY_DIVISOR),
+        ) as cur:
+            async for whale in cur:
+                badges.append(f"whale:{whale[0]}")
     return badges
 
 
@@ -855,19 +630,6 @@ async def list_eco_admins(db_path: str) -> list[dict]:
             """SELECT br.user_id, COALESCE(e.full_name, e.username, CAST(br.user_id AS TEXT)) AS name
                FROM bot_roles br LEFT JOIN economy e ON e.user_id = br.user_id
                WHERE br.role = 'ecoadmin'"""
-        ) as cur:
-            return [dict(r) async for r in cur]
-
-
-async def get_inactives(db_path: str, chat_id: int, since_ts: int) -> list[dict]:
-    async with aiosqlite.connect(db_path) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute(
-            """SELECT user_id, username, full_name, last_seen
-               FROM user_activity
-               WHERE chat_id = ? AND last_seen < ?
-               ORDER BY last_seen ASC""",
-            (chat_id, since_ts),
         ) as cur:
             return [dict(r) async for r in cur]
 
@@ -907,6 +669,106 @@ async def update_balance(db_path: str, user_id: int, delta: int) -> int | None:
             row = await cur.fetchone()
         await db.commit()
         return row[0] if row else None
+
+
+async def transfer_balance_up_to(
+    db_path: str,
+    from_user_id: int,
+    to_user_id: int,
+    max_amount: int,
+) -> dict | None:
+    """Atomically move up to ``max_amount`` of available WRK$ between wallets."""
+    if from_user_id == to_user_id or max_amount <= 0:
+        return None
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute("BEGIN IMMEDIATE")
+        async with db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (from_user_id,)
+        ) as cur:
+            sender = await cur.fetchone()
+        async with db.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (to_user_id,)
+        ) as cur:
+            recipient = await cur.fetchone()
+        if not sender or not recipient:
+            await db.rollback()
+            return None
+        amount = min(max_amount, max(0, int(sender[0])))
+        if amount <= 0:
+            await db.rollback()
+            return None
+        await db.execute(
+            "UPDATE economy SET balance = balance - ? WHERE user_id = ?",
+            (amount, from_user_id),
+        )
+        await db.execute(
+            "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+            (amount, to_user_id),
+        )
+        await db.commit()
+        return {
+            "amount": amount,
+            "from_balance": int(sender[0]) - amount,
+            "to_balance": int(recipient[0]) + amount,
+        }
+
+
+async def raid_game_token(
+    db_path: str,
+    victim_id: int,
+    attacker_id: int,
+    fraction_bps: int,
+    raid_type: str,
+) -> dict | None:
+    """Atomically steal a fraction of one fictional token holding."""
+    if victim_id == attacker_id or not 1 <= fraction_bps <= 10_000:
+        return None
+    now = int(time.time())
+    async with aiosqlite.connect(db_path) as connection:
+        await connection.execute("BEGIN IMMEDIATE")
+        async with connection.execute(
+            "SELECT symbol, amount FROM game_token_balances "
+            "WHERE user_id = ? AND amount > 0",
+            (victim_id,),
+        ) as cursor:
+            holdings = await cursor.fetchall()
+        if not holdings:
+            await connection.rollback()
+            return None
+
+        symbol, balance = random.choice(holdings)
+        amount = max(1, balance * fraction_bps // 10_000)
+        await connection.execute(
+            "UPDATE game_token_balances SET amount = amount - ? "
+            "WHERE user_id = ? AND symbol = ?",
+            (amount, victim_id, symbol),
+        )
+        await connection.execute(
+            "INSERT INTO game_wallets (user_id, wallet_address, created_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(user_id) DO NOTHING",
+            (attacker_id, default_wallet_address(attacker_id), now),
+        )
+        await connection.execute(
+            "INSERT INTO game_token_balances (user_id, symbol, amount) VALUES (?, ?, ?) "
+            "ON CONFLICT(user_id, symbol) DO UPDATE SET amount = amount + excluded.amount",
+            (attacker_id, symbol, amount),
+        )
+        for user_id, transaction_type, counterparty_id in (
+            (victim_id, f"{raid_type}_loss", attacker_id),
+            (attacker_id, f"{raid_type}_win", victim_id),
+        ):
+            await connection.execute(
+                "INSERT INTO game_token_transactions "
+                "(user_id, transaction_type, to_symbol, output_amount, "
+                "counterparty_user_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (user_id, transaction_type, symbol, amount, counterparty_id, now),
+            )
+        await connection.commit()
+        return {
+            "symbol": symbol,
+            "amount": amount,
+            "display_amount": format_token_amount(amount),
+        }
 
 
 async def record_game_stats(
@@ -1791,15 +1653,20 @@ async def get_hack_session(db_path: str, user_id: int) -> dict | None:
 
 async def save_hack_session(
     db_path: str, user_id: int, word: str, clue: str,
-    reward: int, revealed_indices: str
+    reward: int, revealed_indices: str, *, target_user_id: int | None = None,
+    target_name: str | None = None, chat_id: int | None = None,
 ) -> None:
     now = int(time.time())
     async with aiosqlite.connect(db_path) as db:
         await db.execute(
             """INSERT OR REPLACE INTO hack_sessions
-               (user_id, word, clue, reward, attempts, revealed_indices, started_at)
-               VALUES (?, ?, ?, ?, 5, ?, ?)""",
-            (user_id, word, clue, reward, revealed_indices, now),
+               (user_id, word, clue, reward, attempts, revealed_indices, started_at,
+                target_user_id, target_name, chat_id)
+               VALUES (?, ?, ?, ?, 5, ?, ?, ?, ?, ?)""",
+            (
+                user_id, word, clue, reward, revealed_indices, now,
+                target_user_id, target_name, chat_id,
+            ),
         )
         await db.commit()
 

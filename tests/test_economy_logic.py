@@ -11,6 +11,7 @@ from handlers.economy import (
     _craps_come_out,
     _highlow_result,
     _resolve_bet,
+    _social_hack_reward,
 )
 
 
@@ -148,6 +149,12 @@ def test_rob_outcome_fail_variants():
     assert "fine" in outcomes
     assert "bail" in outcomes
     assert "getaway" in outcomes
+
+
+def test_social_hack_reward_is_small_and_capped():
+    for _ in range(100):
+        assert 100 <= _social_hack_reward(10_000) <= 400
+        assert _social_hack_reward(1_000_000_000) == 15_000
 
 
 # ── Roulette ──────────────────────────────────────────────────────────────────

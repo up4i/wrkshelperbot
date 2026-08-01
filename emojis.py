@@ -19,3 +19,17 @@ BADGE_MAP = {
     "admin":        BADGE_ADMIN,
     "plush_pepe_1": BADGE_PLUSH1,
 }
+
+
+def badge_markup(badge: str) -> str:
+    if badge in BADGE_MAP:
+        return BADGE_MAP[badge]
+    if badge.startswith("whale:"):
+        symbol = badge.partition(":")[2]
+        if symbol and symbol.replace("_", "").isalnum():
+            return f"🐋 {symbol} Whale"
+    return ""
+
+
+def badges_markup(badges: list[str]) -> str:
+    return " · ".join(markup for badge in badges if (markup := badge_markup(badge)))

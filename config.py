@@ -19,3 +19,7 @@ except ValueError:
 DB_PATH: str = os.getenv("DB_PATH", os.path.expanduser("~/.local/share/wrkshelperbot/data.db"))
 LOG_FILE: str = os.getenv("LOG_FILE", os.path.expanduser("~/.local/share/wrkshelperbot/bot.log"))
 MINI_APP_URL: str = os.getenv("MINI_APP_URL", "https://t.me/wrkshelperbot/app")
+WRK_PER_USD: int = int(os.getenv("WRK_PER_USD", "1000000"))
+CUSTOM_ADDRESS_GRAM_PRICE: str = os.getenv("CUSTOM_ADDRESS_GRAM_PRICE", "5")
+if WRK_PER_USD <= 0:
+    raise ValueError("WRK_PER_USD must be positive")

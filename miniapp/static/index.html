@@ -892,7 +892,7 @@
   /* ── Underground ── */
   .earn-tabs {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0,1fr));
+    grid-template-columns: repeat(3, minmax(0,1fr));
     gap: 4px;
     padding: 4px;
     border: 1px solid rgba(255,255,255,.08);
@@ -1575,7 +1575,7 @@
   }
   .shop-menu {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0,1fr));
+    grid-template-columns: repeat(4, minmax(0,1fr));
     gap: 4px;
     padding: 4px;
     border: 1px solid rgba(255,255,255,.08);
@@ -1606,6 +1606,7 @@
   .shop-menu-card.rift { --shop-accent:#9b7bff; }
   .shop-menu-card.mkrt { --shop-accent:#53b5f5; }
   .shop-menu-card.fragsmint { --shop-accent:#f4bd60; }
+  .shop-menu-card.coins { --shop-accent:#34d399; }
   .shop-menu-icon {
     min-width: 25px;
     height: 25px;
@@ -1640,7 +1641,7 @@
   }
   .wallet-tabs {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0,1fr));
+    grid-template-columns: repeat(4, minmax(0,1fr));
     gap: 4px;
     padding: 4px;
     border: 1px solid rgba(255,255,255,.08);
@@ -1716,6 +1717,7 @@
   .shop-panel-hero.rift { --panel-accent:#a78bfa; --panel-glow:rgba(139,92,246,.28); }
   .shop-panel-hero.mkrt { --panel-accent:#7dd3fc; --panel-glow:rgba(14,165,233,.25); }
   .shop-panel-hero.fragsmint { --panel-accent:#f6cb7a; --panel-glow:rgba(245,158,11,.24); }
+  .shop-panel-hero.coins { --panel-accent:#6ee7b7; --panel-glow:rgba(16,185,129,.23); }
   .shop-panel-mark {
     width: 58px;
     height: 58px;
@@ -2055,6 +2057,74 @@
   }
   .wallet-gift-actions .locked { color:#9aa5ae; cursor:not-allowed; }
   .wallet-gift-actions .cancel { grid-column:1/-1; border-color:rgba(251,113,133,.22); color:#fda4af; }
+  .game-wallet-card {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    padding: 15px;
+    border: 1px solid rgba(52,211,153,.2);
+    border-radius: 19px;
+    background: radial-gradient(circle at 100% 0, rgba(52,211,153,.13), transparent 46%), #111821;
+  }
+  .game-wallet-head { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .game-wallet-head b { display:block; font-size:15px; }
+  .game-wallet-head span { display:block; margin-top:3px; color:#7f908e; font-size:9px; line-height:1.45; }
+  .game-wallet-address {
+    padding: 10px;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    background: rgba(0,0,0,.16);
+    color:#a9b8bc;
+    font: 700 10px ui-monospace, SFMono-Regular, monospace;
+    overflow-wrap:anywhere;
+  }
+  .game-wallet-balance { color:#89f0c5; font-size:22px; font-weight:900; }
+  .game-wallet-balance small { display:block; margin-bottom:2px; color:#77868b; font-size:8px; letter-spacing:.8px; text-transform:uppercase; }
+  .game-wallet-actions { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+  .game-wallet-actions button,
+  .token-buy-btn {
+    min-height:38px;
+    padding:8px;
+    border:1px solid rgba(52,211,153,.24);
+    border-radius:11px;
+    background:rgba(52,211,153,.1);
+    color:#91edc8;
+    font:800 10px system-ui;
+    cursor:pointer;
+  }
+  .game-wallet-actions button:disabled,
+  .token-buy-btn:disabled { opacity:.45; cursor:not-allowed; }
+  .game-wallet-send { display:grid; grid-template-columns:minmax(0,1fr) 92px; gap:7px; }
+  .game-wallet-send .input:first-child { grid-column:1/-1; }
+  .game-wallet-note { color:#7e8c91; font-size:9px; line-height:1.5; }
+  .token-market-grid { display:grid; gap:8px; }
+  .token-market-card {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+    gap:10px;
+    padding:12px;
+    border:1px solid rgba(255,255,255,.075);
+    border-radius:15px;
+    background:rgba(255,255,255,.025);
+  }
+  .token-market-symbol { font-size:13px; font-weight:900; }
+  .token-market-name { margin-top:2px; color:#78868c; font-size:8px; }
+  .token-market-price { margin-top:6px; color:#dce8e5; font-size:10px; }
+  .token-market-price span { color:#6ee7b7; }
+  .token-market-source { color:#68777d; font-size:8px; text-decoration:none; }
+  .token-market-change { margin-left:5px; font-size:9px; font-weight:900; }
+  .token-market-change.up { color:#6ee7b7; }
+  .token-market-change.down { color:#fb7185; }
+  .token-market-metrics { display:flex; flex-wrap:wrap; gap:4px 9px; margin-top:7px; color:#89979c; font-size:8px; }
+  .token-market-metrics b { color:#c5d2d0; font-weight:800; }
+  .token-sparkline { display:block; width:100%; max-width:230px; height:31px; margin-top:8px; overflow:visible; }
+  .token-sparkline .fill { opacity:.08; }
+  .market-model-note {
+    margin-bottom:9px; padding:10px 12px; border:1px solid rgba(52,211,153,.16);
+    border-radius:13px; background:rgba(52,211,153,.055); color:#8fa39e;
+    font-size:9px; line-height:1.5;
+  }
   .security-center {
     overflow: hidden;
     border: 1px solid rgba(82,174,235,.2);
@@ -2779,6 +2849,21 @@
     line-height: 1.05;
   }
   .welcome-card p { position: relative; z-index: 1; max-width: 400px; color: #b7b7c8; }
+  .welcome-group-action {
+    position: relative;
+    z-index: 1;
+    align-self: flex-start;
+    min-height: 34px;
+    margin-top: 14px;
+    padding: 7px 11px;
+    border: 1px solid rgba(255,255,255,.13);
+    border-radius: 11px;
+    background: rgba(255,255,255,.055);
+    color: #e7e1ff;
+    font-size: 10px;
+    font-weight: 780;
+    cursor: pointer;
+  }
   .home-quick-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -2810,6 +2895,41 @@
     margin-top: 4px;
   }
   .home-section-head span:last-child { color: var(--muted); font-size: 11px; }
+  .home-community-details {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 17px;
+    background: rgba(20,20,32,.72);
+  }
+  .home-community-details summary {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 14px;
+    color: #c9c5d8;
+    font-size: 12px;
+    font-weight: 760;
+    cursor: pointer;
+    list-style: none;
+  }
+  .home-community-details summary::-webkit-details-marker { display: none; }
+  .home-community-details summary::after { content: "＋"; color: var(--muted); font-size: 17px; }
+  .home-community-details[open] summary::after { content: "−"; }
+  .home-community-details .stats-grid { padding: 0 10px 10px; }
+  .lb-more-select {
+    width: 100%;
+    min-height: 42px;
+    margin-bottom: 12px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    background: var(--card2);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 650;
+  }
   .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .stat-card { min-width: 0; border-radius: 16px; padding: 13px 11px; background: rgba(20,20,32,.86); }
   .stat-card .label {
@@ -4454,6 +4574,14 @@
     border-color: rgba(82,174,235,.2);
     background: radial-gradient(circle, rgba(82,174,235,.13), rgba(3,7,18,.32));
   }
+  .profile-badge-slot.whale {
+    border-color: rgba(45,212,191,.28);
+    background: radial-gradient(circle at 50% 20%, rgba(45,212,191,.17), rgba(3,7,18,.34));
+  }
+  .token-whale-badge { display:grid; place-items:center; line-height:1.05; text-align:center; }
+  .token-whale-badge .whale-icon { font-size:19px; filter:drop-shadow(0 3px 7px rgba(45,212,191,.24)); }
+  .token-whale-badge b { margin-top:3px; color:#b8fff1; font-size:8px; letter-spacing:.2px; }
+  .token-whale-badge small { margin-top:2px; color:#5fb9aa; font-size:6px; font-weight:900; letter-spacing:1px; text-transform:uppercase; }
   .profile-badge-slot.empty::before {
     content: "+";
     width: 28px;
@@ -4566,7 +4694,7 @@
   }
   .profile-actions {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0,1fr));
+    grid-template-columns: repeat(2, minmax(0,1fr));
     gap: 7px;
     margin: 13px 14px 0;
   }
@@ -4898,7 +5026,7 @@
     .profile-avatar-shell .avatar { width: 86px; height: 86px; }
     .profile-name { font-size: 21px; }
     .profile-feature-grid { grid-template-columns: 1fr; }
-    .profile-actions { grid-template-columns: 1fr; }
+    .profile-actions { grid-template-columns: repeat(2, minmax(0,1fr)); }
     .profile-actions .btn { font-size: 11px; }
     .profile-collection { padding-inline: 11px; }
     .slots-auto-panel { grid-template-columns: minmax(0,1fr) 64px; }
@@ -4931,7 +5059,7 @@
       <button class="header-action visible theme-toggle" id="themeToggle" type="button" aria-label="Switch to light theme" title="Switch theme" onclick="toggleTheme()">☀️</button>
       <button class="header-action" id="headerSendBtn" type="button" aria-label="Send WRK" onclick="openSendWrkWithPicker()">↗</button>
       <div class="balance-pill" id="headerBal" onclick="goWallet()"></div>
-      <img class="header-avatar" id="headerAvatar" src="" alt="" onclick="goProfile()" onerror="this.style.display='none'">
+      <img class="header-avatar" id="headerAvatar" src="" alt="" onclick="goProfile()" onerror="this.onerror=null;this.src='/emoji/5093898072811898950'">
     </div>
   </header>
 
@@ -4942,24 +5070,13 @@
         <div class="eyebrow">Your WRK hub</div>
         <h2 id="homeGreeting">Make your next move.</h2>
         <p id="homeGreetingSub">Earn, play, collect, and climb — without leaving Telegram.</p>
+        <button class="welcome-group-action" type="button" onclick="openBotGroupPicker()">＋ Add WRK$ to a group</button>
       </div>
       <div class="home-quick-grid" aria-label="Quick actions">
         <button class="quick-action" type="button" onclick="showPage('games',document.querySelector('[data-page=games]'))"><span class="quick-icon">🎮</span>Play</button>
         <button class="quick-action" type="button" onclick="showPage('work',document.querySelector('[data-page=work]'))"><span class="quick-icon">⚡</span>Earn</button>
         <button class="quick-action" type="button" onclick="openSendWrkWithPicker()"><span class="quick-icon">↗️</span>Send</button>
         <button class="quick-action" type="button" onclick="showPage('lb',null)"><span class="quick-icon">🏆</span>Ranks</button>
-      </div>
-      <div class="home-section-head">
-        <div class="home-section-label">Community pulse</div>
-        <span>Live economy</span>
-      </div>
-      <div class="stats-grid" id="homeStats">
-        <div class="stat-card"><div class="label">Total Users</div><div class="value purple" id="statUsers">—</div></div>
-        <div class="stat-card"><div class="label">WRK in Circulation</div><div class="value gold" id="statWrk">—</div></div>
-        <div class="stat-card"><div class="label">Gifts Owned</div><div class="value green" id="statGifts">—</div></div>
-        <div class="stat-card"><div class="label">Top Balance</div><div class="value gold" id="statTop">—</div></div>
-        <div class="stat-card"><div class="label">Games Played</div><div class="value purple" id="statGames">—</div></div>
-        <div class="stat-card"><div class="label">Gifts in Bank</div><div class="value green" id="statBank">—</div></div>
       </div>
       <div class="card" id="homeAccountCard">
         <div class="card-title">Your account</div>
@@ -4970,6 +5087,17 @@
           </div>
         </div>
       </div>
+      <details class="home-community-details">
+        <summary><span>Community stats</span><small>Live economy</small></summary>
+        <div class="stats-grid" id="homeStats">
+          <div class="stat-card"><div class="label">Total Users</div><div class="value purple" id="statUsers">—</div></div>
+          <div class="stat-card"><div class="label">WRK in Circulation</div><div class="value gold" id="statWrk">—</div></div>
+          <div class="stat-card"><div class="label">Gifts Owned</div><div class="value green" id="statGifts">—</div></div>
+          <div class="stat-card"><div class="label">Top Balance</div><div class="value gold" id="statTop">—</div></div>
+          <div class="stat-card"><div class="label">Games Played</div><div class="value purple" id="statGames">—</div></div>
+          <div class="stat-card"><div class="label">Gifts in Bank</div><div class="value green" id="statBank">—</div></div>
+        </div>
+      </details>
     </div>
 
     <!-- GAMES -->
@@ -4980,13 +5108,7 @@
       </div>
       <div id="gamesLoginWall" class="card">
         <div class="card-title">Sign in first</div>
-        <div class="search-row">
-          <input class="input" id="gamesUserId" placeholder="Your Telegram user ID" type="number">
-          <button class="btn" onclick="loginFromGames()">Set</button>
-        </div>
-        <div class="user-id-hint" style="margin-top:10px">
-          Send <strong>/id</strong> in the bot to get your ID.
-        </div>
+        <div class="loading">Checking your Telegram session…</div>
       </div>
       <div class="game-tabs">
         <div class="game-tab-btn active" id="gtabLive" onclick="setGameTab('live')">🔴 Live</div>
@@ -5083,14 +5205,17 @@
         <div class="tab-btn" onclick="setLbTab('networth',this)">💎 Net Worth</div>
         <div class="tab-btn" onclick="setLbTab('streak',this)">🔥 Streak</div>
         <div class="tab-btn" onclick="setLbTab('gifts',this)">🎁 Gifts</div>
-        <div class="tab-btn" onclick="setLbTab('gamble_won',this)">🤑 Gamble Won</div>
-        <div class="tab-btn" onclick="setLbTab('gamble_lost',this)">💀 Gamble Lost</div>
-        <div class="tab-btn" onclick="setLbTab('slots',this)">🎰 Slots</div>
-        <div class="tab-btn" onclick="setLbTab('coinflip',this)">🪙 Coinflip</div>
-        <div class="tab-btn" onclick="setLbTab('blackjack',this)">🃏 Blackjack</div>
-        <div class="tab-btn" onclick="setLbTab('crash',this)">🚀 Crash</div>
-        <div class="tab-btn" onclick="setLbTab('crash_mult',this)">📈 Best ×</div>
       </div>
+      <select class="lb-more-select" id="lbMoreSelect" aria-label="More leaderboard categories" onchange="setLbTab(this.value,null)">
+        <option value="">More rankings…</option>
+        <option value="gamble_won">Gambling · most won</option>
+        <option value="gamble_lost">Gambling · most lost</option>
+        <option value="slots">Slots winnings</option>
+        <option value="coinflip">Coinflip winnings</option>
+        <option value="blackjack">Blackjack winnings</option>
+        <option value="crash">Crash winnings</option>
+        <option value="crash_mult">Best crash multiplier</option>
+      </select>
       <div class="lb-list" id="lbList"><div class="loading">Loading...</div></div>
     </div>
 
@@ -5121,12 +5246,8 @@
           <div class="section-sub">Sign in to see your profile</div>
         </div>
         <div class="card">
-          <div class="card-title">Enter your Telegram ID</div>
-          <div class="search-row">
-            <input class="input" id="profileLoginId" placeholder="Your Telegram user ID" type="number">
-            <button class="btn" onclick="loginFromProfile()">Go</button>
-          </div>
-          <div class="user-id-hint" style="margin-top:10px">Send <strong>/id</strong> in the bot to find it.</div>
+          <div class="card-title">Telegram sign-in</div>
+          <div class="loading">Checking your Telegram session…</div>
         </div>
         <button class="btn outline profile-search-launch" style="width:100%" onclick="togglePlayerSearch()">⌕ Look up a Telegram player</button>
       </div>
@@ -5152,19 +5273,14 @@
       </div>
       <div class="earn-tabs" id="earnTabs" role="tablist" aria-label="Earn sections">
         <button class="earn-tab active" type="button" role="tab" aria-selected="true" data-earn="work" onclick="setEarnSection('work')">💼 Work</button>
+        <button class="earn-tab" type="button" role="tab" aria-selected="false" data-earn="crime" onclick="setEarnSection('crime')">🕵️ Crime</button>
         <button class="earn-tab" type="button" role="tab" aria-selected="false" data-earn="underground" onclick="setEarnSection('underground')">◉ Underground</button>
       </div>
 
       <!-- login wall -->
       <div id="workLoginWall" class="card">
         <div class="card-title">Sign in first</div>
-        <div class="search-row">
-          <input class="input" id="workUserId" placeholder="Your Telegram user ID" type="number">
-          <button class="btn" onclick="loginFromWork()">Set</button>
-        </div>
-        <div class="user-id-hint" style="margin-top:10px">
-          Send <strong>/id</strong> in the bot to get your ID.
-        </div>
+        <div class="loading">Checking your Telegram session…</div>
       </div>
 
       <div class="earn-authenticated" id="earnAuthenticated">
@@ -5181,9 +5297,14 @@
             </div>
             <div class="result-box" id="dailyResult" style="margin-top:8px"></div>
           </div>
-          <!-- Criminal activity -->
+        </section>
+
+        <section class="earn-panel" role="tabpanel" data-earn-panel="crime">
           <div id="workCrimeWrap" style="display:flex;flex-direction:column;gap:10px">
-            <div class="section-title" style="font-size:14px;margin-top:8px">🕵️ Criminal Activity</div>
+            <div class="card" style="padding:14px">
+              <div class="card-title">In-game wallet raids</div>
+              <div style="color:var(--muted);font-size:12px;line-height:1.5">Solve a hack puzzle or try a quick robbery. Both use fictional WRK$, cooldowns, Heat, and +888 firewall protection.</div>
+            </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div class="game-card" onclick="openHack()">
                 <div class="gicon">🖥️</div>
@@ -5212,13 +5333,14 @@
       <div class="wallet-page-heading">
         <div>
           <div class="section-title">Wallet</div>
-          <div class="section-sub">Your balance, security, and collectibles</div>
+          <div class="section-sub">WRK$, simulated coins, addresses, and collectibles</div>
         </div>
         <button class="wallet-profile-link" type="button" onclick="goProfile()">View profile</button>
       </div>
 
       <div class="wallet-tabs" id="walletTabs" role="tablist" aria-label="Wallet sections">
         <button class="wallet-tab active" type="button" role="tab" aria-selected="true" data-wallet="overview" onclick="setWalletSection('overview')">Overview</button>
+        <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet="assets" onclick="setWalletSection('assets')">Coins</button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet="gifts" onclick="setWalletSection('gifts')">Gifts <span id="walletGiftCount">0</span></button>
         <button class="wallet-tab" type="button" role="tab" aria-selected="false" data-wallet="numbers" onclick="setWalletSection('numbers')">Numbers <span id="walletAnonCount">0</span></button>
       </div>
@@ -5238,6 +5360,36 @@
         </div>
         <div id="walletSecurityCenter">
           <div class="loading">Loading Secure Number…</div>
+        </div>
+      </section>
+
+      <section class="wallet-panel" role="tabpanel" data-wallet-panel="assets">
+        <div class="game-wallet-card">
+          <div class="game-wallet-head">
+            <div><b>STONK Wallet</b><span>All balances and addresses here exist only inside the game.</span></div>
+            <button class="token-buy-btn" type="button" onclick="copyGameWalletAddress()">Copy</button>
+          </div>
+          <div class="game-wallet-address" id="gameWalletAddress">Loading game wallet…</div>
+          <div class="game-wallet-balance" id="gameWalletValue"><small>Token portfolio</small>—</div>
+          <div class="game-wallet-actions">
+            <button type="button" onclick="setShopSectionFromWallet('fragsmint')">Buy / cash out GRAM</button>
+            <button type="button" onclick="goCoinShop()">Open STONK.fi</button>
+          </div>
+          <div class="game-wallet-send">
+            <input class="input" id="sendTokenRecipient" autocomplete="off" placeholder="Game address, custom .wrk address, or @username">
+            <select class="input" id="sendTokenSymbol"></select>
+            <input class="input" id="sendTokenAmount" inputmode="decimal" placeholder="Amount">
+            <button type="button" class="token-buy-btn" onclick="sendGameToken()">Send coins</button>
+          </div>
+          <div class="game-wallet-send">
+            <input class="input" id="customWalletAddress" autocomplete="off" placeholder="yourname.wrk">
+            <button type="button" class="token-buy-btn" onclick="buyCustomWalletAddress()">Buy custom address</button>
+          </div>
+          <div class="game-wallet-note" id="customWalletPrice">Custom addresses replace the long display address and are paid for with simulated GRAM.</div>
+        </div>
+        <div class="wallet-section">
+          <div class="wallet-section-head"><div><b>Your coin holdings</b><span>Game balances valued from current simulated pool prices</span></div><span>↻</span></div>
+          <div class="token-market-grid" id="walletTokenMarket"><div class="loading">Loading token wallet…</div></div>
         </div>
       </section>
 
@@ -5284,6 +5436,10 @@
         <button class="shop-menu-card fragsmint" type="button" role="tab" aria-selected="false" data-shop="fragsmint" onclick="setShopSection('fragsmint')">
           <span class="shop-menu-icon">+888</span>
           <span class="shop-menu-name">Numbers</span>
+        </button>
+        <button class="shop-menu-card coins" type="button" role="tab" aria-selected="false" data-shop="coins" onclick="setShopSection('coins')">
+          <span class="shop-menu-icon">$</span>
+          <span class="shop-menu-name">Coins</span>
         </button>
       </div>
 
@@ -5350,6 +5506,20 @@
             <div class="shop-panel-copy">Own a six-digit Anonymous WRK$ Number and pin one to your profile.</div>
           </div>
         </div>
+        <div class="game-wallet-card">
+          <div class="game-wallet-head"><div><b>GRAM Exchange</b><span>Buy simulated GRAM with WRK$ or cash it back out at the current live rate.</span></div></div>
+          <div class="game-wallet-send">
+            <input class="input" id="fragsGramAmount" inputmode="decimal" placeholder="GRAM amount">
+            <button type="button" class="token-buy-btn" onclick="topupGameGram()">Buy GRAM</button>
+            <button type="button" class="token-buy-btn" onclick="cashoutGameGram()">Cash out</button>
+          </div>
+          <div class="game-wallet-note" id="fragsGramQuote">Loading the live GRAM → WRK$ exchange rate…</div>
+        </div>
+        <button class="rift-buyback-link" type="button" onclick="goWallet('assets')">
+          <span>◎</span>
+          <span><b>Open your STONK Wallet</b><small>View GRAM, memecoins, transfers, and custom game addresses</small></span>
+          <span>›</span>
+        </button>
         <input class="market-search" id="anonSearch" inputmode="numeric" placeholder="Find +888 001–999…" oninput="onAnonSearch(this.value)">
         <div class="anon-market-summary">
           <span><b>+888</b> permanent prefix</span>
@@ -5357,6 +5527,28 @@
           <span><b>30M</b> floor</span>
         </div>
         <div class="anon-grid" id="anonGrid"><div class="loading">Loading…</div></div>
+      </section>
+
+      <section class="shop-panel" id="shopPanelCoins" role="tabpanel" data-shop-panel="coins">
+        <div class="shop-panel-hero coins">
+          <div class="shop-panel-mark">$</div>
+          <div>
+            <div class="shop-panel-kicker">Active simulated market · paid with GRAM</div>
+            <div class="shop-panel-title">STONK.fi</div>
+            <div class="shop-panel-copy">Every trade changes persistent pool reserves, prices, liquidity, volume, and market caps.</div>
+          </div>
+        </div>
+        <div class="game-wallet-card">
+          <div class="game-wallet-send">
+            <select class="input" id="stonkFromToken" onchange="updateStonkQuote()"></select>
+            <select class="input" id="stonkToToken" onchange="updateStonkQuote()"></select>
+            <input class="input" id="stonkSwapAmount" inputmode="decimal" placeholder="Amount" oninput="updateStonkQuote()">
+            <button type="button" class="token-buy-btn" onclick="swapGameTokens()">Swap</button>
+          </div>
+          <div class="game-wallet-note" id="stonkSwapQuote">Choose two game tokens to preview pool output and price impact.</div>
+        </div>
+        <div class="market-model-note">STONK.fi uses simulated constant-product liquidity pools with a 0.30% fee per pool. Large orders receive worse execution and move the chart. Historical tape and background market-maker activity are also game simulations; only the GRAM/USD WRK$ anchor is live.</div>
+        <div class="token-market-grid" id="coinMarketGrid"><div class="loading">Opening the simulated market…</div></div>
       </section>
 
     </div>
@@ -5469,7 +5661,7 @@
     <div class="modal-title">🖥️ Hack</div>
     <div id="hackCooldown" style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:8px"></div>
     <div id="hackStartWrap" style="text-align:center">
-      <div style="color:var(--muted);font-size:13px;margin-bottom:12px">Crack a crypto wallet seed phrase</div>
+      <div style="color:var(--muted);font-size:13px;margin-bottom:12px">Crack a fictional wallet passphrase</div>
       <button class="btn" id="hackStartBtn" onclick="startHack()" style="width:100%">🖥️ Start Hack</button>
     </div>
     <div id="hackGameWrap" style="display:none;flex-direction:column;gap:12px">
@@ -5915,6 +6107,7 @@ function clearSession() {
   state.sessionToken = null;
   state.balance = null;
   _shopWallet = null;
+  _gameWallet = null;
   _clearUndergroundTimers();
   undergroundState.data = null;
   undergroundState.heists = null;
@@ -5980,6 +6173,23 @@ function applyTheme(theme, persist = true) {
 function toggleTheme() {
   applyTheme(activeTheme() === 'light' ? 'dark' : 'light');
   haptic('light');
+}
+
+function openTelegramUrl(url) {
+  const tg = window.Telegram?.WebApp;
+  if (tg?.openTelegramLink) tg.openTelegramLink(url);
+  else window.location.href = url;
+}
+
+function openBotGroupPicker() {
+  openTelegramUrl('https://t.me/wrkshelperbot?startgroup=true');
+}
+
+function shareProfile(userId) {
+  const profileUrl = `https://t.me/wrkshelperbot/app?startapp=profile_${userId}`;
+  const shareUrl = 'https://t.me/share/url?url=' + encodeURIComponent(profileUrl)
+    + '&text=' + encodeURIComponent('Check out this WRK$ flex');
+  openTelegramUrl(shareUrl);
 }
 
 function setupTelegramBridge(tg) {
@@ -6090,6 +6300,10 @@ async function boot() {
     if (!isNaN(_deepProfileId)) {
       setTimeout(() => viewUser(_deepProfileId), 300);
     }
+  } else if (_startapp === 'wallet') {
+    setTimeout(() => goWallet('assets'), 300);
+  } else if (_startapp === 'coins') {
+    setTimeout(() => goCoinShop(), 300);
   } else {
     // Handle plain ?profile= param
     const _profileParam = _urlParams.get('profile');
@@ -6141,7 +6355,7 @@ function renderHomeAccount(data) {
   card.className = 'card account-card';
   card.innerHTML = `
     <div class="account-top" onclick="goProfile()" style="cursor:pointer">
-      <img class="account-avatar" src="${esc(state.photoUrl || `/api/avatar/${data.user_id}`)}" alt="" onerror="this.style.visibility='hidden'">
+      <img class="account-avatar" src="${esc(state.photoUrl || `/api/avatar/${data.user_id}`)}" alt="" onerror="this.onerror=null;this.src='/emoji/5093898072811898950'">
       <div class="account-copy">
         <div class="account-name">${esc(displayName)}</div>
         <div class="account-meta">Telegram verified · ${fmt(data.gift_count)} gifts</div>
@@ -6297,8 +6511,11 @@ function setGameTab(tab) {
 }
 
 function setLbTab(tab, btn) {
+  if (!tab) return;
   document.querySelectorAll('#lbTabRow .tab-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
+  const more = document.getElementById('lbMoreSelect');
+  if (more && btn) more.value = '';
   loadLeaderboard(tab);
 }
 
@@ -7067,14 +7284,23 @@ const _BADGE_EMOJI = {
 };
 
 function _profileBadgeSlotsHtml(badges = []) {
-  const known = badges.filter(b => _BADGE_EMOJI[b]);
-  const filled = known.map(b =>
-    `<span class="profile-badge-slot filled" data-badge="${esc(b)}">${_BADGE_EMOJI[b]}</span>`
-  ).join('');
-  const empty = Array.from({ length: Math.max(0, 3-known.length) }, () =>
+  const rendered = badges.map(badge => {
+    if (_BADGE_EMOJI[badge]) {
+      return `<span class="profile-badge-slot filled" data-badge="${esc(badge)}">${_BADGE_EMOJI[badge]}</span>`;
+    }
+    if (badge.startsWith('whale:')) {
+      const symbol = badge.slice(6).toUpperCase();
+      if (!/^[A-Z0-9_]{2,12}$/.test(symbol)) return '';
+      return `<span class="profile-badge-slot filled whale" data-badge="${esc(badge)}" title="${esc(symbol)} Whale · owns more than 1% of supply" aria-label="${esc(symbol)} Whale, owns more than 1% of supply">
+        <span class="token-whale-badge"><span class="whale-icon">🐋</span><b>$${esc(symbol)}</b><small>Whale</small></span>
+      </span>`;
+    }
+    return '';
+  }).filter(Boolean);
+  const empty = Array.from({ length: Math.max(0, 3-rendered.length) }, () =>
     '<span class="profile-badge-slot empty" title="Available badge slot" aria-label="Available badge slot"></span>'
   ).join('');
-  return filled + empty;
+  return rendered.join('') + empty;
 }
 
 async function _loadProfileBadges(userId, scopeEl = null) {
@@ -7151,7 +7377,7 @@ function buildProfileHtml(d, isOwn) {
           </div>` : ''}
       </div>
       <div class="profile-badges-panel">
-        <div class="profile-panel-title"><span>Badges</span><span>3 profile slots</span></div>
+        <div class="profile-panel-title"><span>Badges</span><span>Earned automatically</span></div>
         <div class="profile-badges-strip" data-profile-badges aria-label="Profile badges">${_profileBadgeSlotsHtml([])}</div>
       </div>
       <div class="profile-stats">
@@ -7182,11 +7408,16 @@ function buildProfileHtml(d, isOwn) {
       ${isOwn ? `<select id="pinnedStatPicker" class="profile-stat-picker" aria-label="Profile highlight" onchange="setPinnedStat(this.value)">
         ${[['crash_mult','Best Crash Mult'],['gamble_won','Total WRK$ Won'],['gamble_lost','Total WRK$ Lost'],['gifts_owned','Gifts Owned'],['streak','Day Streak']].map(([v,l]) => `<option value="${v}"${d.pinned_stat===v?' selected':''}>${l}</option>`).join('')}
       </select>` : ''}
-      ${!isOwn && state.userId ? `
+      ${isOwn ? `
+      <div class="profile-actions">
+        <button class="btn" onclick="shareProfile(${d.user_id})">↗ Share flex</button>
+        <button class="btn outline" onclick="openBotGroupPicker()">＋ Add to group</button>
+      </div>` : state.userId ? `
       <div class="profile-actions">
         <button class="btn" onclick="openSendWrk(${d.user_id}, '${esc(d.username || d.name)}')">💸 Send</button>
         <button class="btn outline" onclick="openTradeModal(${d.user_id})">🔄 Trade</button>
         <button class="btn outline" id="addFriendBtn" onclick="sendFriendRequest(${d.user_id})">＋ Friend</button>
+        <button class="btn outline" onclick="shareProfile(${d.user_id})">↗ Flex</button>
       </div>` : ''}
     </div>
     <section class="profile-collection">
@@ -8112,7 +8343,7 @@ async function openHack() {
   try {
     const status = await api(`/api/hack/status/${state.userId}`);
     if (status.active) {
-      _hackEnterGame(status.display, status.clue, status.attempts, status.reward);
+      _hackEnterGame(status.display, status.clue, status.attempts, status.reward, status.target_name);
     } else if (status.cooldown_remaining > 0) {
       document.getElementById('hackStartWrap').style.display = 'block';
       document.getElementById('hackGameWrap').style.display = 'none';
@@ -8130,11 +8361,13 @@ async function openHack() {
   }
 }
 
-function _hackEnterGame(display, clue, attempts, reward) {
+function _hackEnterGame(display, clue, attempts, reward, targetName = null) {
   document.getElementById('hackStartWrap').style.display = 'none';
   document.getElementById('hackGameWrap').style.display = 'flex';
   document.getElementById('hackDisplay').textContent = display;
-  document.getElementById('hackClue').textContent = `Clue: ${clue}`;
+  document.getElementById('hackClue').textContent = targetName
+    ? `Rival target: ${targetName} · Clue: ${clue}`
+    : `Simulation wallet · Clue: ${clue}`;
   document.getElementById('hackAttempts').textContent = attempts;
   document.getElementById('hackReward').textContent = fmt(reward);
   document.getElementById('hackGuessInput').value = '';
@@ -8163,8 +8396,22 @@ async function submitHackGuess() {
       state.balance = data.new_balance;
       refreshHeaderBal();
       const resEl = document.getElementById('hackResult');
-      resEl.innerHTML = `✅ ACCESS GRANTED — "${data.word}" +${fmt(data.reward)} ${WRK}<div style="margin-top:4px;font-size:10px">Heat ${data.heat}/100</div>`;
+      const tokenLoot = data.token_loot
+        ? `<div style="margin-top:4px">🪙 +${esc(data.token_loot.display_amount)} $${esc(data.token_loot.symbol)} game tokens</div>`
+        : '';
+      resEl.innerHTML = `✅ ACCESS GRANTED — "${esc(data.word)}" +${fmt(data.reward)} ${WRK}${tokenLoot}<div style="margin-top:4px;font-size:10px">Heat ${data.heat}/100</div>`;
       resEl.className = 'result-box show win-box';
+      undergroundState.data = null;
+      document.getElementById('hackGameWrap').style.display = 'none';
+      document.getElementById('hackStartWrap').style.display = 'block';
+      document.getElementById('hackStartBtn').disabled = true;
+      document.getElementById('hackCooldown').textContent = '⏳ Cooldown: 60m';
+    } else if (data.result === 'blocked') {
+      state.balance = data.new_balance;
+      refreshHeaderBal();
+      const resEl = document.getElementById('hackResult');
+      resEl.textContent = `🛡 ACCESS BLOCKED — the word was "${data.word}", but a +888 firewall stopped the transfer · Heat ${data.heat}/100`;
+      resEl.className = 'result-box show lose-box';
       undergroundState.data = null;
       document.getElementById('hackGameWrap').style.display = 'none';
       document.getElementById('hackStartWrap').style.display = 'block';
@@ -8257,7 +8504,10 @@ async function attemptRob() {
     state.balance = data.new_balance;
     refreshHeaderBal();
     const resEl = document.getElementById('robResult');
-    resEl.textContent = `${data.emoji} ${data.flavor} · Heat ${data.heat}/100`;
+    const tokenLoot = data.token_loot
+      ? ` · +${data.token_loot.display_amount} $${data.token_loot.symbol} game tokens`
+      : '';
+    resEl.textContent = `${data.emoji} ${data.flavor}${tokenLoot} · Heat ${data.heat}/100`;
     resEl.className = `result-box show ${data.outcome === 'success' ? 'win-box' : 'lose-box'}`;
     undergroundState.data = null;
     document.getElementById('robConfirmWrap').style.display = 'none';
@@ -9394,7 +9644,7 @@ function _clearUndergroundTimers() {
 }
 
 function setEarnSection(section, force = false) {
-  if (!['work','underground'].includes(section)) section = 'work';
+  if (!['work','crime','underground'].includes(section)) section = 'work';
   _earnSection = section;
   document.querySelectorAll('#earnTabs .earn-tab').forEach(tab => {
     const active = tab.dataset.earn === section;
@@ -9404,13 +9654,16 @@ function setEarnSection(section, force = false) {
   document.querySelectorAll('[data-earn-panel]').forEach(panel => {
     panel.classList.toggle('active', panel.dataset.earnPanel === section);
   });
-  document.getElementById('earnPageSub').textContent = section === 'work'
-    ? 'Work a shift or make a riskier move'
-    : 'Contracts, aliases, and the city’s most wanted';
+  const subtitles = {
+    work: 'Shifts, daily rewards, and job progression',
+    crime: 'Quick fictional raids with cooldowns and counterplay',
+    underground: 'Contracts, aliases, and the city’s most wanted',
+  };
+  document.getElementById('earnPageSub').textContent = subtitles[section];
   if (state.userId) {
     if (section === 'underground') {
       if (force || !undergroundState.data) loadUnderground();
-    } else if (force) {
+    } else if (section === 'work' && force) {
       refreshWorkStatus();
       loadDailyStatus();
     }
@@ -10612,6 +10865,10 @@ let _anonSearch = '';
 let _anonSearchTimer = null;
 let _shopWallet = null;
 let _mkrtListingGiftId = null;
+let _tokenMarket = null;
+let _gameWallet = null;
+let _stonkQuoteTimer = null;
+let _stonkQuoteSeq = 0;
 
 function openShopHub() {
   setShopSection(_shopSection || 'rift', true);
@@ -10622,7 +10879,7 @@ function openWalletPage() {
 }
 
 function setWalletSection(section, force = false) {
-  if (!['overview','gifts','numbers'].includes(section)) section = 'overview';
+  if (!['overview','assets','gifts','numbers'].includes(section)) section = 'overview';
   _walletSection = section;
   document.querySelectorAll('#walletTabs .wallet-tab').forEach(tab => {
     const active = tab.dataset.wallet === section;
@@ -10633,11 +10890,15 @@ function setWalletSection(section, force = false) {
     panel.classList.toggle('active', panel.dataset.walletPanel === section);
   });
   if (force || !_shopWallet) loadShopWallet();
+  if (section === 'assets') {
+    loadTokenMarket();
+    loadGameWallet();
+  }
   haptic();
 }
 
 function setShopSection(section, force = false) {
-  if (!['rift','mkrt','fragsmint'].includes(section)) section = 'rift';
+  if (!['rift','mkrt','fragsmint','coins'].includes(section)) section = 'rift';
   _shopSection = section;
   document.querySelectorAll('#shopMenu .shop-menu-card').forEach(card => {
     const active = card.dataset.shop === section;
@@ -10652,10 +10913,280 @@ function setShopSection(section, force = false) {
     if (force || !_marketItems.length) loadMarket(true);
   } else if (section === 'mkrt') {
     loadMkrt(true);
-  } else {
+  } else if (section === 'fragsmint') {
     loadFragsmint(true);
+    loadTokenMarket();
+    loadGameWallet();
+  } else {
+    loadTokenMarket();
   }
   haptic();
+}
+
+function goCoinShop() {
+  showPage('market', document.querySelector('[data-page="market"]'));
+  setShopSection('coins');
+}
+
+function setShopSectionFromWallet(section) {
+  showPage('market', document.querySelector('[data-page="market"]'));
+  setShopSection(section);
+}
+
+function _tokenUsd(value) {
+  const price = Number(value || 0);
+  if (price >= 1) return `$${price.toLocaleString(undefined, { maximumFractionDigits:4 })}`;
+  if (price >= .01) return `$${price.toFixed(6)}`;
+  return `$${price.toFixed(8).replace(/0+$/, '')}`;
+}
+
+function _compactMarketNumber(value, prefix = '') {
+  const number = Number(value || 0);
+  if (!Number.isFinite(number)) return `${prefix}0`;
+  const absolute = Math.abs(number);
+  if (absolute >= 1e9) return `${prefix}${(number / 1e9).toFixed(2)}B`;
+  if (absolute >= 1e6) return `${prefix}${(number / 1e6).toFixed(2)}M`;
+  if (absolute >= 1e3) return `${prefix}${(number / 1e3).toFixed(1)}K`;
+  return `${prefix}${number.toLocaleString(undefined, { maximumFractionDigits:2 })}`;
+}
+
+function _tokenSparkline(values, positive) {
+  const numbers = (values || []).map(Number).filter(Number.isFinite);
+  if (numbers.length < 2) return '';
+  const min = Math.min(...numbers), max = Math.max(...numbers);
+  const range = max - min || 1;
+  const points = numbers.map((value, index) => {
+    const x = index / (numbers.length - 1) * 230;
+    const y = 27 - ((value - min) / range * 23);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const color = positive ? '#6ee7b7' : '#fb7185';
+  return `<svg class="token-sparkline" viewBox="0 0 230 31" preserveAspectRatio="none" aria-hidden="true">
+    <polygon class="fill" points="0,31 ${points} 230,31" fill="${color}"></polygon>
+    <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"></polyline>
+  </svg>`;
+}
+
+function _tokenCardHtml(token) {
+  const quote = token.symbol === 'GRAM'
+    ? 'Live cash-out anchor'
+    : `${Number(token.price_gram || 0).toFixed(8)} GRAM`;
+  const change = Number(token.price_change_24h || 0);
+  const positive = change >= 0;
+  const changeText = `${positive ? '+' : ''}${change.toFixed(2)}%`;
+  return `<article class="token-market-card">
+    <div>
+      <div class="token-market-symbol">$${esc(token.symbol)}${token.stale ? ' <span style="color:#fbbf24;font-size:8px">STALE</span>' : ''}</div>
+      <div class="token-market-name">${esc(token.name)} · ${token.symbol === 'GRAM' ? 'game base asset' : `${fmt(token.holders)} holders · ${fmt(token.age_days)}d old`}</div>
+      <div class="token-market-price">${esc(_tokenUsd(token.price_usd))}<span class="token-market-change ${positive ? 'up' : 'down'}">${esc(changeText)}</span> · <span>${esc(quote)}</span></div>
+      <div class="token-market-metrics">
+        <span>MC <b>${esc(_compactMarketNumber(token.market_cap_usd, '$'))}</b></span>
+        <span>Liq <b>${esc(_compactMarketNumber(token.liquidity_gram))} GRAM</b></span>
+        <span>24h vol <b>${esc(_compactMarketNumber(token.volume_24h_gram))} GRAM</b></span>
+        <span>Trades <b>${fmt(token.trades_24h)}</b></span>
+      </div>
+      ${_tokenSparkline(token.sparkline, positive)}
+      <div class="token-market-source">${esc(token.source)}</div>
+    </div>
+    <button class="token-buy-btn" onclick="prepareStonkSwap('${esc(token.symbol)}')">Trade</button>
+  </article>`;
+}
+
+function _marketToken(symbol) {
+  return _tokenMarket?.tokens?.find(token => token.symbol === symbol);
+}
+
+function _fillTokenSelect(select, selected) {
+  if (!select || !_tokenMarket) return;
+  const current = selected || select.value;
+  select.innerHTML = _tokenMarket.tokens.map(token =>
+    `<option value="${esc(token.symbol)}">$${esc(token.symbol)}</option>`
+  ).join('');
+  if (_tokenMarket.tokens.some(token => token.symbol === current)) select.value = current;
+}
+
+function prepareStonkSwap(symbol) {
+  setShopSection('coins');
+  const from = document.getElementById('stonkFromToken');
+  const to = document.getElementById('stonkToToken');
+  if (symbol === 'GRAM') {
+    if (from) from.value = 'GRAM';
+    if (to) to.value = 'UTYA';
+  } else {
+    if (from) from.value = 'GRAM';
+    if (to) to.value = symbol;
+  }
+  updateStonkQuote();
+  document.getElementById('stonkSwapAmount')?.focus();
+}
+
+function updateStonkQuote() {
+  const from = _marketToken(document.getElementById('stonkFromToken')?.value);
+  const to = _marketToken(document.getElementById('stonkToToken')?.value);
+  const amountText = document.getElementById('stonkSwapAmount')?.value.trim() || '';
+  const amount = Number(amountText);
+  const el = document.getElementById('stonkSwapQuote');
+  clearTimeout(_stonkQuoteTimer);
+  const sequence = ++_stonkQuoteSeq;
+  if (!el || !from || !to || from.symbol === to.symbol || !Number.isFinite(amount) || amount <= 0) {
+    if (el) el.textContent = 'Choose two different game tokens and enter an amount.';
+    return;
+  }
+  if (!state.userId) {
+    el.textContent = 'Open the app in Telegram to request a pool quote.';
+    return;
+  }
+  el.textContent = 'Calculating pool output…';
+  _stonkQuoteTimer = setTimeout(async () => {
+    try {
+      const quote = await api('/api/game-wallet/swap-quote', {
+        method:'POST',
+        json:{ user_id:+state.userId, from_symbol:from.symbol, to_symbol:to.symbol, amount:amountText },
+      });
+      if (sequence !== _stonkQuoteSeq) return;
+      const fee = Number(quote.fee_bps || 0) / 100;
+      el.textContent = `${quote.amount_spent} ${quote.from_symbol} → ${quote.amount_received} ${quote.to_symbol} · ${quote.price_impact_pct}% impact · ${fee.toFixed(2)}% pool fee`;
+    } catch (error) {
+      if (sequence === _stonkQuoteSeq) el.textContent = error.message;
+    }
+  }, 220);
+}
+
+async function swapGameTokens() {
+  if (!state.userId) return _shopToast('Open the app in Telegram first', 'error');
+  const from = document.getElementById('stonkFromToken')?.value || '';
+  const to = document.getElementById('stonkToToken')?.value || '';
+  const amount = document.getElementById('stonkSwapAmount')?.value.trim() || '';
+  try {
+    const result = await api('/api/game-wallet/swap', {
+      method:'POST', json:{ user_id:+state.userId, from_symbol:from, to_symbol:to, amount },
+    });
+    _shopToast(`Swapped ${result.amount_spent} ${result.from_symbol} for ${result.amount_received} ${result.to_symbol} · ${result.price_impact_pct}% impact`);
+    _tokenMarket = null;
+    await Promise.all([loadGameWallet(), loadTokenMarket()]);
+  } catch (error) { _shopToast(error.message, 'error'); }
+}
+
+async function topupGameGram() {
+  if (!state.userId) return _shopToast('Open the app in Telegram first', 'error');
+  const amount = document.getElementById('fragsGramAmount')?.value.trim() || '';
+  try {
+    const result = await api('/api/game-wallet/topup', {
+      method:'POST', json:{ user_id:+state.userId, amount },
+    });
+    state.balance = result.new_wrk_balance;
+    refreshHeaderBal();
+    _shopToast(`Bought ${result.gram_received} simulated GRAM for ${fmt(result.wrk_spent)} WRK$`);
+    await loadGameWallet();
+  } catch (error) { _shopToast(error.message, 'error'); }
+}
+
+async function cashoutGameGram() {
+  if (!state.userId) return _shopToast('Open the app in Telegram first', 'error');
+  const amount = document.getElementById('fragsGramAmount')?.value.trim() || '';
+  try {
+    const result = await api('/api/game-wallet/cashout', {
+      method:'POST', json:{ user_id:+state.userId, amount },
+    });
+    state.balance = result.new_wrk_balance;
+    refreshHeaderBal();
+    _shopToast(`Cashed out ${result.gram_sold} GRAM for ${fmt(result.wrk_received)} WRK$`);
+    await loadGameWallet();
+  } catch (error) { _shopToast(error.message, 'error'); }
+}
+
+async function copyGameWalletAddress() {
+  const address = _gameWallet?.payment_address;
+  if (!address) return _shopToast('Game wallet is still loading', 'error');
+  try {
+    await navigator.clipboard.writeText(address);
+    _shopToast('Game wallet address copied');
+  } catch { _shopToast(address); }
+}
+
+async function sendGameToken() {
+  const recipient = document.getElementById('sendTokenRecipient')?.value.trim() || '';
+  const symbol = document.getElementById('sendTokenSymbol')?.value || '';
+  const amount = document.getElementById('sendTokenAmount')?.value.trim() || '';
+  try {
+    const result = await api('/api/game-wallet/send', {
+      method:'POST', json:{ user_id:+state.userId, recipient, symbol, amount },
+    });
+    _shopToast(`Sent ${result.amount} ${result.symbol} to ${result.recipient}`);
+    await loadGameWallet();
+  } catch (error) { _shopToast(error.message, 'error'); }
+}
+
+async function buyCustomWalletAddress() {
+  const address = document.getElementById('customWalletAddress')?.value.trim() || '';
+  try {
+    const result = await api('/api/game-wallet/custom-address', {
+      method:'POST', json:{ user_id:+state.userId, address },
+    });
+    _shopToast(`${result.custom_address} is now your game address`);
+    await loadGameWallet();
+  } catch (error) { _shopToast(error.message, 'error'); }
+}
+
+function _holdingCardHtml(holding) {
+  return `<article class="token-market-card">
+    <div>
+      <div class="token-market-symbol">$${esc(holding.symbol)}</div>
+      <div class="token-market-name">${esc(holding.name)} · game balance</div>
+      <div class="token-market-price"><span>${esc(holding.display_amount)}</span> · ${esc(_tokenUsd(holding.usd_value))} · ${fmtK(holding.wrk_value)} WRK$</div>
+    </div>
+    <button class="token-buy-btn" onclick="goCoinShop();prepareStonkSwap('${esc(holding.symbol)}')">Swap</button>
+  </article>`;
+}
+
+async function loadGameWallet() {
+  const addressEl = document.getElementById('gameWalletAddress');
+  const valueEl = document.getElementById('gameWalletValue');
+  const holdingsEl = document.getElementById('walletTokenMarket');
+  if (!state.userId) return;
+  try {
+    _gameWallet = await api(`/api/game-wallet?user_id=${state.userId}`);
+    if (addressEl) addressEl.textContent = _gameWallet.payment_address;
+    if (valueEl) valueEl.innerHTML = `<small>Token portfolio</small>${fmtK(_gameWallet.total_wrk)} WRK$`;
+    if (holdingsEl) holdingsEl.innerHTML = _gameWallet.holdings.map(_holdingCardHtml).join('');
+    const priceEl = document.getElementById('customWalletPrice');
+    if (priceEl) priceEl.textContent = _gameWallet.custom_address
+      ? `Active custom address: ${_gameWallet.custom_address}`
+      : `A custom .wrk address costs ${_gameWallet.custom_address_price_gram} simulated GRAM.`;
+    const gram = _gameWallet.holdings.find(item => item.symbol === 'GRAM');
+    const quoteEl = document.getElementById('fragsGramQuote');
+    if (quoteEl && gram) {
+      const wrkRate = Math.ceil(Number(gram.price_usd) * _gameWallet.wrk_per_usd);
+      quoteEl.textContent = `1 GRAM = ${fmt(wrkRate)} WRK$ right now · your GRAM balance: ${gram.display_amount}`;
+    }
+    _fillTokenSelect(document.getElementById('sendTokenSymbol'), 'GRAM');
+  } catch (error) {
+    if (holdingsEl) holdingsEl.innerHTML = `<div class="error-msg">${esc(error.message)}</div>`;
+  }
+}
+
+async function loadTokenMarket() {
+  const targets = [
+    [document.getElementById('coinMarketGrid'), false],
+    [document.getElementById('walletTokenMarket'), true],
+  ].filter(([element]) => element);
+  if (!targets.length) return;
+  if (!_tokenMarket) {
+    targets.forEach(([element]) => { element.innerHTML = '<div class="loading">Opening simulated pools…</div>'; });
+  }
+  try {
+    _tokenMarket = await api('/api/token-market');
+    targets.forEach(([element, walletMode]) => {
+      if (!walletMode) element.innerHTML = _tokenMarket.tokens.map(_tokenCardHtml).join('');
+    });
+    _fillTokenSelect(document.getElementById('stonkFromToken'), 'GRAM');
+    _fillTokenSelect(document.getElementById('stonkToToken'), 'UTYA');
+    updateStonkQuote();
+  } catch (error) {
+    targets.forEach(([element]) => {
+      element.innerHTML = `<div class="error-msg">${esc(error.message)}</div>`;
+    });
+  }
 }
 
 function _shopGiftEmoji(g, className = '') {

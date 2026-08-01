@@ -1,22 +1,5 @@
-import pytest
-from utils import parse_amount, parse_duration, format_duration, display_name
-
-def test_parse_duration_minutes():
-    assert parse_duration("30m") == 1800
-
-def test_parse_duration_hours():
-    assert parse_duration("2h") == 7200
-
-def test_parse_duration_days():
-    assert parse_duration("7d") == 604800
-
-def test_parse_duration_invalid():
-    assert parse_duration("forever") is None
-    assert parse_duration("") is None
-    assert parse_duration("1x") is None
-
-def test_parse_duration_case_insensitive():
-    assert parse_duration("1H") == 3600
+from utils import display_name, parse_amount
+from emojis import badge_markup, badges_markup
 
 def test_parse_amount_short_forms_and_commas():
     assert parse_amount("50k") == 50_000
@@ -24,23 +7,11 @@ def test_parse_amount_short_forms_and_commas():
     assert parse_amount("1,250") == 1_250
     assert parse_amount("1b") == 1_000_000_000
 
-def test_parse_amount_validation_and_negative_admin_delta():
+def test_parse_amount_validation_and_signed_delta():
     assert parse_amount("-50k") is None
     assert parse_amount("-50k", allow_negative=True) == -50_000
     assert parse_amount("all") is None
     assert parse_amount("12x") is None
-
-def test_format_duration_days():
-    assert format_duration(86400) == "1d"
-    assert format_duration(604800) == "7d"
-
-def test_format_duration_hours():
-    assert format_duration(3600) == "1h"
-    assert format_duration(7200) == "2h"
-
-def test_format_duration_minutes():
-    assert format_duration(1800) == "30m"
-    assert format_duration(60) == "1m"
 
 def test_display_name_with_username():
     from unittest.mock import MagicMock
@@ -55,3 +26,8 @@ def test_display_name_without_username():
     user.username = None
     user.full_name = "Bryce"
     assert display_name(user) == "Bryce"
+
+
+def test_dynamic_whale_badges_have_telegram_profile_labels():
+    assert badge_markup("whale:UTYA") == "🐋 UTYA Whale"
+    assert badges_markup(["whale:UTYA", "unknown"]) == "🐋 UTYA Whale"

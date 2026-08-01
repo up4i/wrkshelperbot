@@ -11,6 +11,7 @@ import time
 import urllib.parse
 import urllib.request
 from contextlib import asynccontextmanager, contextmanager
+from decimal import Decimal, ROUND_DOWN, ROUND_UP
 from pathlib import Path
 from typing import Annotated
 
@@ -31,6 +32,25 @@ from collectibles import (
     format_anon_number,
 )
 from gift_artwork import sync_gift_custom_emoji_ids_connection
+from game_tokens import (
+    GAME_TOKEN_SCHEMA,
+    GAME_TOKEN_SYMBOLS,
+    TOKEN_SCALE,
+    default_wallet_address,
+    format_token_amount,
+    normalize_custom_address,
+    parse_token_amount,
+)
+from market_config import WHALE_SUPPLY_DIVISOR
+from simulated_market import (
+    SIMULATED_MARKET_SCHEMA,
+    execute_market_swap,
+    get_market_chart,
+    get_market_snapshot,
+    initialize_market_connection,
+    quote_market_swap,
+    simulate_market_activity,
+)
 
 DB_PATH = config.DB_PATH
 STATIC_DIR = Path(__file__).parent / "static"
@@ -1060,6 +1080,15 @@ def get_user_badges(user_id: int):
         ).fetchone()
         if pepe_row and pepe_row["owner_id"] == user_id:
             badges.append("plush_pepe_1")
+        whale_rows = db.execute(
+            "SELECT b.symbol FROM game_token_balances b "
+            "JOIN simulated_market_pools p ON p.symbol = b.symbol "
+            "WHERE b.user_id = ? "
+            "AND b.amount > p.circulating_supply / ? "
+            "ORDER BY CAST(b.amount AS REAL) / p.circulating_supply DESC, b.symbol",
+            (user_id, WHALE_SUPPLY_DIVISOR),
+        ).fetchall()
+        badges.extend(f"whale:{row['symbol']}" for row in whale_rows)
     return {"badges": badges}
 
 
@@ -2015,6 +2044,7 @@ def hack_status(user_id: int, authenticated_user: AuthenticatedUser):
                 "clue": sess["clue"],
                 "attempts": sess["attempts"],
                 "reward": sess["reward"],
+                "target_name": sess.get("target_name"),
                 "word_length": len(sess["word"]),
                 "cooldown_remaining": 0,
             }
@@ -2072,16 +2102,78 @@ def hack_guess(req: HackGuessRequest, authenticated_user: AuthenticatedUser):
             row = db.execute("SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)).fetchone()
             if not row:
                 raise HTTPException(500, "Economy record missing")
-            new_bal = row["balance"] + sess["reward"]
-            db.execute("UPDATE economy SET balance = ? WHERE user_id = ?", (new_bal, req.user_id))
+            target_id = sess.get("target_user_id")
+            target_notice = None
+            if target_id:
+                firewall = _consume_anon_firewall(
+                    db, target_id, req.user_id, now=now
+                )
+                if firewall["blocked"]:
+                    heat = _add_underground_heat(db, req.user_id, 10, now=now)
+                    db.commit()
+                    _send_telegram_dm(
+                        target_id,
+                        f"🛡️ {firewall['number']} blocked a rival wallet raid. Your WRK$ is safe.",
+                    )
+                    return {
+                        "result": "blocked",
+                        "word": word,
+                        "reward": 0,
+                        "new_balance": row["balance"],
+                        "heat": heat,
+                    }
+                target = db.execute(
+                    "SELECT balance FROM economy WHERE user_id = ?", (target_id,)
+                ).fetchone()
+                amount = min(sess["reward"], max(0, target["balance"] if target else 0))
+                if amount:
+                    db.execute(
+                        "UPDATE economy SET balance = balance - ? WHERE user_id = ?",
+                        (amount, target_id),
+                    )
+                    db.execute(
+                        "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+                        (amount, req.user_id),
+                    )
+                new_bal = row["balance"] + amount
+                reward = amount
+                token_loot = (
+                    _raid_game_token_connection(
+                        db,
+                        target_id,
+                        req.user_id,
+                        random.randint(200, 500),
+                        "hack",
+                    )
+                    if amount else None
+                )
+                token_notice = (
+                    f" and {token_loot['display_amount']} ${token_loot['symbol']}"
+                    if token_loot else ""
+                )
+                target_notice = (
+                    f"🖥️ {_public_identity(db, req.user_id)} won an in-game wallet raid "
+                    f"and took {amount:,} WRK${token_notice} from your fictional wallet."
+                )
+            else:
+                reward = sess["reward"]
+                new_bal = row["balance"] + reward
+                token_loot = None
+                db.execute(
+                    "UPDATE economy SET balance = ? WHERE user_id = ?",
+                    (new_bal, req.user_id),
+                )
             heat = _add_underground_heat(db, req.user_id, 10, now=now)
             db.commit()
+            if target_notice:
+                _send_telegram_dm(target_id, target_notice)
             return {
                 "result": "win",
                 "word": word,
-                "reward": sess["reward"],
+                "reward": reward,
                 "new_balance": new_bal,
                 "heat": heat,
+                "token_loot": token_loot,
             }
 
         attempts_left = sess["attempts"] - 1
@@ -2130,7 +2222,7 @@ def _rob_outcome(success: bool, robber_balance: int, victim_balance: int) -> dic
 
 _ROB_SUCCESS = [
     ("🔫", "{robber} robbed {target} at gunpoint and walked away with {amount} WRK$!"),
-    ("🌱", "{robber} was randomly guessing seed phrases and cracked {target}'s wallet for {amount} WRK$!"),
+    ("🌱", "{robber} guessed {target}'s game-vault passcode and escaped with {amount} WRK$!"),
     ("📞", "{robber} was on a call and sneakily drained {target}'s wallet for {amount} WRK$!"),
     ("🎭", "{robber} pulled a classic social engineering play on {target} and got {amount} WRK$!"),
     ("🧢", "{robber} rug pulled {target} for {amount} WRK$. It was just a 'test token', bro."),
@@ -2157,7 +2249,7 @@ _ROB_BAIL = [
     ("🚨", "{robber} got arrested trying to rob {target}! Had to post {amount} WRK$ bail."),
     ("⛓️", "{robber} got cuffed outside {target}'s wallet. Lawyer fees: {amount} WRK$."),
     ("🏛️", "{robber} went to trial for robbing {target} and lost. Court fined them {amount} WRK$!"),
-    ("📡", "{robber}'s heist on {target} was traced on-chain. Investigators froze {amount} WRK$."),
+    ("📡", "{robber}'s heist on {target} was traced in the game ledger. Investigators froze {amount} WRK$."),
     ("🕵️", "{robber} got doxxed attempting to rob {target}. Restitution order: {amount} WRK$."),
 ]
 _ROB_GETAWAY = [
@@ -2167,7 +2259,7 @@ _ROB_GETAWAY = [
     ("🧊", "{robber} fumbled the job on {target} but kept their cool and disappeared. No loss."),
 ]
 
-_ROB_COOLDOWN = 3600  # 1 hour
+_ROB_COOLDOWN = 15 * 60
 
 
 class RobAttemptRequest(BaseModel):
@@ -2304,21 +2396,39 @@ def rob_attempt(req: RobAttemptRequest, authenticated_user: AuthenticatedUser):
             amount = result["amount"]
             db.execute("UPDATE economy SET balance = balance - ? WHERE user_id = ?", (amount, req.target_id))
             db.execute("UPDATE economy SET balance = balance + ? WHERE user_id = ?", (amount, req.user_id))
+            token_loot = _raid_game_token_connection(
+                db,
+                req.target_id,
+                req.user_id,
+                random.randint(100, 300),
+                "rob",
+            )
             emoji, template = random.choice(_ROB_SUCCESS)
             flavor = template.format(robber="You", target=target_name, amount=f"{amount:,}")
-            _send_telegram_dm(req.target_id, f"{emoji} {robber_display} robbed you and stole {amount:,} WRK$ from your wallet!")
+            token_notice = (
+                f" and {token_loot['display_amount']} ${token_loot['symbol']}"
+                if token_loot else ""
+            )
+            _send_telegram_dm(
+                req.target_id,
+                f"{emoji} {robber_display} won an in-game robbery and took "
+                f"{amount:,} WRK${token_notice} from your fictional wallet.",
+            )
         elif result["outcome"] == "fine":
             amount = result["amount"]
+            token_loot = None
             db.execute("UPDATE economy SET balance = MAX(0, balance - ?) WHERE user_id = ?", (amount, req.user_id))
             emoji, template = random.choice(_ROB_FINE)
             flavor = template.format(robber="You", target=target_name, amount=f"{amount:,}")
         elif result["outcome"] == "bail":
             amount = result["amount"]
+            token_loot = None
             db.execute("UPDATE economy SET balance = MAX(0, balance - ?) WHERE user_id = ?", (amount, req.user_id))
             emoji, template = random.choice(_ROB_BAIL)
             flavor = template.format(robber="You", target=target_name, amount=f"{amount:,}")
         else:
             amount = 0
+            token_loot = None
             emoji, template = random.choice(_ROB_GETAWAY)
             flavor = template.format(robber="You", target=target_name, amount="0")
 
@@ -2337,6 +2447,7 @@ def rob_attempt(req: RobAttemptRequest, authenticated_user: AuthenticatedUser):
             "amount": amount,
             "new_balance": new_bal,
             "heat": heat,
+            "token_loot": token_loot,
         }
 
 
@@ -4746,6 +4857,521 @@ class SecurityMaskRequest(BaseModel):
     enabled: bool
 
 
+class GameTokenAmountRequest(BaseModel):
+    user_id: int
+    amount: str
+
+
+class GameTokenSwapRequest(BaseModel):
+    user_id: int
+    from_symbol: str
+    to_symbol: str
+    amount: str
+
+
+class GameTokenSendRequest(BaseModel):
+    user_id: int
+    recipient: str
+    symbol: str
+    amount: str
+
+
+class CustomWalletAddressRequest(BaseModel):
+    user_id: int
+    address: str
+
+
+@app.get("/api/token-market")
+def token_market():
+    """Return persistent prices and metrics from the simulated AMM market."""
+    snapshot = get_market_snapshot(DB_PATH)
+    if not snapshot["tokens"]:
+        raise HTTPException(503, "The simulated market is temporarily unavailable")
+    return snapshot
+
+
+@app.get("/api/token-market/{symbol}/chart")
+def token_market_chart(symbol: str, hours: int = 24):
+    try:
+        return get_market_chart(DB_PATH, symbol, hours=hours)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+def _game_market() -> tuple[dict, dict[str, dict]]:
+    snapshot = get_market_snapshot(DB_PATH)
+    tokens = {token["symbol"]: token for token in snapshot["tokens"]}
+    if "GRAM" not in tokens:
+        raise HTTPException(503, "The GRAM reference price is temporarily unavailable")
+    return snapshot, tokens
+
+
+def _ensure_game_wallet(connection: sqlite3.Connection, user_id: int) -> sqlite3.Row:
+    player = connection.execute(
+        "SELECT 1 FROM economy WHERE user_id = ?", (user_id,)
+    ).fetchone()
+    if not player:
+        raise HTTPException(404, "Use the bot first to create your game wallet")
+    connection.execute(
+        "INSERT INTO game_wallets (user_id, wallet_address, created_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(user_id) DO NOTHING",
+        (user_id, default_wallet_address(user_id), int(time.time())),
+    )
+    return connection.execute(
+        "SELECT * FROM game_wallets WHERE user_id = ?", (user_id,)
+    ).fetchone()
+
+
+def _game_token_balance(connection: sqlite3.Connection, user_id: int, symbol: str) -> int:
+    row = connection.execute(
+        "SELECT amount FROM game_token_balances WHERE user_id = ? AND symbol = ?",
+        (user_id, symbol),
+    ).fetchone()
+    return int(row["amount"]) if row else 0
+
+
+def _credit_game_token(
+    connection: sqlite3.Connection, user_id: int, symbol: str, amount: int
+) -> None:
+    connection.execute(
+        "INSERT INTO game_token_balances (user_id, symbol, amount) VALUES (?, ?, ?) "
+        "ON CONFLICT(user_id, symbol) DO UPDATE SET amount = amount + excluded.amount",
+        (user_id, symbol, amount),
+    )
+
+
+def _token_transaction(
+    connection: sqlite3.Connection,
+    *,
+    user_id: int,
+    transaction_type: str,
+    from_symbol: str | None = None,
+    to_symbol: str | None = None,
+    input_amount: int = 0,
+    output_amount: int = 0,
+    wrk_amount: int = 0,
+    counterparty_user_id: int | None = None,
+    prices: dict | None = None,
+) -> None:
+    connection.execute(
+        "INSERT INTO game_token_transactions "
+        "(user_id, transaction_type, from_symbol, to_symbol, input_amount, "
+        "output_amount, wrk_amount, counterparty_user_id, price_snapshot, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            user_id,
+            transaction_type,
+            from_symbol,
+            to_symbol,
+            input_amount,
+            output_amount,
+            wrk_amount,
+            counterparty_user_id,
+            json.dumps(prices, separators=(",", ":")) if prices else None,
+            int(time.time()),
+        ),
+    )
+
+
+def _raid_game_token_connection(
+    connection: sqlite3.Connection,
+    victim_id: int,
+    attacker_id: int,
+    fraction_bps: int,
+    raid_type: str,
+) -> dict | None:
+    """Move part of one fictional token holding inside an existing transaction."""
+    if victim_id == attacker_id or not 1 <= fraction_bps <= 10_000:
+        return None
+    holdings = connection.execute(
+        "SELECT symbol, amount FROM game_token_balances "
+        "WHERE user_id = ? AND amount > 0",
+        (victim_id,),
+    ).fetchall()
+    if not holdings:
+        return None
+    holding = random.choice(holdings)
+    symbol = holding["symbol"]
+    amount = max(1, int(holding["amount"]) * fraction_bps // 10_000)
+    connection.execute(
+        "UPDATE game_token_balances SET amount = amount - ? "
+        "WHERE user_id = ? AND symbol = ?",
+        (amount, victim_id, symbol),
+    )
+    connection.execute(
+        "INSERT INTO game_wallets (user_id, wallet_address, created_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(user_id) DO NOTHING",
+        (attacker_id, default_wallet_address(attacker_id), int(time.time())),
+    )
+    _credit_game_token(connection, attacker_id, symbol, amount)
+    for user_id, transaction_type, counterparty_id in (
+        (victim_id, f"{raid_type}_loss", attacker_id),
+        (attacker_id, f"{raid_type}_win", victim_id),
+    ):
+        _token_transaction(
+            connection,
+            user_id=user_id,
+            transaction_type=transaction_type,
+            to_symbol=symbol,
+            output_amount=amount,
+            counterparty_user_id=counterparty_id,
+        )
+    return {
+        "symbol": symbol,
+        "amount": amount,
+        "display_amount": format_token_amount(amount),
+    }
+
+
+@app.get("/api/game-wallet")
+def game_wallet(user_id: int, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, user_id)
+    snapshot, market = _game_market()
+    with db_conn() as connection:
+        wallet = _ensure_game_wallet(connection, user_id)
+        rows = connection.execute(
+            "SELECT symbol, amount FROM game_token_balances WHERE user_id = ?",
+            (user_id,),
+        ).fetchall()
+        balance_map = {row["symbol"]: int(row["amount"]) for row in rows}
+        history = connection.execute(
+            "SELECT * FROM game_token_transactions WHERE user_id = ? "
+            "ORDER BY created_at DESC, id DESC LIMIT 20",
+            (user_id,),
+        ).fetchall()
+        connection.commit()
+
+    holdings = []
+    total_usd = Decimal(0)
+    for symbol in GAME_TOKEN_SYMBOLS:
+        token = market.get(symbol)
+        amount = balance_map.get(symbol, 0)
+        if not token:
+            continue
+        usd_value = Decimal(amount) / TOKEN_SCALE * Decimal(token["price_usd"])
+        total_usd += usd_value
+        holdings.append({
+            **token,
+            "amount": str(amount),
+            "display_amount": format_token_amount(amount),
+            "usd_value": str(usd_value),
+            "wrk_value": int((usd_value * config.WRK_PER_USD).to_integral_value(rounding=ROUND_DOWN)),
+        })
+    return {
+        "wallet_address": wallet["wallet_address"],
+        "custom_address": wallet["custom_address"],
+        "payment_address": wallet["custom_address"] or wallet["wallet_address"],
+        "custom_address_price_gram": config.CUSTOM_ADDRESS_GRAM_PRICE,
+        "wrk_per_usd": config.WRK_PER_USD,
+        "holdings": holdings,
+        "total_usd": str(total_usd),
+        "total_wrk": int((total_usd * config.WRK_PER_USD).to_integral_value(rounding=ROUND_DOWN)),
+        "transactions": [dict(row) for row in history],
+        "market_updated_at": snapshot["updated_at"],
+    }
+
+
+@app.post("/api/game-wallet/topup")
+def game_wallet_topup(req: GameTokenAmountRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
+    try:
+        gram_amount = parse_token_amount(req.amount)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    _snapshot, market = _game_market()
+    if market["GRAM"].get("stale"):
+        raise HTTPException(503, "The GRAM reference price is stale; try again shortly")
+    gram_usd = Decimal(market["GRAM"]["price_usd"])
+    wrk_cost = int(
+        (Decimal(gram_amount) / TOKEN_SCALE * gram_usd * config.WRK_PER_USD)
+        .to_integral_value(rounding=ROUND_UP)
+    )
+    with db_conn() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        _ensure_game_wallet(connection, req.user_id)
+        economy = connection.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)
+        ).fetchone()
+        if not economy or economy["balance"] < wrk_cost:
+            raise HTTPException(400, f"Not enough WRK$ — this top-up costs {wrk_cost:,}")
+        connection.execute(
+            "UPDATE economy SET balance = balance - ? WHERE user_id = ?",
+            (wrk_cost, req.user_id),
+        )
+        _credit_game_token(connection, req.user_id, "GRAM", gram_amount)
+        _token_transaction(
+            connection,
+            user_id=req.user_id,
+            transaction_type="fragsmint_topup",
+            to_symbol="GRAM",
+            output_amount=gram_amount,
+            wrk_amount=-wrk_cost,
+            prices={"GRAM_USD": str(gram_usd), "WRK_PER_USD": config.WRK_PER_USD},
+        )
+        new_wrk = economy["balance"] - wrk_cost
+        new_gram = _game_token_balance(connection, req.user_id, "GRAM")
+        connection.commit()
+    return {
+        "gram_received": format_token_amount(gram_amount),
+        "wrk_spent": wrk_cost,
+        "new_wrk_balance": new_wrk,
+        "new_gram_balance": format_token_amount(new_gram),
+        "gram_usd": str(gram_usd),
+    }
+
+
+@app.post("/api/game-wallet/cashout")
+def game_wallet_cashout(req: GameTokenAmountRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
+    try:
+        gram_amount = parse_token_amount(req.amount)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    _snapshot, market = _game_market()
+    if market["GRAM"].get("stale"):
+        raise HTTPException(503, "The GRAM reference price is stale; try again shortly")
+    gram_usd = Decimal(market["GRAM"]["price_usd"])
+    wrk_payout = int(
+        (Decimal(gram_amount) / TOKEN_SCALE * gram_usd * config.WRK_PER_USD)
+        .to_integral_value(rounding=ROUND_DOWN)
+    )
+    if wrk_payout <= 0:
+        raise HTTPException(400, "Cash-out amount is too small")
+    with db_conn() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        _ensure_game_wallet(connection, req.user_id)
+        gram_balance = _game_token_balance(connection, req.user_id, "GRAM")
+        if gram_balance < gram_amount:
+            raise HTTPException(400, "Not enough simulated GRAM")
+        connection.execute(
+            "UPDATE game_token_balances SET amount = amount - ? "
+            "WHERE user_id = ? AND symbol = 'GRAM'",
+            (gram_amount, req.user_id),
+        )
+        connection.execute(
+            "UPDATE economy SET balance = balance + ? WHERE user_id = ?",
+            (wrk_payout, req.user_id),
+        )
+        _token_transaction(
+            connection,
+            user_id=req.user_id,
+            transaction_type="gram_cashout",
+            from_symbol="GRAM",
+            input_amount=gram_amount,
+            wrk_amount=wrk_payout,
+            prices={"GRAM_USD": str(gram_usd), "WRK_PER_USD": config.WRK_PER_USD},
+        )
+        new_gram = gram_balance - gram_amount
+        new_wrk = connection.execute(
+            "SELECT balance FROM economy WHERE user_id = ?", (req.user_id,)
+        ).fetchone()["balance"]
+        connection.commit()
+    return {
+        "gram_sold": format_token_amount(gram_amount),
+        "wrk_received": wrk_payout,
+        "new_wrk_balance": new_wrk,
+        "new_gram_balance": format_token_amount(new_gram),
+        "gram_usd": str(gram_usd),
+    }
+
+
+@app.post("/api/game-wallet/swap")
+def game_wallet_swap(req: GameTokenSwapRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
+    from_symbol = req.from_symbol.upper()
+    to_symbol = req.to_symbol.upper()
+    if from_symbol == to_symbol or from_symbol not in GAME_TOKEN_SYMBOLS or to_symbol not in GAME_TOKEN_SYMBOLS:
+        raise HTTPException(400, "Choose two different listed game tokens")
+    try:
+        input_amount = parse_token_amount(req.amount)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    with db_conn() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        _ensure_game_wallet(connection, req.user_id)
+        balance = _game_token_balance(connection, req.user_id, from_symbol)
+        if balance < input_amount:
+            raise HTTPException(400, f"Not enough simulated {from_symbol}")
+        try:
+            trade = execute_market_swap(
+                connection,
+                from_symbol,
+                to_symbol,
+                input_amount,
+                user_id=req.user_id,
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        output_amount = trade["output_amount"]
+        connection.execute(
+            "UPDATE game_token_balances SET amount = amount - ? "
+            "WHERE user_id = ? AND symbol = ?",
+            (input_amount, req.user_id, from_symbol),
+        )
+        _credit_game_token(connection, req.user_id, to_symbol, output_amount)
+        _token_transaction(
+            connection,
+            user_id=req.user_id,
+            transaction_type="stonk_swap",
+            from_symbol=from_symbol,
+            to_symbol=to_symbol,
+            input_amount=input_amount,
+            output_amount=output_amount,
+            prices={
+                "market": "simulated_amm",
+                "price_impact_pct": trade["price_impact_pct"],
+                "fee_bps": trade["fee_bps"],
+                "route": trade["route"],
+            },
+        )
+        connection.commit()
+    return {
+        "from_symbol": from_symbol,
+        "to_symbol": to_symbol,
+        "amount_spent": format_token_amount(input_amount),
+        "amount_received": format_token_amount(output_amount),
+        "price_impact_pct": trade["price_impact_pct"],
+        "fee_bps": trade["fee_bps"],
+        "route": trade["route"],
+    }
+
+
+@app.post("/api/game-wallet/swap-quote")
+def game_wallet_swap_quote(
+    req: GameTokenSwapRequest, authenticated_user: AuthenticatedUser
+):
+    _require_actor(authenticated_user, req.user_id)
+    try:
+        input_amount = parse_token_amount(req.amount)
+        quote = quote_market_swap(
+            DB_PATH,
+            req.from_symbol.upper(),
+            req.to_symbol.upper(),
+            input_amount,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {
+        "from_symbol": quote["from_symbol"],
+        "to_symbol": quote["to_symbol"],
+        "amount_spent": format_token_amount(input_amount),
+        "amount_received": format_token_amount(quote["output_amount"]),
+        "price_impact_pct": quote["price_impact_pct"],
+        "fee_bps": quote["fee_bps"],
+        "route": quote["route"],
+    }
+
+
+@app.post("/api/game-wallet/send")
+def game_wallet_send(req: GameTokenSendRequest, authenticated_user: AuthenticatedUser):
+    _require_actor(authenticated_user, req.user_id)
+    symbol = req.symbol.upper()
+    if symbol not in GAME_TOKEN_SYMBOLS:
+        raise HTTPException(400, "That game token is not supported")
+    try:
+        amount = parse_token_amount(req.amount)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    recipient = req.recipient.strip()
+    with db_conn() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        _ensure_game_wallet(connection, req.user_id)
+        if recipient.startswith("@"):
+            target = connection.execute(
+                "SELECT user_id FROM economy WHERE LOWER(username) = LOWER(?)",
+                (recipient[1:],),
+            ).fetchone()
+            if target:
+                _ensure_game_wallet(connection, target["user_id"])
+        else:
+            target = connection.execute(
+                "SELECT user_id FROM game_wallets WHERE LOWER(wallet_address) = LOWER(?) "
+                "OR LOWER(custom_address) = LOWER(?)",
+                (recipient, recipient),
+            ).fetchone()
+        if not target:
+            raise HTTPException(404, "Game wallet address not found")
+        target_id = int(target["user_id"])
+        if target_id == req.user_id:
+            raise HTTPException(400, "You cannot send game tokens to yourself")
+        balance = _game_token_balance(connection, req.user_id, symbol)
+        if balance < amount:
+            raise HTTPException(400, f"Not enough simulated {symbol}")
+        connection.execute(
+            "UPDATE game_token_balances SET amount = amount - ? "
+            "WHERE user_id = ? AND symbol = ?",
+            (amount, req.user_id, symbol),
+        )
+        _credit_game_token(connection, target_id, symbol, amount)
+        for user_id, transaction_type, counterparty_id in (
+            (req.user_id, "token_send", target_id),
+            (target_id, "token_receive", req.user_id),
+        ):
+            _token_transaction(
+                connection,
+                user_id=user_id,
+                transaction_type=transaction_type,
+                to_symbol=symbol,
+                output_amount=amount,
+                counterparty_user_id=counterparty_id,
+            )
+        connection.commit()
+    return {
+        "symbol": symbol,
+        "amount": format_token_amount(amount),
+        "recipient": recipient,
+    }
+
+
+@app.post("/api/game-wallet/custom-address")
+def game_wallet_custom_address(
+    req: CustomWalletAddressRequest, authenticated_user: AuthenticatedUser
+):
+    _require_actor(authenticated_user, req.user_id)
+    try:
+        address = normalize_custom_address(req.address)
+        price = parse_token_amount(config.CUSTOM_ADDRESS_GRAM_PRICE)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if address in {"admin.wrk", "fragsmint.wrk", "stonk.wrk", "support.wrk"}:
+        raise HTTPException(400, "That address is reserved")
+    with db_conn() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        wallet = _ensure_game_wallet(connection, req.user_id)
+        if wallet["custom_address"] == address:
+            connection.rollback()
+            return {"custom_address": address, "gram_spent": "0"}
+        taken = connection.execute(
+            "SELECT user_id FROM game_wallets WHERE LOWER(custom_address) = LOWER(?)",
+            (address,),
+        ).fetchone()
+        if taken:
+            raise HTTPException(409, "That custom address is already owned")
+        balance = _game_token_balance(connection, req.user_id, "GRAM")
+        if balance < price:
+            raise HTTPException(
+                400, f"A custom address costs {config.CUSTOM_ADDRESS_GRAM_PRICE} simulated GRAM"
+            )
+        connection.execute(
+            "UPDATE game_token_balances SET amount = amount - ? "
+            "WHERE user_id = ? AND symbol = 'GRAM'",
+            (price, req.user_id),
+        )
+        connection.execute(
+            "UPDATE game_wallets SET custom_address = ? WHERE user_id = ?",
+            (address, req.user_id),
+        )
+        _token_transaction(
+            connection,
+            user_id=req.user_id,
+            transaction_type="custom_address",
+            from_symbol="GRAM",
+            input_amount=price,
+        )
+        connection.commit()
+    return {"custom_address": address, "gram_spent": format_token_amount(price)}
+
+
 def _anon_item(row) -> dict:
     item = dict(row)
     item["number"] = format_anon_number(item["suffix"])
@@ -6498,6 +7124,9 @@ def game_timers():
 
 async def _startup():
     with db_conn() as db:
+        db.executescript(GAME_TOKEN_SCHEMA)
+        db.executescript(SIMULATED_MARKET_SCHEMA)
+        initialize_market_connection(db)
         for col in (
             "pinned_gift_id INTEGER",
             "pinned_anon_id INTEGER",
@@ -6556,8 +7185,21 @@ async def _startup():
             reward           INTEGER NOT NULL,
             attempts         INTEGER NOT NULL DEFAULT 5,
             revealed_indices TEXT    NOT NULL DEFAULT '0',
-            started_at       INTEGER NOT NULL
+            started_at       INTEGER NOT NULL,
+            target_user_id   INTEGER,
+            target_name      TEXT,
+            chat_id          INTEGER
         )""")
+        for col in (
+            "target_user_id INTEGER",
+            "target_name TEXT",
+            "chat_id INTEGER",
+        ):
+            try:
+                db.execute(f"ALTER TABLE hack_sessions ADD COLUMN {col}")
+                db.commit()
+            except Exception:
+                pass
         db.execute("""CREATE TABLE IF NOT EXISTS craps_sessions (
             user_id    INTEGER PRIMARY KEY,
             bet        INTEGER NOT NULL,
@@ -6824,12 +7466,22 @@ async def _startup():
         sync_gift_custom_emoji_ids_connection(db)
 
     return [
+        asyncio.create_task(_simulated_market_loop()),
         asyncio.create_task(_crash_loop()),
         asyncio.create_task(_duck_loop()),
         asyncio.create_task(_marble_loop()),
         asyncio.create_task(_livebj_loop()),
         asyncio.create_task(_poker_loop()),
     ]
+
+
+async def _simulated_market_loop():
+    while True:
+        await asyncio.sleep(20)
+        try:
+            await asyncio.to_thread(simulate_market_activity, DB_PATH)
+        except Exception:
+            await asyncio.sleep(20)
 
 
 @app.websocket("/ws/crash")

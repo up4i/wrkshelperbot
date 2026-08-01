@@ -1,5 +1,5 @@
 [Unit]
-Description=wrkshelperbot Telegram Group Bot
+Description=wrkshelperbot Telegram Economy Game Bot
 After=network-online.target
 Wants=network-online.target
 

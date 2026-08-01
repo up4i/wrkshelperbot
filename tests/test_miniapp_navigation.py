@@ -25,9 +25,35 @@ def test_primary_navigation_stays_focused_and_wallet_has_sections():
         assert f"</span>{label}" in nav
     assert "</span>Profile" not in nav
 
-    for section in ("overview", "gifts", "numbers"):
+    for section in ("overview", "assets", "gifts", "numbers"):
         assert f'data-wallet="{section}"' in html
         assert f'data-wallet-panel="{section}"' in html
+
+
+def test_coin_wallet_is_explicitly_a_fictional_game_wallet():
+    html = INDEX_HTML.read_text(encoding="utf-8")
+
+    assert "@tonconnect/ui" not in html
+    assert "tonConnectUI" not in html
+    assert "STONK Wallet" in html
+    assert "simulated coins" in html
+    assert "/api/game-wallet" in html
+    assert "fictional" in html.lower()
+
+
+def test_memecoin_shop_uses_simulated_pools_and_reserve_aware_quotes():
+    html = INDEX_HTML.read_text(encoding="utf-8")
+
+    assert 'data-shop="coins"' in html
+    assert 'data-shop-panel="coins"' in html
+    assert "/api/token-market" in html
+    assert "/api/game-wallet/swap" in html
+    assert "/api/game-wallet/swap-quote" in html
+    assert "/api/game-wallet/topup" in html
+    assert "/api/game-wallet/cashout" in html
+    assert "STONK.fi" in html
+    assert "constant-product liquidity pools" in html
+    assert "price impact" in html.lower()
 
 
 def test_underground_lives_under_earn_and_links_from_anon_wallet():
@@ -39,6 +65,38 @@ def test_underground_lives_under_earn_and_links_from_anon_wallet():
     assert 'onclick="goUnderground()"' in html
     assert "A +888 number only replaces the public identity" in html
     assert "/api/underground/status" in html
+
+
+def test_earn_separates_work_crime_and_underground():
+    html = INDEX_HTML.read_text(encoding="utf-8")
+
+    for section in ("work", "crime", "underground"):
+        assert f'data-earn="{section}"' in html
+        assert f'data-earn-panel="{section}"' in html
+    work_panel = html.split('data-earn-panel="work"', 1)[1].split("</section>", 1)[0]
+    crime_panel = html.split('data-earn-panel="crime"', 1)[1].split("</section>", 1)[0]
+    assert "openHack()" not in work_panel
+    assert "openRob()" not in work_panel
+    assert "openHack()" in crime_panel
+    assert "openRob()" in crime_panel
+
+
+def test_home_and_leaderboard_hide_secondary_detail_by_default():
+    html = INDEX_HTML.read_text(encoding="utf-8")
+
+    assert '<details class="home-community-details">' in html
+    assert 'id="lbMoreSelect"' in html
+    assert "if (!tab) return;" in html
+    assert "Your Telegram user ID" not in html
+
+
+def test_profiles_can_be_shared_and_bot_can_be_added_to_groups():
+    html = INDEX_HTML.read_text(encoding="utf-8")
+
+    assert "function shareProfile(userId)" in html
+    assert "function openBotGroupPicker()" in html
+    assert "startgroup=true" in html
+    assert "↗ Share flex" in html
 
 
 def test_underground_has_focused_board_heist_and_market_tabs():
@@ -119,6 +177,15 @@ def test_profile_gifts_keep_a_fixed_size_and_use_the_requested_black():
     assert "width: 104px;" in html
     assert "height: 134px;" in html
     assert "black: '#0e0f0f'" in html
+
+
+def test_profiles_render_dynamic_token_whale_badges():
+    html = INDEX_HTML.read_text(encoding="utf-8")
+
+    assert "badge.startsWith('whale:')" in html
+    assert 'class="profile-badge-slot filled whale"' in html
+    assert '<small>Whale</small>' in html
+    assert "Earned automatically" in html
 
 
 def test_gift_artwork_stays_consistent_in_wallet_profile_and_reorder_mode():
